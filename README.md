@@ -70,7 +70,6 @@ the project's conventions, test command and run command from the repo.
 | `capture-idea` | `/cure:capture-idea` | Captures an idea or design just discussed in a session as a structured goal file under `~/.claude/ideas/`, in a form a fresh session can pick up cold. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
-| `stop-slop` | `/cure:stop-slop` | Removes AI writing patterns from prose. Vendored from [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) (MIT) — see [`VENDORED.md`](plugins/cure/skills/stop-slop/VENDORED.md). |
 
 ## Adding a plugin
 

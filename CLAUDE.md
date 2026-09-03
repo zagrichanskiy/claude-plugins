@@ -37,11 +37,6 @@ Agents and skills that read files shipped alongside them (the `design-advisor` c
 `${CLAUDE_PLUGIN_ROOT}`, never `~/.claude/...` or a path relative to the working directory. The
 plugin's install location varies.
 
-## `skills/stop-slop` is vendored, not ours
-
-Do not edit it in place — changes are lost on the next re-vendor and drift from upstream silently.
-Fix things upstream, or re-copy per [`VENDORED.md`](plugins/cure/skills/stop-slop/VENDORED.md).
-
 ## These agents and skills live only here
 
 They were moved out of `~/.claude/` on each machine, and the user-level copies deleted:
