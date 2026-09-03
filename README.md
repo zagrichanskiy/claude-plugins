@@ -36,6 +36,7 @@ the checklist for its own mode.
 | --- | --- |
 | `note` | Gives working notes one home per repo, frontmatter that states their own end, and a sweep that deletes superseded ones. |
 | `explain` | Explains a technology or codebase as a stepwise conversation, building a tree from the user's questions. |
+| `stop-slop` | Removes AI writing patterns from prose. Vendored from [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) (MIT) — see `skills/stop-slop/VENDORED.md`. |
 
 ## Layout
 
