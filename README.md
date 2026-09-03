@@ -31,9 +31,12 @@ Restart Claude Code afterwards — agents and skills load at startup.
 
 ### `cure`
 
-Design and architecture advisors, review agents, and working-note discipline.
+Design and architecture advisors, review agents, an implementation loop, and working-note
+discipline.
 
 **Agents** — invoked by name, or dispatched automatically when a request matches their description.
+
+*Advisors and reviewers* — they read, judge and write documents; none of them edits code.
 
 | Agent | Description |
 |---|---|
@@ -48,10 +51,23 @@ Design and architecture advisors, review agents, and working-note discipline.
 `architect` and `designer` share the checklists in `plugins/cure/knowledge/design-advisor/`; each
 reads `core.md` plus the one checklist for its own mode.
 
+*Implementation loop* — dispatched in sequence around a change. Each is project-agnostic and learns
+the project's conventions, test command and run command from the repo.
+
+| Agent | Description |
+|---|---|
+| `test-author` | Writes unit tests for a change, module, or coverage gap and saves them to disk. Matches the project's existing test conventions rather than imposing a framework. Does not commit. |
+| `qa` | Runs the test suite, or a named subset, and reports pass/fail with failure detail. The quality gate: it never fixes what it finds. |
+| `reviewer` | Reviews the working diff, or named files, for correctness bugs and design problems, and reports ranked findings with a concrete failing scenario for each. Never edits. |
+| `verifier` | Drives the change end-to-end in the real application to confirm the behaviour works, rather than that the suite passes. Never edits. |
+| `docs-sync` | Updates the documentation a change made stale — API docs, READMEs, convention files — and writes it to disk. Does not commit. |
+| `skill-author` | Creates and updates Claude Code skills from a description or source material, including the skills in this repository. |
+
 **Skills** — invoked as `/cure:<name>`.
 
 | Skill | Invocation | Description |
 |---|---|---|
+| `capture-idea` | `/cure:capture-idea` | Captures an idea or design just discussed in a session as a structured goal file under `~/.claude/ideas/`, in a form a fresh session can pick up cold. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
 | `stop-slop` | `/cure:stop-slop` | Removes AI writing patterns from prose. Vendored from [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) (MIT) — see [`VENDORED.md`](plugins/cure/skills/stop-slop/VENDORED.md). |

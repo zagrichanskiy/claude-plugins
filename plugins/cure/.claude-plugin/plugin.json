@@ -1,7 +1,7 @@
 {
   "name": "cure",
-  "version": "0.1.1",
-  "description": "Design and architecture advisors, review agents, and working-note discipline for embedded and networked systems work.",
+  "version": "0.2.0",
+  "description": "Design and architecture advisors, review agents, an implementation loop (tests, suite runs, code review, end-to-end verification, documentation sync), and working-note discipline for embedded and networked systems work.",
   "author": {
     "name": "Oleh Zahrychanskyi",
     "email": "oleh.zahrychanskyi@gencherry.com"
@@ -13,6 +13,8 @@
     "design-review",
     "documentation",
     "embedded",
-    "security"
+    "security",
+    "testing",
+    "code-review"
   ]
 }

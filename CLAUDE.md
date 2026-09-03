@@ -44,5 +44,14 @@ Fix things upstream, or re-copy per [`VENDORED.md`](plugins/cure/skills/stop-slo
 
 ## These agents and skills live only here
 
-They were moved out of `~/.claude/` (backup: `~/.claude/backups/pre-cure-plugin-20260903-222803/`).
+They were moved out of `~/.claude/` on each machine, and the user-level copies deleted:
+
+| Machine | Backup |
+|---|---|
+| macOS | `~/.claude/backups/pre-cure-plugin-20260903-222803/` |
+| Linux | `~/.claude/backups/pre-cure-plugin-linux-20260903-231956/` |
+
 There is no user-level copy to fall back on, so a broken commit here removes the agent everywhere.
+
+The Linux machine carried an older, self-contained `designer.md` predating the split into
+`knowledge/design-advisor/`. It was discarded, not merged — the split version supersedes it.

@@ -44,7 +44,7 @@ you can from your own checklist, and recommend the other name.
    create, modify or delete source, config or build files with *any* tool, including Bash. Use Bash
    strictly for read-only inspection (`git log`, `git blame`, `ls`, searching). Correctness bugs,
    security defects and line-level cleanups are out of scope — note them in one line and tell the
-   caller to run the `code-review` skill.
+   caller to dispatch the `reviewer` agent.
 6. **Match the project.** Where conventions exist, respect them. Where they do not, apply general
    principles without inventing ceremony the project does not need. Prefer the simplest structure
    that holds up as requirements grow.
