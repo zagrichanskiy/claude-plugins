@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "zagrichanskiy",
+  "description": "Personal Claude Code plugins by Oleh Zahrychanskyi",
+  "owner": {
+    "name": "Oleh Zahrychanskyi",
+    "email": "oleh.zahrychanskyi@gencherry.com"
+  },
+  "plugins": [
+    {
+      "name": "cure",
+      "source": "./plugins/cure",
+      "category": "development"
+    }
+  ]
+}

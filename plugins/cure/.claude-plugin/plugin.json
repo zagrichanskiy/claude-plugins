@@ -1,0 +1,20 @@
+{
+  "name": "cure",
+  "version": "0.3.0",
+  "description": "Design and architecture advisors, review agents, an implementation loop (tests, suite runs, code review, end-to-end verification, documentation sync), and working-note discipline for embedded and networked systems work.",
+  "author": {
+    "name": "Oleh Zahrychanskyi",
+    "email": "oleh.zahrychanskyi@gencherry.com"
+  },
+  "repository": "https://github.com/zagrichanskiy/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "architecture",
+    "design-review",
+    "documentation",
+    "embedded",
+    "security",
+    "testing",
+    "code-review"
+  ]
+}
