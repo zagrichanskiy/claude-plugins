@@ -46,17 +46,19 @@ least visible defect: it survives sentence-level review because every sentence
 is individually true.
 
 The rules below are a copy. **If a `skills/doc/SKILL.md` is reachable from the
-working tree or the plugin directories, read it and prefer it** — it is the
-authority, and this table is here for when it is not reachable.
+working tree or the plugin directories, read it and its `references/` directory
+and prefer them** — they are the authority, and this table is here for when they
+are not reachable.
 
 Determine the type from the caller, the frontmatter title, or the filename, and
-say in your first line which type you assumed. The recurring three:
+say in your first line which type you assumed. The four:
 
 | Type | File | Holds | Must not hold |
 |---|---|---|---|
 | Architecture | `*-architecture.md` | why it exists, requirements, scope, the options compared with the chosen one marked, prerequisites and exit criteria, components and boundaries, what crosses each boundary, the limits table, staging, effort, open questions | how a component is built inside, symbol and function names, library flags and constants, version numbers |
 | Design | `*-design.md` | how one component is built — a class diagram of its internal structure, its own API, the order its steps run in | implementation detail, except where leaving it out makes the implementation impossible or wrong; anything the architecture states |
 | External reference | `*-api.md` | what someone else's code does — calls, flags, defaults, limits, failure behaviour | what we build |
+| How-to | `<gerund>-a-<thing>.md` | one procedure a person executes, in order — a lead, prerequisites, named steps, each with its command and what it produces | a design, an option or flag reference, a failure taxonomy, the reasoning behind the procedure |
 
 The architecture document carries the whole argument in order — motivation,
 requirements, options, then the structure. It is **not** a defect for it to
@@ -150,6 +152,32 @@ a finding when:
 - **It repeats the architecture's component diagram** rather than opening one
   of those components. Cite the architecture section that already holds it.
 
+## The how-to document
+
+A how-to is executed, not read. The reader has the hardware in front of them.
+Review it by walking the commands in order as that reader, then flag:
+
+- **A numbered heading, or a bare `§N` cross-reference.** Headings in a how-to
+  are names; references are anchor links. Quote every occurrence as one finding.
+- **A forward reference.** A step pointing at a later step is in the wrong place,
+  or the later step's content belongs in this one. A prerequisites list at the
+  top is not a forward reference.
+- **One value written more than one way.** A path, host or filename that appears
+  as `/mnt/x` in one step and `/run/media/$USER/x` in the next. Name the variable
+  it should be assigned to once, and the step that should assign it.
+- **A command that cannot run given only the steps above it.**
+- **Two steps that contradict each other** — a flag shown in one and silently
+  dropped in the next, an output the reader is told to capture in a form that
+  does not capture it. Quote both.
+- **More than two notes on a step**, or a note the reader cannot act on. Say
+  which two survive and where the rest go.
+- **Reference content**: an options table transcribing a subset of `--help`, a
+  field-by-field account of what the procedure produces, a failure taxonomy.
+  Name the destination — the tool's own help, or the design document.
+
+`SATISFIED` for a how-to additionally requires that the commands run as written,
+top to bottom, with nothing else open.
+
 ## Invented vocabulary
 
 A term the document coins, and that the reader must decode before the sentence
@@ -173,6 +201,20 @@ every sentence whose meaning depends on a fact the document never introduces.
 
 Give the replacement as the positive statement alone: "systemd 258 is required,
 because the flags first appear in 258."
+
+### A label without its name
+
+Any short label standing for something — a section number, a requirement id, an
+option letter, a stage number, a control number — carries what it means in
+braces every time it appears, not only on first use. `§5 (Requirements summary)`,
+never `§5`. `RND-758 (create a devicectl to automate device testing)`, never
+`RND-758`. `option A (broker in the middle)`, never `option A`.
+
+Report every bare occurrence, including repeated mentions in one paragraph. A
+table column of bare labels is the shape this fails in most often — a *Controls*
+column reading `2.3, 2.4, 5.4` is the violation, not a shorthand the table earns.
+Where you can resolve the name from the document or a sibling, give it; where you
+cannot, say the name has to be looked up.
 
 **Two exemptions.** A section whose subject *is* the comparison — Motivation,
 Options, usually §1, often carrying a table of options with the chosen one
@@ -268,6 +310,13 @@ elsewhere:
   "critically", where deleting the word changes nothing.
 - **Passive voice where a human subject exists** — "the key is provisioned"
   when the document knows who provisions it.
+- **Banned words** — "gate", "gated", "gates", "gating", "harden", "hardened",
+  "hardening", in prose and in any filename, recipe or branch name the document
+  quotes. Each stands in for whichever plain relation is meant and hides which
+  one. Give the replacement: *depends on* or *waits on* for a prerequisite,
+  *exit criteria* for what a stage must show, *before the commit* for when a
+  check runs, *needs* for a missing capability, and the concrete name for a
+  concrete change.
 
 ## What not to do
 
@@ -331,7 +380,7 @@ cleanly start to finish.
 
 Content belonging to another document type is on its own sufficient for
 `CHANGES REQUIRED`, however clean the prose is. So is a design document with no
-class diagram.
+class diagram, and a how-to whose commands do not run in the order given.
 
 A section the caller identifies as **governed by an open question is complete** —
 do not withhold `SATISFIED` for its brevity.
