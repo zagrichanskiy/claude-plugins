@@ -88,13 +88,20 @@ those are the ones a goal quietly breaks.
 Always end the list with a turn bound. Without one a goal that cannot converge runs until something
 else stops it.
 
-## The agent line
+## Name the tools, not the intention
+
+A goal file is written for one repository, so it names that repository's own agents, skills and
+commands. `verify it works` gets satisfied by reasoning about the code; `prove it on the device with
+<the project's hardware agent>` does not. The same holds for the build command, the review agent,
+and the skill that opens the pull requests.
+
+Take the names from the session's own agent and skill list, and prefer the project's plugin over a
+general one wherever both offer something. A general plugin's reviewer named for work a project
+agent covers proposes a tool the project does not use.
 
 When the work splits into parts that do not depend on each other, name the agents and the order in
-the Rules section rather than leaving it to the run. Plan it in the file; do not make the executing
-session invent a fan-out mid-goal.
-
-When the work is one sequence, leave the line out. An agent per step costs more than it saves.
+the Rules section rather than leaving the run to invent a fan-out. When the work is one sequence,
+leave that line out — an agent per step costs more than it saves.
 
 ## Running it
 
