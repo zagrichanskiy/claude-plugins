@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Independently reviews a code change (the working diff or a named set of files) for correctness bugs and design problems, and reports ranked findings without fixing them. Dispatch after an implementation step and before the change is accepted. Reusable in any project; it learns the project's conventions from the repo. Reviews code, not prose or interface: for a written document use `doc-reviewer`, for visual design `ui-reviewer`, for interaction and accessibility `ux-reviewer`.
+description: Independently reviews a code change (the working diff or a named set of files) for correctness bugs and design problems, and reports ranked findings without fixing them. Dispatch after an implementation step and before the change is accepted. Reusable in any project; it learns the project's conventions from the repo. Reviews code, not prose or interface: for visual design use `ui-reviewer`, for interaction and accessibility `ux-reviewer`.
 tools: Read, Bash, Glob, Grep
 ---
 

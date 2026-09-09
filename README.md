@@ -43,7 +43,6 @@ discipline.
 | `architect` | System-level architecture advice, review and documents for networked embedded systems: component boundaries, resource budgets, staging, risk. Advises and writes documents; never edits implementation code. |
 | `designer` | The same three modes at module/class/interface level: how a component is factored internally. Language-agnostic, with Python and asyncio awareness. |
 | `security-expert` | Security architecture and protocol review for networked embedded systems: trust boundaries, authenticated key exchange, replay protection, key lifecycle for field-deployed devices. |
-| `doc-reviewer` | Reviews how a technical document reads — misplaced content, prose where a table belongs, design-discussion residue, padding, duplication. Judges readability, not technical correctness. |
 | `ui-reviewer` | Visual-design review of web UI: typography, spacing, colour, contrast, hierarchy, density, responsive behaviour. Reviews; never edits. |
 | `ux-reviewer` | Interaction and accessibility review: task flow, discoverability, feedback, error and empty states, keyboard and screen-reader support. Reviews; never edits. |
 | `knowledge-librarian` | Maintains a personal `~/knowledge` note library — one concept per file, wikilinked — and delivers changes as a pull request. |
@@ -57,10 +56,9 @@ the project's conventions, test command and run command from the repo.
 | Agent | Description |
 |---|---|
 | `test-author` | Writes unit tests for a change, module, or coverage gap and saves them to disk. Matches the project's existing test conventions rather than imposing a framework. Does not commit. |
-| `qa` | Runs the test suite, or a named subset, and reports pass/fail with failure detail. The quality gate: it never fixes what it finds. |
+| `qa` | Runs the test suite, or a named subset, and reports pass/fail with failure detail. It reports only; it never fixes what it finds. |
 | `reviewer` | Reviews the working diff, or named files, for correctness bugs and design problems, and reports ranked findings with a concrete failing scenario for each. Never edits. |
 | `verifier` | Drives the change end-to-end in the real application to confirm the behaviour works, rather than that the suite passes. Never edits. |
-| `docs-sync` | Updates the documentation a change made stale — API docs, READMEs, convention files — and writes it to disk. Does not commit. |
 | `skill-author` | Creates and updates Claude Code skills from a description or source material, including the skills in this repository. |
 
 **Skills** — invoked as `/cure:<name>`.
