@@ -46,15 +46,24 @@ discipline.
 
 | Agent | Description |
 |---|---|
-| `architect` | System-level architecture advice, review and documents for networked embedded systems: component boundaries, resource budgets, staging, risk. Advises and writes documents; never edits implementation code. |
-| `designer` | The same three modes at module/class/interface level: how a component is factored internally. Language-agnostic, with Python and asyncio awareness. |
+| `architect` | System-level architecture advice, review and documents for networked embedded systems: component boundaries, resource budgets, staging, risk, and the use or misuse of architectural patterns. Advises and writes documents; never edits implementation code. |
+| `designer` | The same three modes at module/class/interface level: class decomposition, interface contracts and completeness, and the use or misuse of design patterns. Loads a C++ or Python supplement only for the target's language. |
 | `security-expert` | Security architecture and protocol review for networked embedded systems: trust boundaries, authenticated key exchange, replay protection, key lifecycle for field-deployed devices. |
 | `ui-reviewer` | Visual-design review of web UI: typography, spacing, colour, contrast, hierarchy, density, responsive behaviour. Reviews; never edits. |
 | `ux-reviewer` | Interaction and accessibility review: task flow, discoverability, feedback, error and empty states, keyboard and screen-reader support. Reviews; never edits. |
 | `knowledge-librarian` | Maintains a personal `~/knowledge` note library — one concept per file, wikilinked — and delivers changes as a pull request. |
 
-`architect` and `designer` share the checklists in `plugins/cure/knowledge/design-advisor/`; each
-reads `core.md` plus the one checklist for its own mode.
+`architect` and `designer` share `plugins/cure/knowledge/design-advisor/`. Each reads `core.md`,
+its own mode's checklist and pattern catalogue, and — once the target is known — only its own
+mode's supplement for each language the target is written in:
+
+| File | `designer` | `architect` |
+|---|---|---|
+| `core.md` | always | always |
+| `checklist-design.md`, `patterns-design.md` | always | never |
+| `checklist-architecture.md`, `patterns-architecture.md` | never | always |
+| `lang/cpp-design.md`, `lang/python-design.md` | per target language | never |
+| `lang/cpp-architecture.md`, `lang/python-architecture.md` | never | per target language |
 
 *Implementation loop* — dispatched in sequence around a change. Each is project-agnostic and learns
 the project's conventions, test command and run command from the repo.
@@ -127,4 +136,5 @@ plugins/<name>/
   agents/<name>.md                one file per agent, auto-discovered
   skills/<name>/SKILL.md          one directory per skill, auto-discovered
   knowledge/                      reference material the agents read at run time
+    design-advisor/lang/          per-language supplements, loaded only for the target's language
 ```

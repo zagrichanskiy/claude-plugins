@@ -11,7 +11,9 @@ crosses the boundary between them, what the system does when something is late o
 it costs on the hardware we actually have*. Questions about how one component is factored into
 classes belong to `designer`.
 
-Cite exactly one item per finding — the most specific that applies.
+Cite exactly one item per finding — the most specific that applies. Pattern judgements are made
+against `patterns-architecture.md`; language-specific system concerns against the architecture
+supplement for the target's language.
 
 ## 1. Quality attributes, with numbers
 
@@ -163,6 +165,53 @@ attachment points still get named.
 - **A diagram's line styles must mean one thing each** (core rules). Flag a diagram where dotted
   means "optional", "future" and "hypothetical" at once.
 - **Forward references should be citable** — `§6 (Performance & Latency Budget)`, not `§6`.
+
+## 12. Architectural patterns and established practice
+
+- **Name the pattern the structure is, or should be.** Every component boundary, failure path and
+  persistence scheme is an instance of a known pattern or a deliberate departure from one. Judge
+  each against `patterns-architecture.md` and record the verdict (fits, missing, misapplied,
+  half-applied, re-implemented) with the forces and the field scenario that justify it.
+- **A departure from established practice needs its reason written down.** Hand-rolled
+  supervision, reconnection, configuration layering or update schemes beside the platform's own
+  are findings unless the document says why the platform's mechanism does not fit.
+- **Flag anti-patterns by name** — a distributed monolith, a big-bang cutover, hidden coupling
+  through files or timing.
+
+## Severity — architecture mode
+
+- **MUST-FIX** — a defect that fails in the field with no early signal, or whose fix later needs a
+  coordinated change across components or a fleet migration: a missing budget for the resource the
+  work exists to protect, undefined behaviour under overload or link loss, a boundary with no
+  contract, a cutover that cannot be staged or reverted.
+- **SHOULD-CONSIDER** — a real cost that one component can absorb later: missing observability, a
+  pattern half-applied where a degraded path still exists, an unstated but non-critical attribute.
+- **NITPICK** — document hygiene.
+
+A correctness bug inside one component is never ranked here; it goes under *Out of altitude*.
+
+## Review skeleton — architecture mode
+
+A review of an architecture or of a change at system level has these sections in this order. The
+first two are required even when there are no findings.
+
+1. **Component and boundary assessment** — one row per component and one per boundary it crosses:
+
+   `| Component or boundary | Owns | Contract (format, timing, ownership) | Behaviour when late, missing or overloaded | Budget stated | Verdict |`
+
+   *Verdict*: `sound`, or the number of the finding that addresses it.
+2. **Pattern assessment** — every architectural pattern present or called for by the forces, with
+   its verdict from `patterns-architecture.md` and the field scenario behind it; anti-patterns
+   observed, by name. List a pattern that fits only when the system depends on it; skip textbook
+   confirmations. Keep each row to one or two lines — the reasoning lives in the finding it points
+   to.
+3. **What is sound** — specific, with evidence.
+4. **Findings** — ranked by the severity above, in the finding shape from `core.md`; each names
+   the failure scenario and whether it is confirmed in the source or a hypothesis.
+5. **Out of altitude** — one line each, unranked: how a component is factored into classes (for
+   `designer`) and correctness bugs (for `reviewer`), with `path:line`.
+6. **Open decisions and risks** — the two tables from §3 (Classify every fork) and §9 (Risks).
+7. **Overall assessment** — two lines, as in `core.md`.
 
 ## Document skeleton — architecture document
 
