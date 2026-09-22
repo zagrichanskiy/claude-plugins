@@ -63,14 +63,16 @@ The reading footer each agent ends with (`Read: N files in full, M sampled; dige
 is the only measurement of whether this keeps working. Do not remove it from `core.md` or the agent
 files.
 
-## Design-advisor files are loaded by mode and by language, never all
+## Advisor and reviewer knowledge is loaded by mode and by language, never all
 
 `designer` and `architect` each read `core.md`, their mode's checklist and pattern catalogue, and
 only their mode's supplement under `knowledge/design-advisor/lang/` for each language the target is
 written in. Nothing language-specific belongs in the shared checklists or pattern catalogues: a C++
 review should not carry Python advice in its context on every request, nor the other way round.
-To add a language, add `lang/<language>-design.md` and `lang/<language>-architecture.md` and a row
-to the extension table in `core.md`.
+`reviewer` follows the same rule with `knowledge/reviewer/lang/<language>.md`. To add a language,
+add `lang/<language>-design.md` and `lang/<language>-architecture.md` under `design-advisor/`,
+`lang/<language>.md` under `reviewer/`, and a row to the extension tables in `core.md` and
+`agents/reviewer.md`.
 
 ## Design review output has a required structure, and merges keep it
 

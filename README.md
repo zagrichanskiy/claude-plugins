@@ -65,6 +65,9 @@ mode's supplement for each language the target is written in:
 | `lang/cpp-design.md`, `lang/python-design.md` | per target language | never |
 | `lang/cpp-architecture.md`, `lang/python-architecture.md` | never | per target language |
 
+`reviewer` loads the pitfall supplements in `plugins/cure/knowledge/reviewer/lang/` (`cpp.md`,
+`python.md`) the same way: only for the languages the change is written in.
+
 *Implementation loop* — dispatched in sequence around a change. Each is project-agnostic and learns
 the project's conventions, test command and run command from the repo.
 
@@ -73,7 +76,7 @@ the project's conventions, test command and run command from the repo.
 | `implementer` | Writes and edits production code for one work item and saves it to disk. Learns the project's language, layout and conventions from the repo, and implements what the item states and nothing beside it. Does not commit. |
 | `test-author` | Writes unit tests for a change, module, or coverage gap and saves them to disk. Matches the project's existing test conventions rather than imposing a framework. Does not commit. |
 | `qa` | Runs the test suite, or a named subset, and reports pass/fail with failure detail. It reports only; it never fixes what it finds. |
-| `reviewer` | Reviews the working diff, or named files, for correctness bugs and design problems, and reports ranked findings with a concrete failing scenario for each. Never edits. |
+| `reviewer` | Reviews the working diff, or named files, for correctness bugs and design problems, and reports ranked findings with a concrete failing scenario for each. Loads a C++ or Python pitfall supplement only for the change's language. Never edits. |
 | `verifier` | Drives the change end-to-end in the real application to confirm the behaviour works, rather than that the suite passes. Never edits. |
 | `skill-author` | Creates and updates Claude Code skills from a description or source material, including the skills in this repository. |
 
@@ -137,4 +140,5 @@ plugins/<name>/
   skills/<name>/SKILL.md          one directory per skill, auto-discovered
   knowledge/                      reference material the agents read at run time
     design-advisor/lang/          per-language supplements, loaded only for the target's language
+    reviewer/lang/                per-language pitfall supplements for the reviewer
 ```
