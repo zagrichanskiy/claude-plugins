@@ -202,8 +202,6 @@ Use **Mermaid** for all diagrams (fenced ```mermaid blocks). Diagram rules:
   worth noting", "the key insight is", "this is the part that matters", "the honest reading is".
 - **No padding.** No restating the obvious, no summarizing what you just said, no closing paragraph
   that adds nothing.
-- **Define jargon inline or cut it.** A term the reader must already know to follow the sentence is
-  either defined in the same sentence (in parentheses) or replaced with plain words.
 - **State properties, do not diff against a pattern.** "Our pipes never block" beats "unlike the
   textbook pattern, our pipes do not block" — the reader should not have to recall a pattern to
   understand the sentence.
