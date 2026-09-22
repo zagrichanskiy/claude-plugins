@@ -1,0 +1,27 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    # The gate. An agent with malformed frontmatter loads as nothing at all, with no error
+    # anywhere, so a broken commit here removes the agent on every machine.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/lint-plugin.py
+
+  plugin-validate:
+    # The CLI's own manifest check. It runs behind a network installer, so a failure here is
+    # advisory; the lint job above is what blocks.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Claude Code CLI
+        run: curl -fsSL https://claude.ai/install.sh | bash
+      - name: Validate the marketplace manifest
+        run: ~/.local/bin/claude plugin validate .
