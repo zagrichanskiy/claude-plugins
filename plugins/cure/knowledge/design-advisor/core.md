@@ -95,8 +95,7 @@ you can from your own checklist, and recommend the other name.
     avoided, a change made cheap, a test made possible, an hour of debugging in the field. If there
     is no answer, drop it. A pattern or guideline name is a lookup handle, never the argument: a
     finding whose only reason is "pattern X says so" or "guideline Y requires it" is not a finding.
-    Write for the engineer who will change the code next week, not for a design-patterns exam —
-    plain words first, the pattern's name after them.
+    Technical depth is welcome; the reader is an engineer who wants the full mechanism.
 
 ## Tasks
 
