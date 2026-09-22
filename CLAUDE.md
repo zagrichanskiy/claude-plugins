@@ -63,6 +63,31 @@ The reading footer each agent ends with (`Read: N files in full, M sampled; dige
 is the only measurement of whether this keeps working. Do not remove it from `core.md` or the agent
 files.
 
+## Advisor and reviewer knowledge is loaded by mode and by language, never all
+
+`designer` and `architect` each read `core.md`, their mode's checklist and pattern catalogue, and
+only their mode's supplement under `knowledge/design-advisor/lang/` for each language the target is
+written in. Nothing language-specific belongs in the shared checklists or pattern catalogues: a C++
+review should not carry Python advice in its context on every request, nor the other way round.
+`reviewer` follows the same rule with `knowledge/reviewer/lang/<language>.md`. To add a language,
+add `lang/<language>-design.md` and `lang/<language>-architecture.md` under `design-advisor/`,
+`lang/<language>.md` under `reviewer/`, and a row to the extension tables in `core.md` and
+`agents/reviewer.md`.
+
+## Design review output has a required structure, and merges keep it
+
+A review of log-manager dispatched `designer` with a brief that asked for coroutine lifetimes and
+bugs, ranked by severity. All four of its must-fix findings came back as behaviour bugs, and the
+merged report, ranked globally, reduced its class-level findings to one-line bullets and dropped
+the proposed interfaces. Three things now prevent that, and each is load-bearing:
+
+- `core.md` ground rule 5: a bug is listed under *Out of altitude*, never ranked, even when the
+  brief asks for bugs.
+- The review skeletons in both checklists: the per-type or per-component assessment and the
+  pattern assessment are required and come before the findings.
+- `review-change` step 4: one section per altitude at full depth, and agreement between agents is
+  never a rank boost.
+
 ## Marketplace names resembling official ones are rejected
 
 `claude plugin marketplace add` refuses a manifest whose `name` looks like an official

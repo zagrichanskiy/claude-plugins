@@ -1,5 +1,5 @@
 ---
-description: Review a change with more than one agent without paying for the same reading twice — run the collector once to produce a source digest, dispatch the reviewing agents against that digest in parallel, then merge their findings into one ranked report. Use when a change is larger than a handful of files, when a pull request group spans repositories, or whenever two or more of reviewer, designer and architect would otherwise each read the same tree.
+description: Review a change with more than one agent without paying for the same reading twice — run the collector once to produce a source digest, dispatch the reviewing agents against that digest in parallel, then merge their findings into one report with a section per altitude. Use it whenever the user asks, in any words, for a design, architecture or multi-agent review of a pull request, a branch, a pull request group or a change ("review this PR with the designer and architect", "do a design review of this branch", "review the change" on more than a handful of files), and whenever two or more of reviewer, designer and architect would otherwise each read the same tree. Prefer it over dispatching those agents directly.
 allowed-tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 ---
 
@@ -46,8 +46,8 @@ Dispatch the agents the change warrants, **in one message so they run concurrent
 | Agent | Dispatch it when |
 |---|---|
 | `reviewer` | Always. Correctness, convention, safety, test coverage. |
-| `designer` | The change adds or reshapes a component: factoring, interfaces, lifetimes, error strategy. |
-| `architect` | The change touches a boundary, a resource budget, a deployment surface, or hardware. |
+| `designer` | The change adds or reshapes a component: class decomposition, interface contracts and completeness, design patterns, ownership model, error strategy. |
+| `architect` | The change touches a boundary, a resource budget, a deployment surface, or hardware; architectural patterns. |
 | `security-expert` | The change touches authentication, keys, trust boundaries, or a network protocol. |
 | `ui-reviewer`, `ux-reviewer` | The change has a user interface. |
 
@@ -59,18 +59,44 @@ Digest: <path> — read it first; it is a map, not evidence. Cite the source for
 Task: REVIEW. Decide for yourself which files to open.
 ```
 
+Project context (the platform, the hardware, where the conventions live) may be added. **Topics may
+not.** Each agent's checklist already defines its work; a brief that asks `designer` to hunt
+lifetime bugs, or `architect` to judge class structure, pulls the agent to another agent's altitude
+and displaces the work only it does. In the review this skill was built from, a brief of that kind
+turned every one of the designer's must-fix findings into a behaviour bug.
+
 ### 4. Merge
 
-The agents return independently; the single ranked report is yours to assemble.
+The agents return independently; the report is yours to assemble. **It has one section per
+altitude, not one global ranking**: correctness (`reviewer`), system (`architect`), design
+(`designer`), and any other agent dispatched. Each section keeps its own `MUST-FIX`,
+`SHOULD-CONSIDER`, `NITPICK` order, by that agent's severity definitions.
 
-- **One defect, one entry.** When two agents raise the same defect, report it once and record that
-  both reached it independently — that agreement is the strongest confidence signal in the run, and
-  it is worth more stated once than implied by a duplicate.
-- **Keep the evidence.** Every entry keeps its `path:line` and its concrete failing scenario. Drop
-  the reasoning and the entry becomes an assertion the author cannot act on.
+A single global ranking was tried and failed: behaviour defects outrank structural ones on
+immediacy, so every design finding sank to a one-line bullet at the bottom and its proposed
+interfaces were cut. The structural findings were the part of the review no other agent could have
+produced.
+
+- **Every section gets the same depth.** A design finding carries its proposed types, declarations
+  and diagram as fully as a correctness finding carries its failing scenario and code excerpt.
+  Never compress one altitude to make room for another; if the report is too long, cut nitpicks in
+  every section.
+- **Carry the assessments through.** The designer's structure assessment and pattern assessment,
+  and the architect's component and boundary assessment and pattern assessment, go into their
+  sections verbatim or as tables — they are deliverables, not preamble.
+- **One defect, one entry.** When two agents raise the same defect, report it once, in the
+  section of the altitude it belongs to, and record that both reached it independently.
+  Agreement is a confidence signal, **not a rank boost**: agents at different altitudes can only
+  overlap on behaviour, so boosting agreement would promote behaviour over structure again.
+- **Keep the evidence.** Every entry keeps its `path:line` and its concrete failing scenario or
+  forces. Drop the reasoning and the entry becomes an assertion the author cannot act on.
+- **Keep the suggested change.** Proposed decompositions, interface declarations and pattern
+  recommendations are the designer's and architect's deliverable; a finding reduced to its
+  diagnosis loses the part the author asked for.
 - **State disagreements as disagreements.** Where two agents recommend incompatible changes, give
   both with their tradeoffs and say which you would take first. Do not average them.
-- **Rank** `MUST-FIX`, `SHOULD-CONSIDER`, `NITPICK`, and open with the single thing to address first.
+- **Open with the first thing to address in each section**, then one line on the order across
+  sections. Summary counts, if any, count every section.
 - **Carry the open questions through.** A question an agent could not answer is not noise; it is
   work for the author.
 
@@ -87,6 +113,8 @@ The agents return independently; the single ranked report is yours to assemble.
 - **Never dispatch the same agent twice over one target** to raise confidence. Dispatch a second
   *kind* of agent, or verify the specific finding.
 - **Never assign files or areas to a reviewing agent.** State the target; let it choose.
+- **Never brief an agent with another agent's topics.** Context yes; topics no.
+- **Never merge the altitudes into one ranking.** One section per altitude, each at full depth.
 - **Never let the digest be the evidence.** A finding cited to the digest instead of the source is
   unverified, and the digest was written by an agent that was told not to judge.
 - **Never re-run the collector to answer one question.** Read the file.
