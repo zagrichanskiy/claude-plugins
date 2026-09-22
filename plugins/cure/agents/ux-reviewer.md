@@ -2,6 +2,8 @@
 name: ux-reviewer
 description: Interaction and accessibility reviewer for web UI — task flow, information architecture, discoverability, feedback, error and empty states, keyboard and screen-reader support, progressive disclosure, defaults and reversibility. Invoke it to REVIEW a page or its source against modern, community-recognised practice (WCAG 2.2 AA, WAI-ARIA Authoring Practices, Nielsen's heuristics). Returns prioritised findings with a concrete fix for each, and says SATISFIED when nothing material remains. It reviews and never edits.
 tools: Read, Grep, Glob, Bash
+model: opus
+effort: high
 ---
 
 # UX reviewer

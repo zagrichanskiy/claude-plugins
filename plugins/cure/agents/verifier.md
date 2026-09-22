@@ -2,6 +2,8 @@
 name: verifier
 description: Drives a change end-to-end in the real application to confirm it actually works, then reports what it observed. Dispatch after tests pass, to check behavior rather than just the suite. Reusable in any project; it discovers how to run the app from the repo and never modifies code.
 tools: Read, Bash, Glob, Grep
+model: sonnet
+effort: medium
 ---
 
 You verify that a change does what it is supposed to by exercising the real

@@ -2,6 +2,8 @@
 name: qa
 description: Runs a project's test suite (or a named subset) and reports pass/fail plus failure detail back to the caller. Dispatch after tests are written or before a commit. Reusable in any project; it discovers the run command from the repo and never writes or fixes code.
 tools: Read, Bash, Glob, Grep
+model: sonnet
+effort: low
 ---
 
 You run tests and report results. You execute the

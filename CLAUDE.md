@@ -24,6 +24,45 @@ An agent file needs `name:` and `tools:`. Omit `name:`, or write `allowed-tools:
 instead of `tools:`, and the agent is skipped at load with no error — it simply never appears in the
 agent list. Three agents in `cure` were broken this way before being moved here.
 
+An *unknown* key is ignored just as quietly, so a typo costs the setting rather than the load:
+`efort: high` is not a failure, it is an agent at default effort. `scripts/lint-plugin.py` is the
+gate — it checks that every agent carries `name:` (matching the file name), `tools:` and
+`description:`, that every skill carries `description:` and uses `allowed-tools:`, that no key is
+unknown, and that `model:` and `effort:` hold accepted values:
+
+| Key | Accepted values |
+|---|---|
+| `model` | `opus`, `sonnet`, `haiku`, `fable`, `inherit` |
+| `effort` | `low`, `medium`, `high`, `xhigh`, `max` |
+
+Run it before every commit; CI runs it on every pull request and every push to `main`. `claude plugin validate .`
+checks the manifests only — it says nothing about agent or skill frontmatter, which is why the lint
+exists.
+
+`memory: user` sits on `architect`, `designer` and `security-expert`. The key is accepted by the
+CLI; its exact effect on a plugin agent has not been verified here, so it was left where it was
+rather than propagated to the other agents.
+
+## Collection is separated from judgement on purpose
+
+Two advisory agents (`architect` and `designer`) reviewing one pull request group independently
+consumed 4.4 M weighted input tokens across 249 requests, and six findings were reached twice. The
+cause was not the agents; it was that each ran its own collection pass over the same source.
+
+`collector` plus `/cure:review-change` exist to fix that, and three properties are load-bearing:
+
+- **The collector never judges.** A digest that contains a severity or a recommendation becomes the
+  finding, and the reviewer that cites it inherits a judgement made by the cheap model.
+- **The digest is a map, never evidence.** Every finding cites the source file. A digest may be
+  wrong; a review built on one that was never checked is worth nothing.
+- **Areas are deliberately not divided between reviewers.** Each agent chooses what to open. An
+  assigned-area split would cost less again and would miss exactly the defects that cross a
+  boundary, which are the ones worth the review.
+
+The reading footer each agent ends with (`Read: N files in full, M sampled; digest: used | absent.`)
+is the only measurement of whether this keeps working. Do not remove it from `core.md` or the agent
+files.
+
 ## Marketplace names resembling official ones are rejected
 
 `claude plugin marketplace add` refuses a manifest whose `name` looks like an official

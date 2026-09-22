@@ -36,6 +36,12 @@ discipline.
 
 **Agents** — invoked by name, or dispatched automatically when a request matches their description.
 
+*Collection* — runs before the agents that judge, so that they do not each read the same tree.
+
+| Agent | Description |
+|---|---|
+| `collector` | Reads a change once and writes a source digest: inventory, public interfaces, wiring, configuration keys, documentation claims, tests, and a shortlist of files worth reading verbatim. Extracts only; it never judges and writes no file but the digest. |
+
 *Advisors and reviewers* — they read, judge and write documents; none of them edits code.
 
 | Agent | Description |
@@ -70,6 +76,32 @@ the project's conventions, test command and run command from the repo.
 | `capture-idea` | `/cure:capture-idea` | Captures an idea or design just discussed in a session as a structured goal file under `~/.claude/ideas/`, in a form a fresh session can pick up cold. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
+| `review-change` | `/cure:review-change` | Runs a multi-agent review as a pipeline: the collector once, then the reviewing agents in parallel against its digest, then one merged and ranked report. |
+
+## Reviewing a change
+
+Two advisory agents reviewing one pull request group independently cost 4.4 M weighted input tokens
+across 249 requests, and six of their findings were the same finding reached twice. The cost was
+structural: each ran its own collection pass over the same source before judging anything.
+
+`/cure:review-change` separates the two. `collector` reads the target once and writes a digest;
+the reviewing agents read the digest first and then choose, each for itself, which files to open.
+No agent is assigned an area and none is forbidden a file — dividing the source would trade a cost
+problem for a coverage problem, and the defects worth finding are the ones that cross an area.
+Every agent ends its reply with a reading footer, so the cost of the next review is visible rather
+than inferred.
+
+## Models and effort
+
+Every agent states its own `model` and `effort`, by role:
+
+| Role | Agents | Model | Effort |
+|---|---|---|---|
+| Judgement | `architect`, `designer`, `security-expert`, `reviewer`, `ui-reviewer`, `ux-reviewer` | `opus` | `high` |
+| Production | `implementer` | `opus` | `medium` |
+| Production | `test-author`, `skill-author`, `knowledge-librarian` | `sonnet` | `medium` |
+| Mechanical | `collector`, `verifier` | `sonnet` | `medium` |
+| Mechanical | `qa` | `sonnet` | `low` |
 
 ## Adding a plugin
 
@@ -82,12 +114,14 @@ the project's conventions, test command and run command from the repo.
 1. Agents: one `.md` file in `plugins/<plugin>/agents/`. Skills: `plugins/<plugin>/skills/<name>/SKILL.md`.
    Both are auto-discovered; no manifest entry is needed.
 2. Bump `version` in that plugin's `plugin.json` — **required**, see [CLAUDE.md](CLAUDE.md).
-3. Run `claude plugin validate .`
+3. Run `python3 scripts/lint-plugin.py`, then `claude plugin validate .`
 
 ## Structure
 
 ```
 .claude-plugin/marketplace.json   marketplace manifest (name, owner, plugin list)
+scripts/lint-plugin.py            frontmatter and manifest lint, run in CI
+.github/workflows/validate.yml    runs the lint on every push and pull request
 plugins/<name>/
   .claude-plugin/plugin.json      plugin manifest (name, version, metadata)
   agents/<name>.md                one file per agent, auto-discovered

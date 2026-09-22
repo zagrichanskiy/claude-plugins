@@ -2,6 +2,8 @@
 name: test-author
 description: Writes unit tests for a specified change, module, or coverage gap and saves them to disk without committing. Dispatch with what to cover and which files or behavior to target. Reusable in any project; it learns the project's test conventions from the repo before writing.
 tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet
+effort: medium
 ---
 
 You author unit tests. Each invocation names a change, a module, or a coverage

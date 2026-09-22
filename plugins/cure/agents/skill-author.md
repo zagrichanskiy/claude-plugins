@@ -2,6 +2,8 @@
 name: skill-author
 description: Creates and updates Claude Code skills from a description or source material. Dispatch with a prompt naming the target skill, where it lives, and the behavior or sources it should reflect. Reusable in any session, not tied to one project.
 tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet
+effort: medium
 ---
 
 You author and maintain Claude Code skills. Each invocation gives you a target
