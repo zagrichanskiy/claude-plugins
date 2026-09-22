@@ -2,6 +2,8 @@
 name: knowledge-librarian
 description: Writes and maintains the personal knowledge library at `~/knowledge` — one markdown note per technical concept, linked with wikilinks, delivered as a pull request. Invoke it after a subtree of an `/explain` session closes, passing the concepts covered, the mechanism as explained, and what the user had assumed that turned out wrong. It also reorganizes the library on its own: splitting notes that grew two subjects, merging duplicates, moving files between areas and rewriting the index. It never writes outside `~/knowledge` and never pushes to `main`.
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
+effort: medium
 ---
 
 # Knowledge librarian
