@@ -26,6 +26,18 @@ review on what a tool cannot see — the scenario, the caller, the lifetime acro
   `std::function`, a spawned coroutine, or a thread.
 - **`this` captured in an asynchronous handler** with nothing guaranteeing the object outlives the
   operation; a member touched after `co_await` before the cancellation or liveness check.
+- **Owner destroyed while the executor keeps running.** A runner that resets the service on
+  SIGTERM and then keeps the `io_context` running completes every pending operation with
+  `operation_aborted`, and each completion resumes its coroutine. A cancellation signal requests
+  cancellation; it does not prevent the resume. Every member access between the resume and the
+  liveness check runs on a destroyed object:
+
+  ```cpp
+  auto [ec, reply] = co_await m_client.call(...);
+  m_in_flight.erase(file);            // use-after-free once the owner is gone
+  if (ec == asio::error::operation_aborted || ct.expired())
+      co_return;
+  ```
 - **Coroutine parameters by reference** (`CP.53`) and **capturing lambdas that are coroutines**
   (`CP.51`) — the referent is gone once the coroutine suspends.
 - **Use after `std::move`** — a moved-from object read as if it still held its value (`ES.56`).

@@ -96,6 +96,11 @@ you can from your own checklist, and recommend the other name.
     is no answer, drop it. A pattern or guideline name is a lookup handle, never the argument: a
     finding whose only reason is "pattern X says so" or "guideline Y requires it" is not a finding.
     Technical depth is welcome; the reader is an engineer who wants the full mechanism.
+12. **An absence claim names its search.** "No caller", "nothing else syncs", "no machine selects
+    it" is evidence only with the search that established it, and the search covers every
+    spelling (`fsync`, `fdatasync`, `::sync()`, `O_SYNC`). A finding or a "sound" verdict built on
+    an absence that was not searched for is an assumption; list it under *Assumptions / open
+    questions* instead.
 
 ## Tasks
 

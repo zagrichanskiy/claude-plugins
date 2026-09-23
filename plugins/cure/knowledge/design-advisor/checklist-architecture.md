@@ -45,6 +45,13 @@ supplement for the target's language.
 - **Timing is part of the contract.** For every pipe: does the producer block, drop, or queue, and
   how deep? Flag any boundary where the answer is unstated — it is the most common source of an
   architecture that works on the bench and collapses under load.
+- **A replacement lists the consumers of what it replaces.** When a change removes or replaces a
+  mechanism (a service, a unit, a file location, a storage mode, a command), find every consumer of
+  the old one outside the change: readers of its files, callers of its commands (`journalctl`,
+  `systemctl start <old unit>`), its config keys, and every policy that controlled it (an
+  operation-mode manager, a feature flag). Flag each consumer the change leaves behind, and each
+  policy the replacement silently drops — a component the old policy kept stopped may now run
+  everywhere.
 
 ## 3. Classify every fork
 
@@ -72,6 +79,11 @@ obligation. Flag a document that mixes them into one list.
   (a board with hardware decode may have no encoder at all). An accelerated path that silently falls
   back to CPU — an unsupported NPU operator, a missing codec — is worse than no accelerator, because
   it fails as a performance mystery rather than an error.
+- **Check every per-machine selection against that machine.** Where the build or the
+  configuration selects a variant per board (a storage profile, a driver, a tuning file), open each
+  board's own hardware definition (machine config, device tree, partition or UBI layout) and check
+  the variant against it. List the boards that select nothing. A selection that exists is not a
+  selection that is right: a NAND board given the eMMC profile passes every build.
 - **Aggregate specs hide per-instance limits.** "6 TOPS" may be three cores at 2 TOPS, one per
   model. "Four cores" is not four cores once the kernel, the network stack and the encoder are on
   them.
