@@ -1,5 +1,5 @@
 ---
-description: Write the goal file that `/goal @<file>` runs from — a self-contained brief a fresh session can execute unattended. Asks every open question in one round first, then writes the work items, the measurable done-when list and the standing rules. Use when the user says "write a goal", "create a goal md", "capture this as a goal", or "/cure:goal", typically after settling a design in conversation.
+description: Write the goal file that `/goal @<file>` runs from — a self-contained brief a fresh session can execute unattended. Asks every open question in one round first, then writes the orchestrator-led work items with an agent per step and a closing retrospective, the measurable done-when list and the standing rules. Use when the user says "write a goal", "create a goal md", "capture this as a goal", or "/cure:goal", typically after settling a design in conversation.
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, AskUserQuestion
 ---
 
@@ -57,21 +57,30 @@ rest — a recipe, a module, a ticket id and name — rather than restating them
 
 ## Work
 
-1. <One step. Name the file or recipe it touches.>
+The main session is the orchestrator. It does not read source or edit code. It dispatches agents,
+keeps the ledger and checks completeness.
+
+1. <One step, the agent that does it, and the file or recipe it touches.>
 2. ...
+N. Write `.notes/<slug>-retro.md`: per agent, what it did, findings raised and accepted, cost where
+   reported; what was effective; what was not; concrete changes to agents, skills or this format.
 
 ## Done when
 
 1. <Measurable, and provable by something this session runs. `pytest` passes in `src/foo`. The
    build exits 0. `ip addr show usb0` reports the address.>
 2. ...
+N. `.notes/<slug>-retro.md` exists and its summary is in the transcript.
 
 ## Rules
 
 - Ask nothing. Every open question was answered before this goal started; decide the rest from the
   code and state the assumption.
 - Establish scope with `grep` and `glob` first. Read a whole file only once it matters.
-- <Agent plan, when the work suits one — see below.>
+- <Agent plan: which agent does which step, what runs in parallel, which advisor to consult on a
+  hard question.>
+- Save tokens: pass agents paths and ids, not file content. Ask for findings or results only. The
+  orchestrator does not re-read files an agent already read.
 - Stop after <N> turns and report what is left.
 ```
 
@@ -99,9 +108,22 @@ Take the names from the session's own agent and skill list, and prefer the proje
 general one wherever both offer something. A general plugin's reviewer named for work a project
 agent covers proposes a tool the project does not use.
 
-When the work splits into parts that do not depend on each other, name the agents and the order in
-the Rules section rather than leaving the run to invent a fan-out. When the work is one sequence,
-leave that line out — an agent per step costs more than it saves.
+## Delegate, then reflect
+
+Every goal has this structure. The user runs goals unattended and pays for the orchestrator's
+context on every turn.
+
+| Part | What the goal file states |
+|---|---|
+| Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
+| Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
+| Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. |
+| Review loop | When the work changes code: review, fix, test, re-review until each named reviewer says SATISFIED. A ledger file holds every finding and its status. |
+| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. |
+| Retrospective | The last work item and the last done-when item before the turn bound. |
+
+The retrospective records how the agents performed, what was effective, what was not, and what to
+change. Its findings feed later changes to the agents, the skills and this format.
 
 ## Running it
 
