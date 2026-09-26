@@ -51,8 +51,9 @@ In that case, give each resumed agent the ledger ids still open, from `.notes/<s
 and a diff range (`git diff <last-round-ref>..HEAD`) instead of a digest; do not re-run the
 collector to produce one. A diff over the threshold, or a change of agents, forces the full
 pipeline from step 2. The fix step commits each round with explicit paths, new files included,
-before the round closes; that commit is the next `<last-round-ref>` — see step 5. `git diff` on
-an uncommitted round misses untracked files, so a round is not closed until it is committed.
+before the round closes. `<last-round-ref>` is the commit this round reviewed — HEAD when its
+agents were dispatched, not the fix commit; see step 5. `git diff` on an uncommitted round misses
+untracked files, so a round is not closed until it is committed.
 
 ### 2. Collect once
 
@@ -183,8 +184,9 @@ one: that pays for the reading again and counts as a second agent over the targe
     delta still understates the resumed agent's true cost: each request re-reads its full context,
     so the reading is paid for again even though it does not show up in the delta.
   - Flag any agent whose reported usage is at or over its token budget (step 1).
-- The fix step commits each round with explicit paths, new files included. Record that commit as
-  `<last-round-ref>` for the next round's re-check test (step 1a), and update
+- The fix step commits each round with explicit paths, new files included. Record HEAD at the
+  start of this round — before the fix commit, when its agents were dispatched — as
+  `<last-round-ref>` for the next round's re-check test (step 1a). Update
   `.notes/<slug>-ledger.md` with the round's finding ids and their status.
 - Give the digest a `supersedes_when` that names the report, and sweep it once the report is
   delivered — see the `note` skill.
