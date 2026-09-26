@@ -27,6 +27,11 @@ repositories. Resolve it with `git diff --stat <base>...HEAD`, `gh pr view`, `gh
 agent in the run inherits this boundary, so it is written once here rather than re-derived five
 times.
 
+Also find earlier review reports of the same target: a report or handoff under `.notes/`, a
+published report the user names, an earlier digest. Record each one and the commits that landed
+since it. Do not pass their findings to the agents (step 3 forbids topics); the merge uses them in
+step 4.
+
 ### 2. Collect once
 
 Dispatch `collector` with the target and a digest path — `.notes/<slug>-digest.md` at the repository
@@ -99,6 +104,16 @@ produced.
   sections. Summary counts, if any, count every section.
 - **Carry the open questions through.** A question an agent could not answer is not noise; it is
   work for the author.
+- **Account for every earlier finding.** When step 1 found an earlier report, add a carry-over
+  table: each earlier finding is *re-raised* (with its new ID), *resolved* (with the commit), or
+  *not raised*. Re-check every must-fix that was not raised against the source yourself before you
+  drop it. If it still holds, keep it in its altitude's section, marked as carried by the merging
+  session. Independent agents drop findings between rounds; on unchanged code a must-fix that
+  disappears is a miss, not a fix.
+
+An agent that stops on a usage or rate limit has not finished. Resume that same agent with
+`SendMessage` once the limit resets; it keeps its context and its reading. Do not dispatch a new
+one: that pays for the reading again and counts as a second agent over the target.
 
 ### 5. Close the run
 
@@ -118,3 +133,4 @@ produced.
 - **Never let the digest be the evidence.** A finding cited to the digest instead of the source is
   unverified, and the digest was written by an agent that was told not to judge.
 - **Never re-run the collector to answer one question.** Read the file.
+- **Never drop an earlier must-fix without checking it.** Not raised this round is not resolved.

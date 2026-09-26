@@ -82,6 +82,11 @@ Who calls whom, who owns whose lifetime, which thread or context each runs on, a
 surface the change touches: services started or stopped, files and directories written, units,
 timers, sockets, environment.
 
+When the change removes or replaces a mechanism (a unit, a file location, a storage mode, a
+command), list every consumer of the old mechanism outside the target: grep the workspace for the
+unit name, the paths, the command that reads it (`journalctl`, `systemctl`), and its config keys.
+Record each hit with `path:line`, and say which search terms you used.
+
 ## 5. Configuration and schema
 Every key the change reads or defines: the file it lives in, its default, and the layer or override
 mechanism that can change it. Quote defaults exactly.

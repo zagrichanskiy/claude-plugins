@@ -88,6 +88,25 @@ the proposed interfaces. Three things now prevent that, and each is load-bearing
 - `review-change` step 4: one section per altitude at full depth, and agreement between agents is
   never a rank boost.
 
+## Independent agents drop findings between rounds
+
+Round 3 of the log-manager review ran on the same commit as round 2. Three round-2 must-fixes came
+back from no agent: a use-after-free on SIGTERM, a NAND board given the eMMC storage profile, and a
+web endpoint that still read the journal the change had made volatile. The merging session found
+all three still present. The reviewer had missed the use-after-free in both rounds, although the
+C++ supplement named the pitfall. Each of these guards addresses one miss; keep them:
+
+| Miss | Guard |
+|---|---|
+| Earlier must-fix not raised again | `review-change` step 4 carry-over table; the merger re-checks before dropping |
+| Use-after-free after `co_await` | `reviewer.md` teardown walk; `reviewer/lang/cpp.md` owner-destroyed item |
+| Per-machine profile wrong for the board | `checklist-architecture.md` §4, check each selection against the machine file |
+| Consumer of the replaced mechanism left behind | `checklist-architecture.md` §2 replacement item; `collector.md` §4 consumer sweep |
+| "Nothing else syncs" built on a grep for `fsync` only | `core.md` rule 12 and `reviewer.md`: an absence claim names its search |
+
+The earlier findings are deliberately not given to the agents. That would be a topic brief, which
+`review-change` step 3 forbids; the carry-over check belongs to the merge.
+
 ## Marketplace names resembling official ones are rejected
 
 `claude plugin marketplace add` refuses a manifest whose `name` looks like an official

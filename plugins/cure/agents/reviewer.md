@@ -47,6 +47,16 @@ fix, or commit.
   error paths, resource leaks, concurrency and async hazards, boundary and
   empty-input cases. State a concrete failing scenario for each — inputs or
   state, then the wrong result.
+- **Teardown, in asynchronous code:** for every object that owns a coroutine,
+  a timer or a pending handler, find where its owner destroys it and whether
+  the executor keeps running afterwards. That code often lives in a
+  neighbouring library (a service runner, a signal handler); read it. Then walk
+  every resume point: each statement between a `co_await` or a callback entry
+  and its liveness check runs on a possibly destroyed object.
+- **Absence claims:** a claim that something does not exist ("no caller",
+  "nothing else syncs", "no test covers it") names the search that established
+  it, and the search covers every spelling of the thing (`fsync`, `fdatasync`,
+  `::sync()`, `O_SYNC`).
 - **Design, as far as the diff shows it:** an abstraction that leaks in this
   change, coupling it introduces across the project's layering, an interface it
   adds that invites misuse, an error strategy it omits, code it makes untestable.
