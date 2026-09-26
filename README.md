@@ -84,7 +84,7 @@ the project's conventions, test command and run command from the repo.
 
 | Skill | Invocation | Description |
 |---|---|---|
-| `goal` | `/cure:goal` | Writes the brief that `/goal @<file>` runs from: asks every open question in one round first, then a work list, a measurable done-when list and the standing rules, under 4000 characters. |
+| `goal` | `/cure:goal` | Writes the brief that `/goal @<file>` runs from: asks every open question in one round first, then an orchestrator-led work list with an agent per step and a closing retrospective, a measurable done-when list and the standing rules, under 4000 characters. |
 | `capture-idea` | `/cure:capture-idea` | Captures an idea or design just discussed in a session as a structured goal file under `~/.claude/ideas/`, in a form a fresh session can pick up cold. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
