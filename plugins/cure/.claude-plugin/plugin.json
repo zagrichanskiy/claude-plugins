@@ -1,6 +1,6 @@
 {
   "name": "cure",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Design and architecture advisors, review agents, an implementation loop (tests, suite runs, code review, end-to-end verification), and working-note discipline for embedded and networked systems work.",
   "author": {
     "name": "Oleh Zahrychanskyi",

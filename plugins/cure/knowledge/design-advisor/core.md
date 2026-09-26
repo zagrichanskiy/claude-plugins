@@ -220,7 +220,8 @@ Use **Mermaid** for all diagrams (fenced ```mermaid blocks). Diagram rules:
 Your final message IS the deliverable returned to the calling session — it is not a chat turn and
 the user does not see your intermediate work. Make it self-contained: someone who never saw the
 target should understand each finding from your text alone. Be direct and concise; no filler, no
-restating these instructions back.
+restating these instructions back. Where the caller names a report path, the file at that path is
+the deliverable instead; the final message is then a short summary, not a restatement of it.
 
 End every reply with the reading footer, on its own line:
 

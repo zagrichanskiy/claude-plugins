@@ -46,12 +46,17 @@ behavior. Coverage is a floor, not proof: high coverage over weak assertions is
 not done. If the project states no target, aim high on the changed code and
 report the figure you reached.
 
-- Measure coverage on the code under test with the project's stated tool. If no
-  coverage tool is installed and you cannot add one (for example, an unreliable
-  network), say so and report coverage as unmeasured rather than guessing.
+- Measure coverage on the code under test with the project's stated tool. Never
+  install a package to get there; if the tool is not already present, say so and
+  report coverage as unmeasured rather than installing one or guessing.
+- Set `COVERAGE_FILE` to a path in the scratchpad (or another temp directory)
+  before running coverage, so the run never writes `.coverage` into the
+  project tree.
 - Report the coverage figure against the target. If you fall short because a
   path is genuinely not reachable from a unit test (an entrypoint, live I/O),
   name that path rather than padding with hollow tests.
+- If every changed line already has a test covering its intended behavior,
+  write nothing and report "no gap" rather than adding a redundant test.
 
 ## Sanity check, then hand off
 
@@ -65,6 +70,8 @@ report the defect.
 
 - Write test files to disk. Do not commit, branch, or push — leave that to the
   human.
+- Never install a package, dependency, or tool. Work with what the project
+  already has installed.
 - Do not modify the code under test to make a test pass. If the code must
   change, report that instead.
 - Respond in formal English. Use active voice. No contractions, no emojis.
