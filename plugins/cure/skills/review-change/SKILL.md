@@ -30,7 +30,30 @@ times.
 Also find earlier review reports of the same target: a report or handoff under `.notes/`, a
 published report the user names, an earlier digest. Record each one and the commits that landed
 since it. Do not pass their findings to the agents (step 3 forbids topics); the merge uses them in
-step 4.
+step 4. Step 1a is the one exception: re-check mode passes the open ledger ids, not the findings
+themselves.
+
+**Set the token budget for the round** before dispatching anything: 400k tokens per agent per
+round, unless the caller states a different figure. State the figure in the same line as the
+target. If an agent's per-leg usage (not its cumulative context — see step 5) is near the budget
+with findings still open, stop it, take what it returned, and say so in the close-out rather than
+letting it run unbounded.
+
+### 1a. Re-check mode
+
+Skip the collector and dispatch straight to step 3 when both hold:
+
+- The diff since the last round touches 5 files or fewer, and 200 changed lines or fewer
+  (`git diff --stat <last-round-ref>..HEAD`).
+- The same agents from the previous round are being resumed, not freshly dispatched.
+
+In that case, give each resumed agent the ledger ids still open, from `.notes/<slug>-ledger.md`,
+and a diff range (`git diff <last-round-ref>..HEAD`) instead of a digest; do not re-run the
+collector to produce one. A diff over the threshold, or a change of agents, forces the full
+pipeline from step 2. The fix step commits each round with explicit paths, new files included,
+before the round closes. `<last-round-ref>` is the commit this round reviewed — HEAD when its
+agents were dispatched, not the fix commit; see step 5. `git diff` on an uncommitted round misses
+untracked files, so a round is not closed until it is committed.
 
 ### 2. Collect once
 
@@ -56,13 +79,25 @@ Dispatch the agents the change warrants, **in one message so they run concurrent
 | `security-expert` | The change touches authentication, keys, trust boundaries, or a network protocol. |
 | `ui-reviewer`, `ux-reviewer` | The change has a user interface. |
 
-Give each the same three things and nothing that constrains its reading:
+Give each the same things and nothing that constrains its reading. `reviewer`, `security-expert`,
+`designer` and `architect` hold `Write` for this purpose only: the report path named below, under
+`.notes/`, nothing else:
 
 ```
 Target: <the boundary from step 1>
 Digest: <path> — read it first; it is a map, not evidence. Cite the source for every finding.
+Report path: .notes/<slug>-<agent>-r<N>-report.md — write your report there yourself; do not return it in full to the caller.
+Token budget: <the figure from step 1>
 Task: REVIEW. Decide for yourself which files to open.
 ```
+
+`ui-reviewer` and `ux-reviewer` hold no `Write`. Give them the same brief without the `Report path`
+line, and add instead: `Return your report in full in your reply.`
+
+Name each agent's path distinctly (its own slug and round number) so two agents, and two rounds,
+never collide. The orchestrator reads the written report from disk in step 4 for the agents that
+hold `Write`; for `ui-reviewer` and `ux-reviewer` it reads the report from their return message
+instead.
 
 Project context (the platform, the hardware, where the conventions live) may be added. **Topics may
 not.** Each agent's checklist already defines its work; a brief that asks `designer` to hunt
@@ -74,8 +109,26 @@ turned every one of the designer's must-fix findings into a behaviour bug.
 
 The agents return independently; the report is yours to assemble. **It has one section per
 altitude, not one global ranking**: correctness (`reviewer`), system (`architect`), design
-(`designer`), and any other agent dispatched. Each section keeps its own `MUST-FIX`,
-`SHOULD-CONSIDER`, `NITPICK` order, by that agent's severity definitions.
+(`designer`), and any other agent dispatched. Each section keeps its own `MUST-FIX` and
+`SHOULD-CONSIDER` order, by that agent's severity definitions; `NITPICK` findings do not stay in
+the section body — see below.
+
+`security-expert` grades `critical`, `high`, `medium`, `low`, and an overall verdict of `CHANGES
+REQUIRED` or `SATISFIED`, not the four tags below directly. Map them when merging: `critical` and
+`high` to `MUST-FIX`, `medium` to `SHOULD-CONSIDER`, `low` to `NITPICK`, and a verdict of `CHANGES
+REQUIRED` to the round not passing the severity floor (`NOT SATISFIED`).
+
+**Triage every finding into exactly one of four tags.** `MUST-FIX`, `SHOULD-CONSIDER`, and
+`NITPICK` are severities, per the dispatched agent's own definitions (mapped for `security-expert`
+above). `enhancement` is a separate tag, not a severity: it marks a proposal for new behaviour
+rather than a defect in the change under review. Carry the `enhancement` tag from the agent that
+raised the finding; the merge never assigns it to a finding the agent tagged with a severity
+instead — recasting a defect as an enhancement removes it from the severity floor, and that call
+belongs to the agent that read the source, not to the orchestrator.
+
+Route every `NITPICK` and every `enhancement` to `.notes/<slug>-backlog.md` instead of the round's
+report body; `MUST-FIX` and `SHOULD-CONSIDER` stay in the section. State the tag next to each
+finding, both in the merged report and in the backlog.
 
 A single global ranking was tried and failed: behaviour defects outrank structural ones on
 immediacy, so every design finding sank to a one-line bullet at the bottom and its proposed
@@ -117,7 +170,24 @@ one: that pays for the reading again and counts as a second agent over the targe
 
 ### 5. Close the run
 
-- Report the run cost: each agent's reading footer, and the number of agents dispatched.
+- **State whether the round passes the severity floor.** A round passes when no `MUST-FIX` or
+  `SHOULD-CONSIDER` finding is open across every section. Open `NITPICK`s and `enhancement`s do not
+  hold the round open; they sit in `.notes/<slug>-backlog.md` for whoever picks them up later. Say
+  the pass/fail plainly, before the summary counts.
+- Report the run cost: each agent's reading footer, and the number of agents dispatched. The figure
+  compared against the token budget (step 1) is always the per-leg figure below, never the
+  cumulative one.
+  - For a freshly dispatched agent, its reported token usage is the round's cost for that leg.
+  - For a resumed agent (re-check mode, or a later round), the harness reports cumulative context,
+    not the round's cost. The per-leg cost is the difference between this report and the agent's
+    previous report; compute and state that difference, not the cumulative figure. That per-leg
+    delta still understates the resumed agent's true cost: each request re-reads its full context,
+    so the reading is paid for again even though it does not show up in the delta.
+  - Flag any agent whose reported usage is at or over its token budget (step 1).
+- The fix step commits each round with explicit paths, new files included. Record HEAD at the
+  start of this round — before the fix commit, when its agents were dispatched — as
+  `<last-round-ref>` for the next round's re-check test (step 1a). Update
+  `.notes/<slug>-ledger.md` with the round's finding ids and their status.
 - Give the digest a `supersedes_when` that names the report, and sweep it once the report is
   delivered — see the `note` skill.
 - If the report is large enough that the author will work from it over several sessions, persist it

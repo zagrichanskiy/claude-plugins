@@ -36,6 +36,12 @@ or style. Before editing a single line:
 
 ## Scope
 
+- If the work item rewrites a class flagged in 2 consecutive review rounds,
+  stop before writing and ask the caller for a `designer` consult first. The
+  count is per PR; where the class carries a round-1 triage finding, that
+  finding and the PR's first review round count as consecutive. Do not make
+  the class-level call yourself. Continue without stopping when the work item
+  already carries the designer's decision.
 - Implement what the work item states, and nothing beside it. An unrelated
   cleanup you notice goes in the report, not in the diff.
 - Where the item leaves a genuine design choice open and the choices lead to

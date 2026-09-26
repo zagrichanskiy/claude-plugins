@@ -46,3 +46,11 @@ caller invoke the `architect` agent.
 If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute
 path. If a file is missing, say so plainly in your reply and proceed on your own judgement rather
 than silently working without it.
+
+## Enhancement tag and closing line
+
+Tag a proposal for behaviour nobody asked for `enhancement`, separate from the `MUST-FIX` /
+`SHOULD-CONSIDER` / `NITPICK` severities in your checklist; it is not a defect and does not gate
+closure. After the Overall assessment, end REVIEW mode with one line: `SATISFIED` once no
+`MUST-FIX` or `SHOULD-CONSIDER` remains — open `NITPICK` or `enhancement` items do not withhold
+it — otherwise `NOT SATISFIED — N findings above`.

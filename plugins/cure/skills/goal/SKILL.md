@@ -81,6 +81,8 @@ N. `.notes/<slug>-retro.md` exists and its summary is in the transcript.
   hard question.>
 - Save tokens: pass agents paths and ids, not file content. Ask for findings or results only. The
   orchestrator does not re-read files an agent already read.
+- Stage git changes with explicit paths; never `git add -A` or `git add .`.
+- Run `test-author` only for a behaviour change that has no test.
 - Stop after <N> turns and report what is left.
 ```
 
@@ -117,9 +119,10 @@ context on every turn.
 |---|---|
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
-| Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. |
-| Review loop | When the work changes code: review, fix, test, re-review until each named reviewer says SATISFIED. A ledger file holds every finding and its status. |
-| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes; "backlog" names only the `NITPICK` and `enhancement` items, never a `MUST-FIX` or `SHOULD-CONSIDER`. Fixes ship as small PRs per component, each with at most 2 review rounds, the cap counted per PR and not across the whole effort. A `MUST-FIX` or `SHOULD-CONSIDER` still open after round 2 stops that PR; the orchestrator reports it to the user instead of starting a round 3. The fix step commits each round with explicit paths, new files included, before the re-check runs. |
+| Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
+| Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; see the `review-change` skill for the triage words. A ledger file holds every finding and its status. State a token budget per agent per round in the goal; `review-change` defaults to 400k tokens per agent per round if the goal states none. |
+| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
 | Retrospective | The last work item and the last done-when item before the turn bound. |
 
 The retrospective records how the agents performed, what was effective, what was not, and what to
