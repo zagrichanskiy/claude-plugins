@@ -14,14 +14,10 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 - **`class` when there is an invariant, `struct` when members vary independently** (Core
   Guidelines `C.2`). Flag a `struct` whose fields must agree and a `class` that is a plain
   aggregate hidden behind accessors.
-- **A function is a member only if it needs the representation** (`C.4`); the test runs in both
-  directions. A free function that enforces a type's invariant (`add_entry(registry&, ...)`)
-  or that only asks questions of one type belongs in that type. A function that only reads public
-  members of a record with no invariant stays free. Flag callers that mutate the fields directly
-  and bypass the invariant-enforcing function.
-- **Decompose orchestrators into stages** (`F.2`, `F.3`) — a function does one logical operation
-  and stays short. Stages are pure functions from inputs to a named struct; see the pipeline item
-  in `checklist-design.md`.
+- **Common origin is not an invariant.** Fields that must come from one call but may diverge
+  afterwards by design — a result a later stage updates — stay a `struct`. A private constructor
+  restricts who builds a value; it checks nothing about the values. Ask for a class only when a
+  relation between field values can be broken by a hand-built value (`x ⊆ y`, `a ⇒ b`).
 - **A constructor creates a fully initialised object** (`C.41`). Flag `init()`/`open()` that must
   follow construction, and members that stay in a moved-from or empty state the rest of the class
   must test. When construction can fail as a normal outcome, prefer a factory returning
@@ -56,6 +52,12 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 - **Moves are `noexcept`** where possible; containers depend on it.
 - **Value types are regular** — copyable, comparable, no hidden sharing. Flag a "value" that shares
   mutable state through a pointer.
+- **Ordering operators state the type's natural order.** `operator<` (or `<=>`) must agree with
+  `==` (Sutter, *Consistent comparison*, P0515 — the model C++20 `<=>` is built on): two values
+  neither less nor greater are equal. Flag an ordering operator added for one sort whose key skips
+  a field `==` compares, or whose order is one caller's policy; that order is a named projection or
+  comparator at the caller (`std::ranges::sort(v, {}, key)`). A defaulted `<=>` orders by
+  declaration order, which is rarely the policy order.
 
 ## `const` and logical constness
 
@@ -81,7 +83,14 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 ## Members versus free functions
 
 - **Make a function a member only if it needs direct access to the representation** (`C.4`);
-  non-member non-friend functions increase encapsulation (Meyers, *Effective C++* item 23).
+  non-member non-friend functions increase encapsulation (Meyers, *Effective C++* item 23). The
+  test runs in both directions: a free function that enforces a type's invariant
+  (`add_entry(registry&, ...)`) belongs in that type, and so does a function that only asks
+  questions of one type. Flag callers that mutate fields directly and bypass the function that
+  enforces the invariant.
+- **Decompose orchestrators into stages** (`F.2`, `F.3`) — a function does one logical operation
+  and stays short. Stages are pure functions from inputs to a named struct; see the pipeline item
+  in `checklist-design.md`.
 - **Pure logic in an anonymous namespace is untestable.** A string transformation or a decision
   function reachable only through a class that does I/O is a finding under *Testability*; the fix
   is an internal header or a small value type, not a friend test.
