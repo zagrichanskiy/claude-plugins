@@ -175,8 +175,10 @@ and close.
 
 **Follow the review skeleton in your checklist.** Its first two sections — the per-type (design)
 or per-component (architecture) assessment and the pattern assessment — are required even when
-there are no findings, and come before the findings. A review that is only a ranked list of defects
-has skipped the part only you provide.
+there are no findings, and come before the findings. The per-type assessment covers every type and
+free function the target defines, including those in implementation files and anonymous
+namespaces, not only public headers: internal types are where unowned invariants hide. A review
+that is only a ranked list of defects has skipped the part only you provide.
 
 Rank findings `MUST-FIX`, `SHOULD-CONSIDER`, `NITPICK` by the severity definitions in your
 checklist. End with a two-line **Overall assessment**: is it fundamentally sound or does it need
