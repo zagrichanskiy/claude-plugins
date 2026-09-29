@@ -15,6 +15,13 @@ a given line of code misbehaves belongs to `reviewer`.
 - **Single Responsibility / high cohesion** — a unit should do one thing and have one reason to
   change. Flag grab-bag classes (the god class in `patterns-design.md`), and functions that mix
   unrelated responsibilities.
+- **An orchestrating function is a pipeline of named stages** (Martin, *Clean Code* — functions do
+  one thing at one level of abstraction; Ousterhout — deep, narrow units). Flag a function that
+  performs several jobs in one body, above all one that computes several loose locals (flags,
+  masks, counters) that later blocks consume. Split it into named stages, each taking its inputs
+  and returning a named value type that the next stage reads. For a pure, single-call computation
+  prefer this over promoting the locals to class members: members hide the data flow and give the
+  stages an order the signatures do not show.
 - **Information Expert** — behaviour lives with the data it needs. Flag feature envy: a method that
   reads another object's fields to make a decision that object should make.
 - **Tell, don't ask; Law of Demeter** (Hunt & Thomas, *The Pragmatic Programmer*) — callers ask an

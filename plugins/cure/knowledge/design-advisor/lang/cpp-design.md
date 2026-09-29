@@ -14,6 +14,14 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 - **`class` when there is an invariant, `struct` when members vary independently** (Core
   Guidelines `C.2`). Flag a `struct` whose fields must agree and a `class` that is a plain
   aggregate hidden behind accessors.
+- **A function is a member only if it needs the representation** (`C.4`); the test runs in both
+  directions. A free function that enforces a type's invariant (`add_entry(registry&, ...)`)
+  or that only asks questions of one type belongs in that type. A function that only reads public
+  members of a record with no invariant stays free. Flag callers that mutate the fields directly
+  and bypass the invariant-enforcing function.
+- **Decompose orchestrators into stages** (`F.2`, `F.3`) — a function does one logical operation
+  and stays short. Stages are pure functions from inputs to a named struct; see the pipeline item
+  in `checklist-design.md`.
 - **A constructor creates a fully initialised object** (`C.41`). Flag `init()`/`open()` that must
   follow construction, and members that stay in a moved-from or empty state the rest of the class
   must test. When construction can fail as a normal outcome, prefer a factory returning
