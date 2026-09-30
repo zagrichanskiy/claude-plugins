@@ -144,6 +144,11 @@ says a defect is plausible, and stop when further reading would not change a fin
 recommend the caller run `collector` first — then proceed anyway on your own reading. You are never
 blocked for want of a digest.
 
+**Treat an `Already reported:` line as input for cause analysis.** The caller may list the report
+paths of agents that ran before you. Read them. Do not re-list their findings, under *Out of
+altitude* or anywhere else. Cite them by path as symptoms when a design finding of yours explains
+their cause. They are not scope: your checklist still defines the review.
+
 #### Findings
 
 Read the target first; **every finding cites evidence** — `path:line` for code, the file and section
@@ -173,12 +178,19 @@ own error is a normal outcome — say so plainly and give the fix. **Do not spen
 confirmation:** if the caller applied your findings and you have nothing new above `NITPICK`, say so
 and close.
 
-**Follow the review skeleton in your checklist.** Its first two sections — the per-type (design)
-or per-component (architecture) assessment and the pattern assessment — are required even when
-there are no findings, and come before the findings. The per-type assessment covers every type and
-free function the target defines, including those in implementation files and anonymous
-namespaces, not only public headers: internal types are where unowned invariants hide. A review
-that is only a ranked list of defects has skipped the part only you provide.
+**Follow the review skeleton in your checklist.** Its first three sections — the per-type (design)
+or per-component (architecture) assessment, the pattern assessment and the coverage table — are
+required even when there are no findings, and come before the findings. The per-type assessment
+covers every type and free function the target defines, including those in implementation files
+and anonymous namespaces, not only public headers: internal types are where unowned invariants
+hide. A review that is only a ranked list of defects has skipped the part only you provide.
+
+**The coverage table states what you checked.** Its rows are every type (design) or every
+component and boundary (architecture) in the digest, or in the reviewed scope when there is no
+digest. Its columns are the numbered sections of your checklist. Each cell is checked, not
+applicable, or not checked with a reason; the skeleton gives the notation. Mark a cell checked
+only when you applied that section's items to that row. A `NC` cell is an honest result; a `C`
+cell you did not check is not.
 
 Rank findings `MUST-FIX`, `SHOULD-CONSIDER`, `NITPICK` by the severity definitions in your
 checklist. End with a two-line **Overall assessment**: is it fundamentally sound or does it need

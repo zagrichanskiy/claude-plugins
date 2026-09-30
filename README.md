@@ -68,6 +68,22 @@ mode's supplement for each language the target is written in:
 `reviewer` loads the pitfall supplements in `plugins/cure/knowledge/reviewer/lang/` (`cpp.md`,
 `python.md`) the same way: only for the languages the change is written in.
 
+*C++ Core Guidelines* — each checks a C++ change against its own sections of the
+[C++ Core Guidelines](https://github.com/isocpp/CppCoreGuidelines) and reports ranked findings and a
+coverage table with one row per rule. All seven follow
+`plugins/cure/knowledge/cpp-core-guidelines/procedure.md` and read only their own condensed section
+files under `sections/`. None edits code.
+
+| Agent | Sections |
+|---|---|
+| `cg-interfaces` | I (Interfaces), F (Functions) |
+| `cg-classes` | C (Classes and class hierarchies), Enum (Enumerations) |
+| `cg-resources` | R (Resource management), E (Error handling) |
+| `cg-statements` | ES (Expressions and statements), Con (Constants and immutability), CPL (C-style programming) |
+| `cg-generic` | T (Templates and generic programming), SL (The Standard Library) |
+| `cg-concurrency` | CP (Concurrency and parallelism) |
+| `cg-philosophy` | P (Philosophy), Per (Performance), SF (Source files), A (Architectural ideas) |
+
 *Implementation loop* — dispatched in sequence around a change. Each is project-agnostic and learns
 the project's conventions, test command and run command from the repo.
 
@@ -113,6 +129,7 @@ Every agent states its own `model` and `effort`, by role:
 | Production | `implementer` | `opus` | `medium` |
 | Production | `test-author`, `skill-author`, `knowledge-librarian` | `sonnet` | `medium` |
 | Mechanical | `collector`, `verifier` | `sonnet` | `medium` |
+| Rule check | `cg-interfaces`, `cg-classes`, `cg-resources`, `cg-statements`, `cg-generic`, `cg-concurrency`, `cg-philosophy` | `sonnet` | `medium` |
 | Mechanical | `qa` | `sonnet` | `low` |
 
 ## Adding a plugin
@@ -141,4 +158,5 @@ plugins/<name>/
   knowledge/                      reference material the agents read at run time
     design-advisor/lang/          per-language supplements, loaded only for the target's language
     reviewer/lang/                per-language pitfall supplements for the reviewer
+    cpp-core-guidelines/          vendored C++ Core Guidelines, condensed sections, cg-* procedure
 ```

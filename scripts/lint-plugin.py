@@ -177,6 +177,10 @@ def main():
         for problem in problems:
             print(f"  {problem}")
         return 1
+    for plugin_root in sorted(ROOT.glob("plugins/*")):
+        agents = [path.stem for path in sorted(plugin_root.glob("agents/*.md"))]
+        if agents:
+            print(f"{plugin_root.name} agents ({len(agents)}): {', '.join(agents)}")
     print("lint passed")
     return 0
 
