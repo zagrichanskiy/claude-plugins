@@ -47,6 +47,29 @@ If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and 
 path. If a file is missing, say so plainly in your reply and proceed on your own judgement rather
 than silently working without it.
 
+## Core Guidelines deviations
+
+When the `Already reported:` line says its `deviation` findings are yours to decide, decide every
+`deviation` finding in the `cg-*` reports it names. Add a *Core Guidelines decisions* table to the
+review, after Findings. A `Carried decisions:` line lists `accept here` decisions from an earlier
+round at unchanged code. Do not decide those again, and leave them out of the table.
+
+| Rule | `file:line` | Decision | Reason |
+|---|---|---|---|
+| `Enum.3` | `src/a.hpp:12` | `fix` `SHOULD-CONSIDER` | Plain enum leaks `kRed` into a namespace three headers include. |
+| `C.131` | `src/b.hpp:40` | `accept here` | Trivial getter on a struct kept for ABI with the C client. |
+| `Enum.6` | `src/c.hpp:8` | `propose project-wide` | `Enum.6: unnamed enums holding size and bit-width constants — pre-constexpr house style` |
+
+| Decision | Meaning |
+|---|---|
+| `fix` | The deviation costs something in this design. Give a severity from your checklist: `MUST-FIX`, `SHOULD-CONSIDER` or `NITPICK`. It counts toward the closing line. |
+| `accept here` | The deviation is justified at this place only. The reason names why. |
+| `propose project-wide` | The deviation is the project's practice. The reason holds the exact line to add to `.claude/cure/cg-deviations.md`, in its format `<rule id>: <scope> — <reason>`. |
+| `reclassify as defect` | The finding causes incorrect behaviour and was filed as a `deviation`. The reason names the failure: the input or state, and the wrong result. Give no severity; the merge ranks it as a bug. |
+
+A `defect` finding in a `cg-*` report is not yours to rank, and neither is a finding you reclassify.
+Ground rule 5 in `core.md` holds.
+
 ## Enhancement tag and closing line
 
 Tag a proposal for behaviour nobody asked for `enhancement`, separate from the `MUST-FIX` /

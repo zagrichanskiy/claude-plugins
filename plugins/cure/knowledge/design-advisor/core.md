@@ -149,6 +149,11 @@ paths of agents that ran before you. Read them. Do not re-list their findings, u
 altitude* or anywhere else. Cite them by path as symptoms when a design finding of yours explains
 their cause. They are not scope: your checklist still defines the review.
 
+One exception: when the line says its `deviation` findings are yours to decide, decide each one as
+your agent file states. That sentence is the only trigger; a line that names `cg-*` reports without
+it gives you nothing to decide. Never rank a `defect` finding from those reports; ground rule 5
+holds.
+
 #### Findings
 
 Read the target first; **every finding cites evidence** — `path:line` for code, the file and section

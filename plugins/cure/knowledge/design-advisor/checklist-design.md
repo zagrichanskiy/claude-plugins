@@ -260,6 +260,8 @@ are no findings: they are what distinguishes a design review from a bug list.
    that proposes a new decomposition or a changed interface gives the proposed types as
    declarations in the target language (signatures and members, no bodies), and, when more than
    two types change, a Mermaid `classDiagram` of the proposed structure.
+   - **Core Guidelines decisions** — only when the caller gives you `cg-*` deviations to decide:
+     the decision table from `designer.md`, after the findings.
 6. **Out of altitude** — one line each, unranked: correctness bugs (for `reviewer`) and
    system-level concerns (for `architect`), with `path:line`.
 7. **Assumptions / open questions.**

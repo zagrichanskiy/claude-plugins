@@ -155,12 +155,17 @@ Wait for all of them.
 **Wave 2.** Dispatch `designer` with step 3's brief and one more line:
 
 ```
-Already reported: <the wave 1 report paths, one per line> — already reported, do not repeat; input for cause analysis, not scope.
+Already reported: <the wave 1 report paths, one per line> — already reported, do not repeat; input for cause analysis, not scope. The cg-* deviation findings in these reports are yours to decide.
+Carried decisions: <the carried `accept here` decisions from step 4, one per line as rule, file:line, reason> — decided in an earlier round; do not decide again.
 ```
+
+Omit the `Carried decisions:` line when step 4 carries none.
 
 Pass the paths, never the findings copied into the brief. This line is not a topic: it names what
 the designer should not report again, and it lets the designer trace a class-level cause behind
-behaviour findings. The designer's checklist still defines its work.
+behaviour findings. The designer's checklist still defines its work. The `cg-*` agents do not rank;
+`designer` decides each `deviation` finding (fix, accept here, propose a project-wide entry, or
+reclassify as defect).
 
 **Record every skip.** For each agent left out, keep one line for the report.
 
@@ -179,12 +184,39 @@ dispatched. Each section keeps its own `MUST-FIX` and
 `SHOULD-CONSIDER` order, by that agent's severity definitions; `NITPICK` findings do not stay in
 the section body — see below.
 
+The `cg-*` agents classify findings as `defect` or `deviation` and rank nothing. Place them so:
+
+| Class | Section | Rank |
+|---|---|---|
+| `defect` | Correctness, beside the `reviewer` findings. | You rank it as a bug: `MUST-FIX`. Use `SHOULD-CONSIDER` only when the `cg-*` report states the failure is unreachable and names the search. |
+| `deviation`, decided `reclassify as defect` | Correctness, beside the `reviewer` findings, with the designer's named failure. | You rank it as a bug, as a `defect` above. |
+| `deviation`, any other decision | Design, in the designer's decision table. | The designer's decision. A `fix` carries the designer's severity; `accept here` and `propose project-wide` are not open findings. |
+| `deviation`, carried `accept here` | Design, in the designer's decision table, marked `carried from round <N>`. | Not an open finding. |
+| `deviation`, not in the designer's decision table for any reason | Core Guidelines subsection of the agent that raised it. | `undecided`, with the cause: `designer did not run`, `designer stopped at the token budget`, or `designer left it out`. It does not gate the round. |
+
+A `defect` inside the scope of a `cg-deviations.md` entry is ranked as any other `defect`; the entry
+accepts deviations only.
+
+**Carry `accept here` decisions forward.** Before wave 2, take every `accept here` decision from the
+earlier rounds step 1 found. Carry one when all three hold: the same rule id, the same file, and no
+change to the decided lines since that round (`git diff <that round's ref>..<head> -- <file>`).
+Give the carried list to `designer` in wave 2. Record each in the carry-over table below as
+*carried*. A decision whose code changed is not carried; the designer decides it again.
+
+The Core Guidelines subsections keep each agent's coverage table and count line. Collect every
+`propose project-wide` line from the designer's table in one list at the end of the design section,
+for the author to add to `.claude/cure/cg-deviations.md`. When a `cg-*` report lists entries that
+the change itself adds or edits in that file, list them in the same place, marked `added by this
+change`.
+
 `security-expert` grades `critical`, `high`, `medium`, `low`, and an overall verdict of `CHANGES
 REQUIRED` or `SATISFIED`, not the four tags below directly. Map them when merging: `critical` and
 `high` to `MUST-FIX`, `medium` to `SHOULD-CONSIDER`, `low` to `NITPICK`, and a verdict of `CHANGES
 REQUIRED` to the round not passing the severity floor (`NOT SATISFIED`).
 
-**Triage every finding into exactly one of four tags.** `MUST-FIX`, `SHOULD-CONSIDER`, and
+**Triage every finding into exactly one of four tags**, or mark it `undecided`. `undecided` applies
+only to a `cg-*` deviation with no designer decision, per the table above; it is not a tag and does
+not gate the round. `MUST-FIX`, `SHOULD-CONSIDER`, and
 `NITPICK` are severities, per the dispatched agent's own definitions (mapped for `security-expert`
 above). `enhancement` is a separate tag, not a severity: it marks a proposal for new behaviour
 rather than a defect in the change under review. Carry the `enhancement` tag from the agent that
@@ -233,7 +265,7 @@ produced.
   work for the author.
 - **Account for every earlier finding.** When step 1 found an earlier report, add a carry-over
   table: each earlier finding is *re-raised* (with its new ID), *resolved* (with the commit), or
-  *not raised*. Re-check every must-fix that was not raised against the source yourself before you
+  *not raised*; each carried `accept here` decision is *carried*. Re-check every must-fix that was not raised against the source yourself before you
   drop it. If it still holds, keep it in its altitude's section, marked as carried by the merging
   session. Independent agents drop findings between rounds; on unchanged code a must-fix that
   disappears is a miss, not a fix.

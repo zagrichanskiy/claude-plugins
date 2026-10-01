@@ -20,6 +20,38 @@ here.
 
 Read the project's `CLAUDE.md`, and any nearer `CLAUDE.md`, for conventions and safety rules.
 
+## Project-accepted deviations
+
+The reviewed repository may hold `.claude/cure/cg-deviations.md`. The path is relative to the root of
+the reviewed repository, not to the plugin. Its absence is not a finding.
+
+Read the file at the reviewed revision, never from the working directory:
+
+- Read it from the repository that contains the changed file, at the target's head.
+- For a multi-repository target, read one file per repository. An entry applies only to files in
+  its own repository.
+- For a pull request that is not checked out, run `git show <head>:.claude/cure/cg-deviations.md`.
+- When the change itself adds or edits the file, list the entries it adds or changes in the report.
+  Mark each finding or row that relies on one of them `entry added by this change`.
+
+Format: one entry per line.
+
+```
+<rule id>: <scope / when accepted> — <reason>
+```
+
+Example:
+
+```
+Enum.6: unnamed enums holding size and bit-width constants — pre-constexpr house style
+```
+
+- An entry suppresses `deviation` findings only. A `deviation` that matches an entry's rule id and
+  falls inside its scope is not raised.
+- A `defect` is always raised, inside an entry's scope or not. An entry never accepts a failure.
+- A finding outside the stated scope is raised as usual.
+- Quote the entry in the coverage table (see *Review*).
+
 ## Rule texts
 
 Read only your own section files, under `${CLAUDE_PLUGIN_ROOT}/knowledge/cpp-core-guidelines/sections/`.
@@ -47,6 +79,10 @@ Name a section by its index and title, for example "Per (Performance)", never by
    | `checked` | The change contains the construct the rule is about, and you inspected it. Either a finding cites the rule, or the change conforms. |
    | `not applicable` | The change contains no construct the rule is about. The reason names the absent construct, and the search that established the absence. |
    | `not checked` | The rule applies, or may apply, and you did not inspect it. The reason says why: the construct is outside the diff, the check needs a build or a tool, the budget ran out. |
+   | `accepted by project` | Every case of the rule in the change is a `deviation` inside an entry of `.claude/cure/cg-deviations.md`, and no `defect` cites the rule. The reason quotes the entry. |
+
+   A rule with both accepted cases and a raised finding is `checked`. The reason cites the finding
+   and quotes the entry. This includes a `defect` inside an entry's scope.
 
 3. A rule is a finding only when you can state the concrete place and effect in this code. A rule id
    is a lookup handle, never the argument.
@@ -59,20 +95,24 @@ used, and the pattern covers every spelling (`std::thread`, `std::jthread`, `pth
 
 ## Findings
 
-Rank findings most-severe first. Tag each with exactly one severity:
+You do not rank findings. Never tag a finding `MUST-FIX`, `SHOULD-CONSIDER` or `NITPICK`. Classify
+each finding as exactly one class:
 
-| Severity | Meaning | Gates the review |
+| Class | Meaning | Who ranks it |
 |---|---|---|
-| `MUST-FIX` | Breaks behaviour, security or a contract. | yes |
-| `SHOULD-CONSIDER` | A defect with a local, bounded cost. | yes |
-| `NITPICK` | Cosmetic or preference, no behavioural cost. | no |
+| `defect` | The violation causes incorrect behaviour: undefined behaviour, a leak, a data race, an uninitialised read, a throwing destructor. | The merge, as a correctness finding. |
+| `deviation` | The code departs from recommended practice, and no concrete failure follows. | `designer`, which decides whether it is fixed. |
+
+A `defect` names the concrete failure: the input or state, and the wrong result. A finding with no
+failure named is a `deviation`.
 
 Each finding holds:
 
 - a reference, `F1`, `F2`, and so on, used by the coverage table;
+- the class, `defect` or `deviation`;
 - the rule id, for example `R.11`;
 - `file:line`;
-- one sentence stating the defect and the effect in this code;
+- one sentence stating the departure and its effect in this code; for a `defect`, the failure;
 - the concrete fix, in words. You do not apply it.
 
 Separate confirmed findings from lower-confidence concerns.
@@ -81,8 +121,10 @@ Separate confirmed findings from lower-confidence concerns.
 
 In this order:
 
-1. The change reviewed and the sections covered, each as "<index> (<title>)".
-2. Findings, ranked.
+1. The change reviewed and the sections covered, each as "<index> (<title>)". The
+   `cg-deviations.md` read, per repository, with its revision, and the entries the change adds or
+   edits.
+2. Findings: defects first, then deviations.
 3. The coverage table: one row for every rule in your sections, in section order. A rule with no
    row is a defect in the report.
 
@@ -96,12 +138,13 @@ In this order:
 4. A count per status for each section.
 5. The reading footer on its own line:
    `Read: <N> files in full, <M> sampled; digest: used | absent.`
-6. Exactly one verdict line:
-   - `SATISFIED` when only `NITPICK` findings remain;
-   - `NOT SATISFIED — N MUST-FIX or SHOULD-CONSIDER findings above.`
+6. One count line, and no verdict:
+   `Defects: <N>. Deviations: <M>. Accepted by project: <K> rules.`
+   The report gives no verdict because it ranks nothing. The merge ranks defects; `designer` decides
+   deviations.
 
-Where the caller names a report path, the final message is a short summary: the finding count by
-severity, the status counts, the footer and the verdict.
+Where the caller names a report path, the final message is a short summary: the count line, the
+status counts and the footer.
 
 ## Rules
 
