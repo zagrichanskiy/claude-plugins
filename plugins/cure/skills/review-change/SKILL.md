@@ -41,8 +41,11 @@ Record `--with architect` when the user passed it; step 3a uses it.
 Also find earlier review reports of the same target: a report or handoff under `.notes/`, a
 published report the user names, an earlier digest. Record each one and the commits that landed
 since it. Do not pass their findings to the agents (step 3 forbids topics); the merge uses them in
-step 4. Step 1a is the one exception: re-check mode passes the open ledger ids, not the findings
-themselves.
+step 4. There are two exceptions:
+
+- Step 1a: re-check mode passes the open ledger ids, not the findings themselves.
+- Step 3a: wave 2 passes the carried `accept here` decisions on the `Carried decisions:` line. This
+  is not a topic: it removes work from the designer and adds none.
 
 **Set the token budget for the round** before dispatching anything: 400k tokens per agent per
 round, unless the caller states a different figure. State the figure in the same line as the
@@ -152,14 +155,19 @@ Core Guidelines: <the report paths of the cg-* agents in this wave, one per line
 
 Wait for all of them.
 
+**Carry `accept here` decisions forward.** Before wave 2, take every `accept here` decision from the
+earlier rounds step 1 found. Carry one when all three hold: the same rule id, the same file, and no
+change to the decided lines since that round (`git diff <that round's ref>..<head> -- <file>`).
+A decision whose code changed is not carried; the designer decides it again.
+
 **Wave 2.** Dispatch `designer` with step 3's brief and one more line:
 
 ```
 Already reported: <the wave 1 report paths, one per line> — already reported, do not repeat; input for cause analysis, not scope. The cg-* deviation findings in these reports are yours to decide.
-Carried decisions: <the carried `accept here` decisions from step 4, one per line as rule, file:line, reason> — decided in an earlier round; do not decide again.
+Carried decisions: <the carried `accept here` decisions from above, one per line as rule, file:line, reason> — decided in an earlier round; do not decide again.
 ```
 
-Omit the `Carried decisions:` line when step 4 carries none.
+Omit the `Carried decisions:` line when no decision is carried.
 
 Pass the paths, never the findings copied into the brief. This line is not a topic: it names what
 the designer should not report again, and it lets the designer trace a class-level cause behind
@@ -188,7 +196,7 @@ The `cg-*` agents classify findings as `defect` or `deviation` and rank nothing.
 
 | Class | Section | Rank |
 |---|---|---|
-| `defect` | Correctness, beside the `reviewer` findings. | You rank it as a bug: `MUST-FIX`. Use `SHOULD-CONSIDER` only when the `cg-*` report states the failure is unreachable and names the search. |
+| `defect` | Correctness, beside the `reviewer` findings. | You rank it as a bug: `MUST-FIX`. |
 | `deviation`, decided `reclassify as defect` | Correctness, beside the `reviewer` findings, with the designer's named failure. | You rank it as a bug, as a `defect` above. |
 | `deviation`, any other decision | Design, in the designer's decision table. | The designer's decision. A `fix` carries the designer's severity; `accept here` and `propose project-wide` are not open findings. |
 | `deviation`, carried `accept here` | Design, in the designer's decision table, marked `carried from round <N>`. | Not an open finding. |
@@ -197,11 +205,7 @@ The `cg-*` agents classify findings as `defect` or `deviation` and rank nothing.
 A `defect` inside the scope of a `cg-deviations.md` entry is ranked as any other `defect`; the entry
 accepts deviations only.
 
-**Carry `accept here` decisions forward.** Before wave 2, take every `accept here` decision from the
-earlier rounds step 1 found. Carry one when all three hold: the same rule id, the same file, and no
-change to the decided lines since that round (`git diff <that round's ref>..<head> -- <file>`).
-Give the carried list to `designer` in wave 2. Record each in the carry-over table below as
-*carried*. A decision whose code changed is not carried; the designer decides it again.
+Record each `accept here` decision carried in step 3a as *carried* in the carry-over table below.
 
 The Core Guidelines subsections keep each agent's coverage table and count line. Collect every
 `propose project-wide` line from the designer's table in one list at the end of the design section,
