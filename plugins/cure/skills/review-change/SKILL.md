@@ -41,11 +41,8 @@ Record `--with architect` when the user passed it; step 3a uses it.
 Also find earlier review reports of the same target: a report or handoff under `.notes/`, a
 published report the user names, an earlier digest. Record each one and the commits that landed
 since it. Do not pass their findings to the agents (step 3 forbids topics); the merge uses them in
-step 4. There are two exceptions:
-
-- Step 1a: re-check mode passes the open ledger ids, not the findings themselves.
-- Step 3a: wave 2 passes the carried `accept here` decisions on the `Carried decisions:` line. This
-  is not a topic: it removes work from the designer and adds none.
+step 4. Step 1a is the one exception: re-check mode passes the open ledger ids, not the findings
+themselves.
 
 **Set the token budget for the round** before dispatching anything: 400k tokens per agent per
 round, unless the caller states a different figure. State the figure in the same line as the
@@ -155,21 +152,11 @@ Core Guidelines: <the report paths of the cg-* agents in this wave, one per line
 
 Wait for all of them.
 
-**Carry `accept here` decisions forward.** Before wave 2, take every `accept here` decision from the
-earlier rounds step 1 found. A decision is identified by its rule id, its file and the source
-line or lines it was made on, quoted verbatim in the designer's decision table. Carry one when the
-quoted text still exists verbatim in that file at the reviewed head (`grep -nF` on the file at
-head). The line number is informational: replace it with the line where the quote now is. A
-decision whose quoted text is gone or changed is not carried; the designer decides it again.
-
 **Wave 2.** Dispatch `designer` with step 3's brief and one more line:
 
 ```
 Already reported: <the wave 1 report paths, one per line> — already reported, do not repeat; input for cause analysis, not scope. The cg-* deviation findings in these reports are yours to decide.
-Carried decisions: <the carried `accept here` decisions from above, one per line as rule, file:line at head, quoted line, reason> — decided in an earlier round; do not decide again.
 ```
-
-Omit the `Carried decisions:` line when no decision is carried.
 
 Pass the paths, never the findings copied into the brief. This line is not a topic: it names what
 the designer should not report again, and it lets the designer trace a class-level cause behind
@@ -201,13 +188,10 @@ The `cg-*` agents classify findings as `defect` or `deviation` and rank nothing.
 | `defect` | Correctness, beside the `reviewer` findings. | You rank it as a bug: `MUST-FIX`. |
 | `deviation`, decided `reclassify as defect` | Correctness, beside the `reviewer` findings, with the designer's named failure. | You rank it as a bug, as a `defect` above. |
 | `deviation`, any other decision | Design, in the designer's decision table. | The designer's decision. A `fix` carries the designer's severity; `accept here` and `propose project-wide` are not open findings. |
-| `deviation`, carried `accept here` | Design, in the designer's decision table, marked `carried from round <N>`. | Not an open finding. |
-| `deviation`, not in the designer's decision table and not carried | Core Guidelines subsection of the agent that raised it. | `undecided`, with the cause: `designer did not run`, `designer stopped at the token budget`, or `designer left it out`. It does not gate the round. |
+| `deviation`, not in the designer's decision table | Core Guidelines subsection of the agent that raised it. | `undecided`, with the cause: `designer did not run`, `designer stopped at the token budget`, or `designer left it out`. It does not gate the round. |
 
 A `defect` inside the scope of a `cg-deviations.md` entry is ranked as any other `defect`; the entry
 accepts deviations only.
-
-Record each `accept here` decision carried in step 3a as *carried* in the carry-over table below.
 
 The Core Guidelines subsections keep each agent's coverage table and count line. Collect every
 `propose project-wide` line from the designer's table in one list at the end of the design section,
@@ -271,7 +255,7 @@ produced.
   work for the author.
 - **Account for every earlier finding.** When step 1 found an earlier report, add a carry-over
   table: each earlier finding is *re-raised* (with its new ID), *resolved* (with the commit), or
-  *not raised*; each carried `accept here` decision is *carried*. Re-check every must-fix that was not raised against the source yourself before you
+  *not raised*. Re-check every must-fix that was not raised against the source yourself before you
   drop it. If it still holds, keep it in its altitude's section, marked as carried by the merging
   session. Independent agents drop findings between rounds; on unchanged code a must-fix that
   disappears is a miss, not a fix.

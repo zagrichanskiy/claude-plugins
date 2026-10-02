@@ -51,26 +51,18 @@ than silently working without it.
 
 When the `Already reported:` line says its `deviation` findings are yours to decide, decide every
 `deviation` finding in the `cg-*` reports it names. Add a *Core Guidelines decisions* table to the
-review, after Findings. For an `accept here` decision, quote the source line or lines it was made
-on, verbatim, in *Quoted line*; a later round carries the decision while that text is unchanged.
-Leave *Quoted line* empty for the other decisions.
+review, after Findings.
 
-A `Carried decisions:` line lists `accept here` decisions from an earlier round, each with its rule
-id, file, line at head and quoted line. A finding matches a carried decision when the rule id and
-file match and the finding's line at head holds the quoted text. Do not decide a matched finding
-again, and leave it out of the table. Decide every other finding, including another instance of
-the same rule in the same file.
-
-| Rule | `file:line` | Decision | Quoted line | Reason |
-|---|---|---|---|---|
-| `Enum.3` | `src/a.hpp:12` | `fix` `SHOULD-CONSIDER` | | Plain enum leaks `kRed` into a namespace three headers include. |
-| `C.131` | `src/b.hpp:40` | `accept here` | `int id() const { return id_; }` | Trivial getter on a struct kept for ABI with the C client. |
-| `Enum.6` | `src/c.hpp:8` | `propose project-wide` | | `Enum.6: unnamed enums holding size and bit-width constants — pre-constexpr house style` |
+| Rule | `file:line` | Decision | Reason |
+|---|---|---|---|
+| `Enum.3` | `src/a.hpp:12` | `fix` `SHOULD-CONSIDER` | Plain enum leaks `kRed` into a namespace three headers include. |
+| `C.131` | `src/b.hpp:40` | `accept here` | Trivial getter on a struct kept for ABI with the C client. |
+| `Enum.6` | `src/c.hpp:8` | `propose project-wide` | `Enum.6: unnamed enums holding size and bit-width constants — pre-constexpr house style` |
 
 | Decision | Meaning |
 |---|---|
 | `fix` | The deviation costs something in this design. Give a severity from your checklist: `MUST-FIX`, `SHOULD-CONSIDER` or `NITPICK`. It counts toward the closing line. |
-| `accept here` | The deviation is justified at this place only. The reason names why. *Quoted line* holds the source text. |
+| `accept here` | The deviation is justified at this place only. The reason names why. |
 | `propose project-wide` | The deviation is the project's practice. The reason holds the exact line to add to `.claude/cure/cg-deviations.md`, in its format `<rule id>: <scope> — <reason>`. |
 | `reclassify as defect` | The finding causes incorrect behaviour and was filed as a `deviation`. The reason names the failure: the input or state, and the wrong result. Give no severity; the merge ranks it as a bug. |
 

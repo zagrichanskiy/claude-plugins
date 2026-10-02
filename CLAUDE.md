@@ -105,10 +105,7 @@ C++ supplement named the pitfall. Each of these guards addresses one miss; keep 
 | "Nothing else syncs" built on a grep for `fsync` only | `core.md` rule 12 and `reviewer.md`: an absence claim names its search |
 
 The earlier findings are deliberately not given to the agents. That would be a topic brief, which
-`review-change` step 3 forbids; the carry-over check belongs to the merge. One kind of earlier
-decision is carried to the designer in step 3a: an `accept here` decision on a deviation. It
-carries only for the same rule id and file, and only while the quoted source line it was made on
-still exists verbatim in that file. `fix` and `propose project-wide` decisions are never carried.
+`review-change` step 3 forbids; the carry-over check belongs to the merge.
 
 ## Marketplace names resembling official ones are rejected
 
