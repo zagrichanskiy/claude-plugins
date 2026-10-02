@@ -45,7 +45,7 @@ To decrease code size and run time.
 To avoid data races by using constants.
 To catch errors at compile time (and thus eliminate the need for error-handling code).
 
-Search hint: `grep -nE '^\s*switch\s*\(|[!=]=\s*\w+(::\w+)+' <files>` lists a `switch`, or an `if` chain comparing against a scoped enumerator; add the names of unscoped enumerators to the pattern. For each hit, grep the enclosing function's callers (`grep -rnE '<function>\s*(<[^>]*>)?\('`). Where every caller passes a constant (an enumerator, a literal, a `constexpr` value, a template argument), the result is computable at compile time. When the rest of the result reads run-time data, the part that depends only on the constant arguments (for example the `switch` dispatch on an enumerator) can still move to compile time (a template parameter, `if constexpr`, a trait lookup). Such a site is a finding, not a conforming site.
+Search hint: `grep -nE '^\s*switch\s*\(|[!=]=\s*\w+(::\w+)+' <files>` lists a `switch`, or an `if` chain comparing against a scoped enumerator; add the names of unscoped enumerators to the pattern. For each hit, grep the enclosing function's callers (`grep -rnE '<function>\s*(<[^>]*>)?\('`). Where every caller passes a constant (an enumerator, a literal, a `constexpr` value, a template argument), the result is computable at compile time. When the rest of the result reads run-time data, the part that depends only on the constant arguments (for example the `switch` dispatch on an enumerator) can still move to compile time (a template parameter, `if constexpr`, a trait lookup). Such a site is a `deviation` finding, not a conforming site.
 
 ## Per.16: Use compact data structures
 

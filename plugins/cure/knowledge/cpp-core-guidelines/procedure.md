@@ -61,9 +61,10 @@ path.
 - Each rule is a `## <id>: <title>` heading followed by its reason.
 - Some rules end with a `Search hint:` line: a search that finds the sites the rule is about. Run
   it on the changed files. A different search is allowed when it finds every site the hint finds.
-- For a rule with a `Search hint:`, a `checked` reason gives the hint's hit count over the target.
-  It lists each hit, or groups the hits by enclosing function. A hint step that was not run, for
-  example a caller sweep, leaves the row `not checked` for the sites that step would have found.
+- For a rule with a `Search hint:`, a `checked` reason gives the hint's hit count over the changed
+  files. It lists each hit, or groups the hits by enclosing function. A hint step that was not run,
+  for example a caller sweep, leaves the row `not checked` for the sites that step would have
+  found.
 - List the rule ids of a section with `grep -n '^## ' <file>`. That list is the set of rows your
   coverage table must hold.
 - Never fetch the full upstream `CppCoreGuidelines.md`. It is the full text of every section and
@@ -136,7 +137,7 @@ In this order:
    |---|---|---|
    | `F.2` | checked | F1 |
    | `F.3` | checked | conforms: `parse()` at `src/a.cpp:40` is 12 lines |
-   | `E.4` | checked | Search hint: 9 hits in 3 functions, all inspected: `load()` `src/a.cpp:20-48` (4), `save()` `src/a.cpp:60-75` (3), `check()` `src/b.cpp:12-30` (2); caller sweep of `check()`: `set_size()` `src/b.cpp:40`, `set_rate()` `src/b.cpp:52`; conforms |
+   | `E.4` | checked | Search hint: 9 hits in 3 functions, all inspected: `load()` `src/a.cpp:20-48` (4), `save()` `src/a.cpp:60-75` (3), `check()` `src/b.cpp:12-30` (2); caller sweep: `load()` and `save()` catch and need none, `check()` is called by `set_size()` `src/b.cpp:40` and `set_rate()` `src/b.cpp:52`; conforms |
    | `F.55` | not applicable | no variadic function; `grep -nE '\.\.\.\)' <changed files>` found none |
    | `F.60` | not checked | the callers are outside the diff |
 
