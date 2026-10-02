@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Condense the vendored C++ Core Guidelines into one file per section.
+"""Condense the C++ Core Guidelines into one file per section.
+
+By default the script downloads CppCoreGuidelines.md at the commit pinned in the README and checks
+its SHA-256. The download is kept in memory only. --source reads a local copy instead.
 
 Each rule keeps its id, its title and its Reason text, or its lead text up to the first heading
 when it has no Reason heading. Examples, notes, exceptions and enforcement text are dropped. A rule whose reason is missing, empty or only "???" is a stub and is dropped.
@@ -7,9 +10,12 @@ The output is deterministic: a rerun on the same input writes byte-identical fil
 """
 
 import argparse
+import hashlib
 import pathlib
 import re
 import sys
+import urllib.error
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = ROOT / "plugins" / "cure" / "knowledge" / "cpp-core-guidelines"
@@ -24,11 +30,14 @@ ANY_HEADING = re.compile(r"^#{1,6} ")
 REASON_HEADING = re.compile(r"^#{4,5} Reason\s*$")
 INTERNAL_LINK = re.compile(r"\[([^\]]+)\]\(#[^)]*\)")
 COMMIT = re.compile(r"^\| Commit \| ([0-9a-f]{40}) \|$", re.MULTILINE)
+SHA256 = re.compile(r"^\| SHA-256 \| ([0-9a-f]{64}) \|$", re.MULTILINE)
+URL = "https://raw.githubusercontent.com/isocpp/CppCoreGuidelines/{commit}/CppCoreGuidelines.md"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--source", type=pathlib.Path, default=BASE / "upstream" / "CppCoreGuidelines.md")
+    parser.add_argument("--source", type=pathlib.Path,
+                        help="local CppCoreGuidelines.md to read instead of downloading it")
     parser.add_argument("--out", type=pathlib.Path, default=BASE / "sections")
     parser.add_argument("--readme", type=pathlib.Path, default=BASE / "README.md")
     return parser.parse_args()
@@ -114,18 +123,43 @@ def render(section_id, title, commit, rules):
     return "\n".join(out) + "\n"
 
 
+def download(url):
+    """Return the body of url, or exit with a message that names --source."""
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            return response.read()
+    except (urllib.error.URLError, OSError) as error:
+        sys.exit(f"cannot download {url}: {error}\n"
+                 "Pass a local copy of CppCoreGuidelines.md with --source <path>.")
+
+
 def main():
     args = parse_args()
-    match = COMMIT.search(args.readme.read_text(encoding="utf-8"))
+    readme = args.readme.read_text(encoding="utf-8")
+    match = COMMIT.search(readme)
     if not match:
         sys.exit(f"{args.readme}: no '| Commit | <sha> |' row")
     commit = match.group(1)
+    match = SHA256.search(readme)
+    if not match:
+        sys.exit(f"{args.readme}: no '| SHA-256 | <hex> |' row")
+    expected = match.group(1)
 
-    lines = args.source.read_text(encoding="utf-8").splitlines()
+    if args.source is not None:
+        origin = str(args.source)
+        data = args.source.read_bytes()
+    else:
+        origin = URL.format(commit=commit)
+        data = download(origin)
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != expected:
+        sys.exit(f"{origin}: SHA-256 {actual} does not match {expected} in {args.readme}")
+
+    lines = data.decode("utf-8").splitlines()
     sections = split_sections(lines)
     missing = [s for s in SECTIONS if s not in sections]
     if missing:
-        sys.exit(f"{args.source}: sections not found: {', '.join(missing)}")
+        sys.exit(f"{origin}: sections not found: {', '.join(missing)}")
 
     args.out.mkdir(parents=True, exist_ok=True)
     for section_id in SECTIONS:

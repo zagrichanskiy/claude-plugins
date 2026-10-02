@@ -162,5 +162,5 @@ plugins/<name>/
   knowledge/                      reference material the agents read at run time
     design-advisor/lang/          per-language supplements, loaded only for the target's language
     reviewer/lang/                per-language pitfall supplements for the reviewer
-    cpp-core-guidelines/          vendored C++ Core Guidelines, condensed sections, cg-* procedure
+    cpp-core-guidelines/          condensed C++ Core Guidelines sections, cg-* procedure
 ```

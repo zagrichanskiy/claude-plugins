@@ -61,9 +61,8 @@ path.
 - Each rule is a `## <id>: <title>` heading followed by its reason.
 - List the rule ids of a section with `grep -n '^## ' <file>`. That list is the set of rows your
   coverage table must hold.
-- Never read the upstream `CppCoreGuidelines.md` under
-  `${CLAUDE_PLUGIN_ROOT}/knowledge/cpp-core-guidelines/upstream/`. It is the full text of every
-  section and costs its size on every request.
+- Never fetch the full upstream `CppCoreGuidelines.md`. It is the full text of every section and
+  costs its size on every request.
 
 Name a section by its index and title, for example "Per (Performance)", never by the bare index.
 
