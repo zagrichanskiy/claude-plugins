@@ -156,15 +156,17 @@ Core Guidelines: <the report paths of the cg-* agents in this wave, one per line
 Wait for all of them.
 
 **Carry `accept here` decisions forward.** Before wave 2, take every `accept here` decision from the
-earlier rounds step 1 found. Carry one when all three hold: the same rule id, the same file, and no
-change to the decided lines since that round (`git diff <that round's ref>..<head> -- <file>`).
-A decision whose code changed is not carried; the designer decides it again.
+earlier rounds step 1 found. A decision is identified by its rule id, its file and the source
+line or lines it was made on, quoted verbatim in the designer's decision table. Carry one when the
+quoted text still exists verbatim in that file at the reviewed head (`grep -nF` on the file at
+head). The line number is informational: replace it with the line where the quote now is. A
+decision whose quoted text is gone or changed is not carried; the designer decides it again.
 
 **Wave 2.** Dispatch `designer` with step 3's brief and one more line:
 
 ```
 Already reported: <the wave 1 report paths, one per line> — already reported, do not repeat; input for cause analysis, not scope. The cg-* deviation findings in these reports are yours to decide.
-Carried decisions: <the carried `accept here` decisions from above, one per line as rule, file:line, reason> — decided in an earlier round; do not decide again.
+Carried decisions: <the carried `accept here` decisions from above, one per line as rule, file:line at head, quoted line, reason> — decided in an earlier round; do not decide again.
 ```
 
 Omit the `Carried decisions:` line when no decision is carried.
@@ -200,7 +202,7 @@ The `cg-*` agents classify findings as `defect` or `deviation` and rank nothing.
 | `deviation`, decided `reclassify as defect` | Correctness, beside the `reviewer` findings, with the designer's named failure. | You rank it as a bug, as a `defect` above. |
 | `deviation`, any other decision | Design, in the designer's decision table. | The designer's decision. A `fix` carries the designer's severity; `accept here` and `propose project-wide` are not open findings. |
 | `deviation`, carried `accept here` | Design, in the designer's decision table, marked `carried from round <N>`. | Not an open finding. |
-| `deviation`, not in the designer's decision table for any reason | Core Guidelines subsection of the agent that raised it. | `undecided`, with the cause: `designer did not run`, `designer stopped at the token budget`, or `designer left it out`. It does not gate the round. |
+| `deviation`, not in the designer's decision table and not carried | Core Guidelines subsection of the agent that raised it. | `undecided`, with the cause: `designer did not run`, `designer stopped at the token budget`, or `designer left it out`. It does not gate the round. |
 
 A `defect` inside the scope of a `cg-deviations.md` entry is ranked as any other `defect`; the entry
 accepts deviations only.
