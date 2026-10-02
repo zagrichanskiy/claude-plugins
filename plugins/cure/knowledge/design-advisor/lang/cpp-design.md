@@ -9,34 +9,26 @@ Sources are cited by their usual short names: the *C++ Core Guidelines* (Stroust
 rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutter & Alexandrescu
 (*C++ Coding Standards*), Lakos (*Large-Scale C++ Software Design*).
 
+This file does not restate Core Guidelines rules. The `cg-*` agents check the code against every
+rule. An entry here adds design content beyond the rule it cites.
+
 ## Types and invariants
 
-- **`class` when there is an invariant, `struct` when members vary independently** (Core
-  Guidelines `C.2`). Flag a `struct` whose fields must agree and a `class` that is a plain
-  aggregate hidden behind accessors.
-- **Common origin is not an invariant.** Fields that must come from one call but may diverge
-  afterwards by design — a result a later stage updates — stay a `struct`. A private constructor
-  restricts who builds a value; it checks nothing about the values. Ask for a class only when a
-  relation between field values can be broken by a hand-built value (`x ⊆ y`, `a ⇒ b`).
-- **A constructor creates a fully initialised object** (`C.41`). Flag `init()`/`open()` that must
-  follow construction, and members that stay in a moved-from or empty state the rest of the class
-  must test. When construction can fail as a normal outcome, prefer a factory returning
-  `std::expected<T, E>` (or `std::optional<T>`) over a half-built object.
-- **Single-argument constructors are `explicit`** (`C.46`).
-- **Strong types at interfaces** (`I.4`) — a size, a duration, an identifier or a pattern is its
-  own type (or `std::chrono` type), not a `std::uintmax_t` or a `std::string`. `enum class` over
-  plain `enum` (`Enum.3`); an enum over a `bool` parameter that selects behaviour.
+- **Common origin is not an invariant** (qualifies `C.2`). Fields that must come from one call but
+  may diverge afterwards by design — a result a later stage updates — stay a `struct`. A private
+  constructor restricts who builds a value; it checks nothing about the values. Ask for a class
+  only when a relation between field values can be broken by a hand-built value (`x ⊆ y`,
+  `a ⇒ b`).
+- **Construction that can fail as a normal outcome** is a factory returning `std::expected<T, E>`
+  (or `std::optional<T>`), not a half-built object with an `is_valid()` check (extends `C.41`).
+- **An enum over a `bool` parameter that selects behaviour.**
 - **Sum types for closed sets** — `std::variant` over two `std::optional` members of which one is
   set, and over a `kind` field with members that are meaningful only for some kinds.
 
-## Ownership in the signature (Core Guidelines, section R and I)
+## Ownership in the signature
 
-- **Raw pointers and references never own** (`I.11`, `R.3`). A parameter a callee stores must say
-  so in its type; a reference member means "something else outlives me" and needs that stated.
-- **`std::unique_ptr` for sole ownership; `std::shared_ptr` only for ownership that is genuinely
-  shared** (`R.20`, `R.21`). Flag `shared_ptr` used to avoid thinking about lifetime.
-- **Take smart pointers as parameters only to express a lifetime transfer** (`R.30`); otherwise
-  take `T&` or `T*` (`F.7`).
+- **A reference member means "something else outlives me"** and needs the owner that guarantees
+  it stated.
 - **Views do not outlive their source.** A `std::string_view` or `std::span` member, or one
   returned from a function, is a lifetime claim; flag one whose source is a temporary or a member
   that can change.
@@ -45,13 +37,6 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 
 ## Special members and value semantics
 
-- **Rule of zero** (`C.20`) — a type that owns through RAII members needs no user-declared copy,
-  move or destructor. **Rule of five** (`C.21`) — if one is declared, all five are considered.
-- **Polymorphic bases**: destructor public and virtual, or protected and non-virtual (`C.35`);
-  suppress public copy and move (`C.67`) to prevent slicing.
-- **Moves are `noexcept`** where possible; containers depend on it.
-- **Value types are regular** — copyable, comparable, no hidden sharing. Flag a "value" that shares
-  mutable state through a pointer.
 - **Ordering operators state the type's natural order.** `operator<` (or `<=>`) must agree with
   `==` (Sutter, *Consistent comparison*, P0515 — the model C++20 `<=>` is built on): two values
   neither less nor greater are equal. Flag an ordering operator added for one sort whose key skips
@@ -61,11 +46,10 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 
 ## `const` and logical constness
 
-- **Member functions are `const` by default** (`Con.2`) — and **`const` means "does not change what
-  a caller can observe"**, not "does not touch a member". Flag a `const` member that renames,
-  deletes or writes through a held descriptor: the keyword then lies about the most destructive
-  operations. Flag `mutable` used for anything but caches, mutexes and counters invisible to
-  callers.
+- **`const` means "does not change what a caller can observe"**, not "does not touch a member"
+  (extends `Con.2`). Flag a `const` member that renames, deletes or writes through a held
+  descriptor: the keyword then lies about the most destructive operations. Flag `mutable` used for
+  anything but caches, mutexes and counters invisible to callers.
 
 ## Polymorphism choice
 
@@ -82,27 +66,22 @@ rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutt
 
 ## Members versus free functions
 
-- **Make a function a member only if it needs direct access to the representation** (`C.4`);
-  non-member non-friend functions increase encapsulation (Meyers, *Effective C++* item 23). The
-  test runs in both directions: a free function that enforces a type's invariant
-  (`add_entry(registry&, ...)`) belongs in that type, and so does a function that only asks
-  questions of one type. Flag callers that mutate fields directly and bypass the function that
-  enforces the invariant.
-- **Decompose orchestrators into stages** (`F.2`, `F.3`) — a function does one logical operation
-  and stays short. Stages are pure functions from inputs to a named struct; see the pipeline item
-  in `checklist-design.md`.
+- **The member-or-free test runs in both directions** (extends `C.4`; Meyers, *Effective C++*
+  item 23): a free function that enforces a type's invariant (`add_entry(registry&, ...)`) belongs
+  in that type, and so does a function that only asks questions of one type. Flag callers that
+  mutate fields directly and bypass the function that enforces the invariant.
+- **Decompose orchestrators into stages** (extends `F.2`). Stages are pure functions from inputs to
+  a named struct; see the pipeline item in `checklist-design.md`.
 - **Pure logic in an anonymous namespace is untestable.** A string transformation or a decision
-  function reachable only through a class that does I/O is a finding under *Testability*; the fix
-  is an internal header or a small value type, not a friend test.
+  function reachable only through a class that does I/O is a finding under §15 (Testability); the
+  fix is an internal header or a small value type, not a friend test.
 
 ## Error strategy
 
 - **One mechanism per layer** — exceptions, `std::expected`, or `std::error_code`; flag mixtures
   in one interface.
-- **Exceptions are specific types** (`E.14`) and are caught by the concrete type the code can act
-  on; flag `catch (const std::exception&)` used as a fallback trigger where one type is expected.
-- **`noexcept` is a contract** — declare it where the design relies on it (moves, destructors,
-  swap), and never where the function can throw.
+- **Exceptions are caught by the concrete type the code can act on** (extends `E.14`); flag
+  `catch (const std::exception&)` used as a fallback trigger where one type is expected.
 
 ## Coroutines, executors and asynchronous lifetime
 
@@ -110,9 +89,6 @@ These are design questions: *which structure guarantees an object outlives the c
 it*. A single unguarded resumption is a `reviewer` bug; the structure that makes it possible is
 yours.
 
-- **Coroutine parameters are taken by value** (`CP.53`) and **lambdas that are coroutines do not
-  capture** (`CP.51`) — references and captures dangle once the coroutine suspends past the
-  caller's frame.
 - **Pick one lifetime model per project and apply it everywhere**: structured scopes that join
   their tasks; `shared_from_this` keeping the owner alive; or a cancellation token checked after
   every suspension. Flag a class whose coroutines use a different model from each other, and a
@@ -130,8 +106,8 @@ yours.
 - **Headers are the compile-time contract.** Flag a public header that includes third-party or
   internal headers its callers do not need, exposes implementation types, or defines what could be
   declared.
-- **Pimpl** (`I.27`) — fits a public library interface that must keep a stable ABI or hide heavy
-  dependencies; misuse on internal types that pay an allocation for nothing.
+- **Pimpl on an internal type** pays an allocation for nothing; flag it where no ABI or header
+  dependency needs hiding (qualifies `I.27`).
 - **Internal versus public headers** are separated by directory, and tests reach internals through
   the internal headers, not through the public ones.
 
@@ -142,10 +118,7 @@ developer is making — the idiom's name is the lookup handle, the finding is th
 
 | Idiom | Use it when | Signal in the code under review |
 |---|---|---|
-| **RAII** (`R.1`) | Any resource with a release step: descriptors, locks, mappings, registrations, subscriptions | A release call on every exit path, or a `close()` the caller must remember |
 | **Scope guard** | One-off cleanup or rollback that no type owns | `goto cleanup`, or cleanup duplicated in several `catch` blocks |
-| **Rule of zero / rule of five** (`C.20`, `C.21`) | Always; five only when the type itself manages a resource | A user-declared destructor with default copy operations (double release) |
-| **Pimpl** (`I.27`) | A public library type whose ABI or header dependencies must stay stable | A public header pulling in third-party headers for a private member |
 | **Non-virtual interface** | A base must enforce checks or logging around every override | Every override repeating the same pre/post steps |
 | **Type erasure** | Value-semantic polymorphism for callbacks and strategies, without a hierarchy | A one-method interface plus a heap-allocated implementation per call site |
 | **`std::variant` + overload set** | A closed set of alternatives, visited exhaustively | A `kind` enum with members valid only for some kinds |
@@ -155,13 +128,10 @@ developer is making — the idiom's name is the lookup handle, the finding is th
 | **Passkey** | A constructor that must be public for `std::make_shared` / `std::make_unique` but callable only by the factory | A public constructor with a comment saying "do not call" |
 | **`enable_shared_from_this` / `weak_from_this`** | An object must keep itself alive, or check it is alive, across an asynchronous callback | `this` captured in a completion handler with nothing guaranteeing the object outlives it |
 | **Hidden friend** | Operators and customisation points for a type, found only by argument-dependent lookup | Free operators in a namespace that make overload resolution slow or ambiguous |
-| **Scoped locking** (*POSA 2*; `std::scoped_lock`) | Every mutex acquisition | Manual `lock()` / `unlock()` |
 | **Thread-safe interface** (*POSA 2*) | A class locked internally: public members lock, private members assume the lock | Public members calling each other and self-deadlocking, or a recursive mutex added to hide it |
 
 **Idioms not to recommend any more** — flag them where they appear, with the modern replacement:
 
-- **Double-checked locking** → a function-local `static` (thread-safe since C++11) or
-  `std::call_once`.
 - **Thread-specific storage by hand** → `thread_local`.
 - **Safe bool** → `explicit operator bool`.
 - **SFINAE / `std::enable_if`** in new code on C++20 → concepts and `requires`.
@@ -169,7 +139,6 @@ developer is making — the idiom's name is the lookup handle, the finding is th
 - **Copy-and-swap** written by hand for a type that could follow the rule of zero → the rule of
   zero; keep copy-and-swap only where the strong exception guarantee is required and measured
   acceptable.
-- **`std::auto_ptr`, owning raw `new`/`delete`** → `std::unique_ptr` and `std::make_unique`.
 
 ## C++ forms of common patterns
 

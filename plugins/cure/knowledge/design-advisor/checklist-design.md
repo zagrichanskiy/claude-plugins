@@ -10,7 +10,7 @@ component, what each is responsible for, what its interface promises, and how th
 one another*. Which components exist and what crosses between them belongs to `architect`; whether
 a given line of code misbehaves belongs to `reviewer`.
 
-## Responsibility assignment (Larman, *Applying UML and Patterns* — GRASP; Martin, SRP)
+## 1. Responsibility assignment (Larman, *Applying UML and Patterns* — GRASP; Martin, SRP)
 
 - **Single Responsibility / high cohesion** — a unit should do one thing and have one reason to
   change. Flag grab-bag classes (the god class in `patterns-design.md`), and functions that mix
@@ -33,7 +33,7 @@ a given line of code misbehaves belongs to `reviewer`.
   among unrelated callers, and collaborators built inside a class that should receive them
   (hidden dependency, untestable).
 
-## Class interface: contract (Meyer, *Object-Oriented Software Construction* — Design by Contract)
+## 2. Class interface: contract (Meyer, *Object-Oriented Software Construction* — Design by Contract)
 
 - **The constructor establishes the invariant.** After construction the object is usable and
   valid. Flag two-phase initialisation (`init()`, `start()` that must precede any use), and
@@ -54,7 +54,7 @@ a given line of code misbehaves belongs to `reviewer`.
 - **Substitutability** (Liskov) — every implementation of an interface honours its contract: no
   stronger precondition, no weaker postcondition, no new failure mode the interface does not name.
 
-## Class interface: completeness and minimality (Meyers, *Effective C++* item 18 — "easy to use correctly, hard to use incorrectly"; Ousterhout)
+## 3. Class interface: completeness and minimality (Meyers, *Effective C++* item 18 — "easy to use correctly, hard to use incorrectly"; Ousterhout)
 
 - **Complete for its abstraction.** The operations form the set the concept needs: what can be
   acquired can be released, what can be added can be removed, every state the object can be in
@@ -72,7 +72,7 @@ a given line of code misbehaves belongs to `reviewer`.
 - **Outcome reporting.** An operation that can do nothing, succeed or fail distinguishes the three
   for the caller; one flag with two meanings is a defect in the interface.
 
-## Encapsulation and data modeling
+## 4. Encapsulation and data modeling
 
 - **Information hiding** (Ousterhout) — flag implementation details (data formats, protocols,
   algorithms, container types) that leak through an interface and force callers to know them.
@@ -89,7 +89,7 @@ a given line of code misbehaves belongs to `reviewer`.
   is genuinely one-to-many. Distinguish from YAGNI: model the multiplicity the domain *actually
   exhibits*, not multiplicity that is merely conceivable.
 
-## Modules & abstractions (Ousterhout, *A Philosophy of Software Design*)
+## 5. Modules & abstractions (Ousterhout, *A Philosophy of Software Design*)
 
 - **Deep, not shallow modules** — a good module hides substantial complexity behind a simple
   interface. Flag classes/functions whose interface is nearly as complex as their implementation
@@ -101,7 +101,7 @@ a given line of code misbehaves belongs to `reviewer`.
   now, or a second concrete caller is already known; otherwise treat the extra generality as
   speculative (see YAGNI).
 
-## Inheritance, composition and polymorphism (GoF — "favour composition over inheritance")
+## 6. Inheritance, composition and polymorphism (GoF — "favour composition over inheritance")
 
 - **Interface inheritance versus implementation inheritance** — inherit to be substitutable, not to
   reuse code. Flag a base class used as a bag of shared helpers, and hierarchies deeper than the
@@ -114,7 +114,7 @@ a given line of code misbehaves belongs to `reviewer`.
 - **Interface Segregation** — flag fat interfaces that force callers to depend on methods they do
   not use.
 
-## Coupling & dependencies (Martin, SOLID / Clean Architecture; Pragmatic Programmer)
+## 7. Coupling & dependencies (Martin, SOLID / Clean Architecture; Pragmatic Programmer)
 
 - **Complexity = dependencies + obscurity** — treat non-obvious coupling and behavior that cannot be
   understood locally as the core cost you are hunting.
@@ -135,7 +135,7 @@ a given line of code misbehaves belongs to `reviewer`.
 - **DRY** — flag duplicated *knowledge* (the same decision expressed twice), not incidental
   similarity that is not the same decision.
 
-## Error handling strategy
+## 8. Error handling strategy
 
 - **Explicit strategy** — errors should propagate by one consistent mechanism per layer (exceptions
   vs. result values), caught at a layer that can act on them, not swallowed. Flag silent failure
@@ -144,7 +144,7 @@ a given line of code misbehaves belongs to `reviewer`.
   each step fails, and repeated failure does not repeat the expensive part. Flag operations that are
   unsafe to retry when they should be idempotent.
 
-## Ownership, lifetime and concurrency model
+## 9. Ownership, lifetime and concurrency model
 
 These are design questions about **structure**; an individual use-after-free or race is a bug for
 `reviewer`, listed under *Out of altitude*.
@@ -158,13 +158,13 @@ These are design questions about **structure**; an individual use-after-free or 
 - **The concurrency model is stated** — which executor or thread each type runs on, and which
   state is shared. Flag types usable from more than one thread with no statement either way.
 
-## Interface & data evolution
+## 10. Interface & data evolution
 
 - **Compatibility** — flag public interfaces (APIs, CLI surface) and persisted formats (on-disk
   files, wire formats) that cannot change without breaking existing callers or stored data, when
   evolution is foreseeable. Look for a versioning or migration path where one is needed.
 
-## Naming, consistency & self-documentation
+## 11. Naming, consistency & self-documentation
 
 - **Names reveal intent** — flag names that mislead, abbreviations that obscure, and asymmetry in
   paired concepts; two members with one name and two meanings. The interface should read well at
@@ -180,19 +180,19 @@ These are design questions about **structure**; an individual use-after-free or 
   contract are part of the design. Flag missing rationale on subtle decisions; do not reward
   comments that merely restate the code.
 
-## Complexity & simplicity
+## 12. Complexity & simplicity
 
 - **Essential vs. accidental complexity** — ask whether complexity is inherent to the problem or
   self-inflicted. Flag accidental complexity.
 - **YAGNI** — flag speculative generality, configurability, and abstraction built for requirements
   that do not exist yet.
 
-## Observability (a design concern, not an afterthought)
+## 13. Observability (a design concern, not an afterthought)
 
 - Flag designs with no way to diagnose failures in the field: absent or unstructured logging,
   missing log levels, and no seam to observe key state or transitions.
 
-## Safety & security by design
+## 14. Safety & security by design
 
 - **Trust boundaries & least privilege** — flag inputs crossing a trust boundary without a defined
   validation point, and components granted more capability than they need.
@@ -200,7 +200,7 @@ These are design questions about **structure**; an individual use-after-free or 
   accidentally (confirmation, dry-run, backup-before-write). Respect any project-specific safety
   constraints stated in the codebase.
 
-## Testability
+## 15. Testability
 
 - Flag designs that are hard to test: hidden dependencies, I/O and logic fused together, global
   state, no seam to inject fakes, pure logic reachable only through the filesystem or a live
@@ -221,8 +221,8 @@ A correctness bug is never ranked here, whatever its severity; it goes under *Ou
 
 ## Review skeleton — design mode
 
-A design review has these sections in this order. The first two are required even when there are
-no findings: they are what distinguishes a design review from a bug list.
+A design review has these sections in this order. The first three are required even when there
+are no findings: they are what distinguishes a design review from a bug list.
 
 1. **Structure assessment** — one row per significant type (every public type, and every internal
    type that owns a resource, a policy or state):
@@ -239,15 +239,33 @@ no findings: they are what distinguishes a design review from a bug list.
    listed here by name. List a pattern that fits only when the rest of the design depends on it;
    skip textbook confirmations. Keep each row to one or two lines — the reasoning lives in the
    finding it points to.
-3. **What is well designed** — specific, with evidence.
-4. **Findings** — ranked by the severity above, in the finding shape from `core.md`. A finding
+3. **Coverage** — one row per type in the digest, or in the reviewed scope when there is no
+   digest; free functions take one row per file. One column per numbered section of this
+   checklist, §1 to §15:
+
+   `| Type | §1 | §2 | … | §15 |`
+
+   Each cell holds one value:
+
+   | Value | Meaning |
+   |---|---|
+   | `C` | Checked: the section's items were applied to this type. The result is `sound` or a finding. |
+   | `NA` | Not applicable: no item in the section can apply to this type (§13 on a plain value type with no I/O). |
+   | `NC` | Not checked. Each `NC` cell has a line under the table: `Type × §n (name) — reason`. |
+
+   Under the table, one line maps each column to its section name. A blank cell is a defect in
+   the report.
+4. **What is well designed** — specific, with evidence.
+5. **Findings** — ranked by the severity above, in the finding shape from `core.md`. A finding
    that proposes a new decomposition or a changed interface gives the proposed types as
    declarations in the target language (signatures and members, no bodies), and, when more than
    two types change, a Mermaid `classDiagram` of the proposed structure.
-5. **Out of altitude** — one line each, unranked: correctness bugs (for `reviewer`) and
+   - **Core Guidelines decisions** — only when the caller gives you `cg-*` deviations to decide:
+     the decision table from `designer.md`, after the findings.
+6. **Out of altitude** — one line each, unranked: correctness bugs (for `reviewer`) and
    system-level concerns (for `architect`), with `path:line`.
-6. **Assumptions / open questions.**
-7. **Overall assessment** — two lines, as in `core.md`.
+7. **Assumptions / open questions.**
+8. **Overall assessment** — two lines, as in `core.md`.
 
 ## Document skeleton — design document
 

@@ -30,6 +30,24 @@ supplement for the target's language.
 - **Flag attributes in tension** and say which one wins. Resolution versus frame rate, image quality
   versus detectability, latency versus buffering, accuracy versus quantization.
 
+### Product quality characteristics (ISO/IEC 25010:2023)
+
+Check the target against each characteristic of the 2023 revision. Where the 2011 revision used
+another name, it is given in brackets. Each row is one row of the quality-attribute coverage in a
+review: stated with a scenario, missing (a finding), or not applicable with a reason.
+
+| Characteristic | Sub-characteristics | What to check in this domain |
+|---|---|---|
+| Functional suitability | completeness, correctness, appropriateness | Each stated mission task maps to a component that performs it; detection, tracking or telemetry output has an accuracy target and a way to measure it. |
+| Performance efficiency | time behaviour, resource utilisation, capacity | End-to-end latency, sustained frame or message rate, CPU, NPU, memory and power per stage against the budget in §4 (Resource reality on fixed hardware). |
+| Compatibility | co-existence, interoperability | Components sharing a board, a bus, a camera or a radio channel; wire protocols (MAVLink, RTSP, the IPC schema) and their versions across mixed releases. |
+| Interaction capability (usability) | appropriateness recognisability, learnability, operability, user error protection, user engagement, inclusivity, user assistance, self-descriptiveness | What the operator sees when the link degrades or a stage stops; whether a ground-station action can put the device in an unsafe or unrecoverable state. |
+| Reliability | faultlessness (maturity), availability, fault tolerance, recoverability | Behaviour under overload, link loss and partial failure per §5 (Failure, degradation and the link); restart time and state lost; weeks of uptime without a leak. |
+| Security | confidentiality, integrity, non-repudiation, accountability, authenticity, resistance | Trust boundaries per §10 (Trust boundaries): the link, the update path, model artifacts, removable media. |
+| Maintainability | modularity, reusability, analysability, modifiability, testability | Replaying a field recording on a desk per §6 (Diagnosability in the field); swapping one component without touching others; a test seam at each boundary. |
+| Flexibility (portability) | adaptability, scalability, installability, replaceability | Cost of a board, camera or model change per §7 (Portability and vendor lock-in); a Yocto image and an update path that install on every target machine. |
+| Safety (new in 2023) | operational constraint, risk identification, fail safe, hazard warning, safe integration | What the device does when a stage fails in flight: a defined fail-safe state, a warning to the operator, and no path where a software fault commands the airframe or payload unsafely. |
+
 ## 2. Boundaries and contracts
 
 - **Define each boundary by what crosses it**, not by which module sits on either side. A component
@@ -205,7 +223,7 @@ A correctness bug inside one component is never ranked here; it goes under *Out 
 ## Review skeleton — architecture mode
 
 A review of an architecture or of a change at system level has these sections in this order. The
-first two are required even when there are no findings.
+first three are required even when there are no findings.
 
 1. **Component and boundary assessment** — one row per component and one per boundary it crosses:
 
@@ -217,13 +235,37 @@ first two are required even when there are no findings.
    observed, by name. List a pattern that fits only when the system depends on it; skip textbook
    confirmations. Keep each row to one or two lines — the reasoning lives in the finding it points
    to.
-3. **What is sound** — specific, with evidence.
-4. **Findings** — ranked by the severity above, in the finding shape from `core.md`; each names
+3. **Coverage** — two tables.
+
+   Components and boundaries: one row per component and one per boundary in the digest, or in the
+   reviewed scope when there is no digest. One column per numbered section of this checklist, §1
+   to §12:
+
+   `| Component or boundary | §1 | §2 | … | §12 |`
+
+   Quality attributes: one row per characteristic of §1 (Quality attributes, with numbers), for the
+   system as a whole:
+
+   `| Characteristic | Status | Scenario or reason | Finding |`
+
+   *Status* is `stated`, `missing` (a finding) or `n/a` (with the reason). Each cell of the first
+   table holds one value:
+
+   | Value | Meaning |
+   |---|---|
+   | `C` | Checked: the section's items were applied to this row. The result is `sound` or a finding. |
+   | `NA` | Not applicable: no item in the section can apply to this row (§7 on a component with no vendor dependency). |
+   | `NC` | Not checked. Each `NC` cell has a line under the table: `Row × §n (name) — reason`. |
+
+   Under the first table, one line maps each column to its section name. A blank cell is a defect
+   in the report.
+4. **What is sound** — specific, with evidence.
+5. **Findings** — ranked by the severity above, in the finding shape from `core.md`; each names
    the failure scenario and whether it is confirmed in the source or a hypothesis.
-5. **Out of altitude** — one line each, unranked: how a component is factored into classes (for
+6. **Out of altitude** — one line each, unranked: how a component is factored into classes (for
    `designer`) and correctness bugs (for `reviewer`), with `path:line`.
-6. **Open decisions and risks** — the two tables from §3 (Classify every fork) and §9 (Risks).
-7. **Overall assessment** — two lines, as in `core.md`.
+7. **Open decisions and risks** — the two tables from §3 (Classify every fork) and §9 (Risks).
+8. **Overall assessment** — two lines, as in `core.md`.
 
 ## Document skeleton — architecture document
 
