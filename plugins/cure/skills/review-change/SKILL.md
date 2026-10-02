@@ -50,23 +50,45 @@ target. If an agent's per-leg usage (not its cumulative context — see step 5) 
 with findings still open, stop it, take what it returned, and say so in the close-out rather than
 letting it run unbounded.
 
+**Check that the `cg-*` agents are registered** before dispatching anything for a C++ change. Look
+for `cg-interfaces`, `cg-classes`, `cg-resources`, `cg-statements`, `cg-philosophy`,
+`cg-concurrency` and `cg-generic` in the session's available agent list. Plugin agents appear there
+prefixed with the plugin name, for example `cure:cg-philosophy`. When any is missing, tell the user
+so, in those words, before dispatching:
+
+- Cause: the session loaded a `cure` version without the `cg-*` agents. A session that started
+  before a plugin update keeps the old agent list.
+- Fix: run `claude plugin marketplace update zagrichanskiy` and
+  `claude plugin update cure@zagrichanskiy`, then restart Claude Code.
+
+Do not fall back to step 3's table without saying so. If the user chooses to continue, state in the
+report that the Core Guidelines section is absent and why.
+
 ### 1a. Re-check mode
 
-Skip the collector and dispatch straight to step 3 when both hold:
+Skip the collector and dispatch straight to step 3 when either holds:
 
-- The diff since the last round touches 5 files or fewer, and 200 changed lines or fewer
-  (`git diff --stat <last-round-ref>..HEAD`).
-- The same agents from the previous round are being resumed, not freshly dispatched.
-  For a C++ change, the previous round's gating (step 3a) stands; the skipped agents stay skipped
-  and are listed again in the report.
+| Agents | Condition |
+|---|---|
+| Resumed from the previous round | None on diff size. A resumed agent re-checks a diff range of any size. |
+| Freshly dispatched | The diff since the last round touches 5 files or fewer, and 200 changed lines or fewer (`git diff --stat <last-round-ref>..HEAD`). |
 
-In that case, give each resumed agent the ledger ids still open, from `.notes/<slug>-ledger.md`,
-and a diff range (`git diff <last-round-ref>..HEAD`) instead of a digest; do not re-run the
-collector to produce one. A diff over the threshold, or a change of agents, forces the full
-pipeline from step 2. The fix step commits each round with explicit paths, new files included,
-before the round closes. `<last-round-ref>` is the commit this round reviewed — HEAD when its
-agents were dispatched, not the fix commit; see step 5. `git diff` on an uncommitted round misses
-untracked files, so a round is not closed until it is committed.
+A fresh agent over the threshold forces the full pipeline from step 2. Resuming the previous round's
+agents avoided a new collector and fresh readings in the run this rule came from; the per-leg budget
+of step 1 still applies.
+
+For a C++ change, the previous round's gating (step 3a) stands; the skipped agents stay skipped and
+are listed again in the report. Resume every gated-in `cg-*` agent of the previous round on the fix
+diff, not only the agents that raised the round's ids. A fix can introduce a defect in a guideline
+area whose agent raised nothing before; only that agent is placed to find it.
+
+Give each resumed agent the ledger ids still open, from `.notes/<slug>-ledger.md`, and a diff range
+(`git diff <last-round-ref>..HEAD`) instead of a digest. Give a fresh agent the diff range only, with
+no ledger ids: they would be a topic brief, which step 3 forbids. Do not re-run the collector to
+produce a digest. The fix step commits each round with explicit paths, new files included, before
+the round closes. `<last-round-ref>` is the commit this round reviewed — HEAD when its agents were
+dispatched, not the fix commit; see step 5. `git diff` on an uncommitted round misses untracked
+files, so a round is not closed until it is committed.
 
 ### 2. Collect once
 
@@ -174,8 +196,22 @@ reclassify as defect).
 
 ### 4. Merge
 
-The agents return independently; the report is yours to assemble. **It has one section per
-altitude, not one global ranking**: correctness (`reviewer`), system (`architect`), design
+The agents return independently; the report is yours to assemble. You may delegate the assembly to
+a merge agent of type `general-purpose`, which holds `Read` on the source. Its brief lists:
+
+- the target, and the output path `.notes/<slug>-r<N>-report.md`;
+- the report file paths of the agents that hold `Write`, and the reports of `ui-reviewer` and
+  `ux-reviewer` in full, since those exist only in their reply messages;
+- the skip lines recorded in step 3a;
+- the earlier reports found in step 1;
+- the backlog path `.notes/<slug>-backlog.md`.
+
+It reads the reports from disk, so the orchestrator's context does not hold every report. Every
+rule of this step binds the merge agent, including opening the source to re-check a carried
+must-fix. Tell it so in its brief, and check the assembled report against those rules before
+closing the round.
+
+**The report has one section per altitude, not one global ranking**: correctness (`reviewer`), system (`architect`), design
 (`designer`), Core Guidelines (the `cg-*` agents, one subsection per agent), and any other agent
 dispatched. Each section keeps its own `MUST-FIX` and
 `SHOULD-CONSIDER` order, by that agent's severity definitions; `NITPICK` findings do not stay in

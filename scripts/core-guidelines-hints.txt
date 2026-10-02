@@ -1,0 +1,22 @@
+# Search hints for scripts/condense-core-guidelines.py.
+#
+# One line per rule: <rule id>: <hint>. The script appends the hint to the rule's entry in
+# sections/ as a "Search hint:" line. Blank lines and lines starting with # are ignored.
+# A hint is a general pattern that finds the sites the rule is about. It names no project.
+# Add a hint only where a mechanical search exists. <files> stands for the changed files.
+
+Per.10: `grep -nE 'void\s*\*|reinterpret_cast|memcpy|memset|\(\s*(unsigned\s+)?char\s*\*\s*\)' <files>` lists untyped pointers and byte-level manipulation.
+Per.11: `grep -nE '^\s*switch\s*\(|[!=]=\s*\w+(::\w+)+' <files>` lists a `switch`, or an `if` chain comparing against a scoped enumerator; add the names of unscoped enumerators to the pattern. For each hit, grep the enclosing function's callers (`grep -rnE '<function>\s*(<[^>]*>)?\('`). Where every caller passes a constant (an enumerator, a literal, a `constexpr` value, a template argument), the result is computable at compile time. When the rest of the result reads run-time data, the part that depends only on the constant arguments (for example the `switch` dispatch on an enumerator) can still move to compile time (a template parameter, `if constexpr`, a trait lookup). Such a site is a `deviation` finding, not a conforming site.
+E.4: `grep -nE '\bthrow\b|\.at\(|\bsto(i|l|ul|ll|ull|f|d|ld)\(|\bnew\b|\.(push_back|emplace_back|emplace|insert|resize|reserve)\(' <files>` lists direct throws and common throwing calls (bounds-checked access, string conversion, allocation). A throwing call is also any call not declared `noexcept` whose contract says it throws: check the callee's documentation (`\throws`, `@throws`) or its body, at any depth. Then sweep the callers: for each function that contains a `throw` or a throwing call, grep its callers (`grep -rnE '\b<function>\s*(<[^>]*>)?\('`) and treat each calling function as a hit; repeat one level up while the caller does not catch. In each function that is a hit, list the assignments (`[^=!<>]=[^=]`) that precede the throw or the throwing call to members (`this->`, or a name declared in the class, for example under an `m_` prefix or a `_` suffix), out-parameters (a dereferenced pointer or a non-const reference parameter) and globals. Include writes through a local reference or pointer bound to that state (`auto& v = <member or parameter>...; v.f = ...;`). Each write is visible to the caller after the throw unless the function restores it.
+E.6: `grep -nE '\bnew\b|\b(malloc|fopen|open|openat|shm_open|mmap|socket|accept4?|dup2?|pipe2?|eventfd|timerfd_create|epoll_create1?|opendir|pthread_mutex_lock)\(|\.lock\(\)' <files>` lists raw acquisitions whose release is a separate statement.
+E.12: `grep -nE 'extern\s+"C"|\bmain\s*\(|std::j?thread|pthread_create|\bsignal\s*\(|sigaction' <files>` lists C-linkage functions, `main`, thread entry points and signal handlers; a throw must not leave any of them or the function a thread or C caller runs. Move constructors, move assignments and `swap` are C.66 and C.85, checked by `cg-classes`.
+E.13: `grep -nE '\bnew\b|\bmalloc\(' <files>`; in each function, a `throw` or a throwing call between the allocation and the hand-over to an owner leaks it.
+E.14: `grep -nE '\bthrow\s+([0-9"-]|std::string\b)' <files>` lists built-in types and strings thrown.
+E.15: `grep -nE '\bthrow\s+new\b|\bcatch\s*\(\s*(const\s+)?[A-Za-z_:<>]+(\s+\w+)?\s*\)' <files>` lists pointers thrown and exceptions caught by value.
+E.16: `grep -nE '~\w+\s*\(|\bswap\s*\(|noexcept\s*\(\s*false\s*\)' <files>` lists destructors, `swap` and `noexcept(false)`; check each body for a `throw` or a throwing call outside a `try`.
+E.17: `grep -nE '\bcatch\s*\(\s*(\.\.\.|(const\s+)?std::exception\b)' <files>` lists catch-all handlers; check that each function can recover.
+E.18: `grep -nE '\btry\b' <files>` lists the explicit `try` blocks.
+E.19: `grep -nE '^\s*throw\s*;' <files>` lists rethrows; a handler that cleans up and rethrows is a `final_action` candidate.
+E.28: `grep -nE '\berrno\b' <files>` lists error handling through `errno`.
+E.30: `grep -nE '\)\s*(const\s*)?throw\s*\(' <files>` lists dynamic exception specifications.
+E.31: `grep -nE '\bcatch\s*\(' <files>` lists the handlers; in each sequence, a base type caught before a type derived from it hides the derived handler.

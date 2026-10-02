@@ -81,6 +81,12 @@ a given line of code misbehaves belongs to `reviewer`.
 - **Make illegal states unrepresentable** — flag models that permit invalid combinations the code
   must then defend against: two optional members of which exactly one is set, a mode expressed as
   independent booleans. The fix is a sum type or a State (see `patterns-design.md`).
+- **One source of truth per fact** (Hunt & Thomas — DRY) — flag two mechanisms that derive the
+  same fact independently: one component tracks a change flag or a dirty set while another
+  computes the same difference, a cached count beside the container it counts. Check three things.
+  First, whether every write path updates both. Second, whether the two can disagree. Third,
+  which one decides when they disagree. The fix keeps one source and derives the other from it,
+  or removes it.
 - **Parse, don't validate** — validate at the trust boundary and convert to a typed, known-good
   representation once (a Value Object), rather than re-checking raw data deep inside the system.
 - **Model the domain's real multiplicity** (Evans, *Domain-Driven Design* — associations; Chen, the
