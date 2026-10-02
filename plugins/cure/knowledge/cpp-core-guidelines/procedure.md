@@ -59,6 +59,8 @@ If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and 
 path.
 
 - Each rule is a `## <id>: <title>` heading followed by its reason.
+- Some rules end with a `Search hint:` line: a search that finds the sites the rule is about. Run
+  it on the changed files. A different search is allowed when it finds every site the hint finds.
 - List the rule ids of a section with `grep -n '^## ' <file>`. That list is the set of rows your
   coverage table must hold.
 - Never fetch the full upstream `CppCoreGuidelines.md`. It is the full text of every section and
@@ -75,7 +77,7 @@ Name a section by its index and title, for example "Per (Performance)", never by
 
    | Status | Meaning |
    |---|---|
-   | `checked` | The change contains the construct the rule is about, and you inspected it. Either a finding cites the rule, or the change conforms. |
+   | `checked` | The change contains the construct the rule is about, and you inspected it. Either a finding cites the rule, or the change conforms. The reason cites the sites inspected as `file:line`, or the search, its hit count and the hits inspected. A hit not inspected makes the row `not checked`, or gets its own reason. A conforming example elsewhere in the tree is not evidence for the other sites. |
    | `not applicable` | The change contains no construct the rule is about. The reason names the absent construct, and the search that established the absence. |
    | `not checked` | The rule applies, or may apply, and you did not inspect it. The reason says why: the construct is outside the diff, the check needs a build or a tool, the budget ran out. |
    | `accepted by project` | Every case of the rule in the change is a `deviation` inside an entry of `.claude/cure/cg-deviations.md`, and no `defect` cites the rule. The reason quotes the entry. |

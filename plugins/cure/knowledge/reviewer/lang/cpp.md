@@ -61,12 +61,13 @@ review on what a tool cannot see — the scenario, the caller, the lifetime acro
 
 ## Exceptions and error codes
 
-- **A function that mutates state and then throws.** The caller sees a partial update: a
-  container half-filled, a member set and its counterpart not, a file renamed before the index is
-  written. Check which guarantee the function gives and that its callers need no more: strong
-  (build the result on the side and commit at the end with non-throwing operations, or roll back
-  in a scope guard), or basic (invariants hold, the state is valid but changed). A throw after the
-  first observable write with neither is the defect.
+- **A function that mutates state and then throws.** The function writes a member, an
+  out-parameter or a global, then throws or calls something that can throw. The caller sees a
+  partial update: a container half-filled, a member set and its counterpart not, a file renamed
+  before the index is written. Check which guarantee the function gives and that its callers need
+  no more: strong (build the result on the side and commit at the end with non-throwing
+  operations, or roll back in a scope guard), or basic (invariants hold, the state is valid but
+  changed). A throw after the first observable write with neither is the defect.
 - **An exception escaping a constructor's member-initialiser list** or `main`, where the caller
   does not expect one.
 - **`std::filesystem` throwing overloads** used where the `std::error_code` overload was intended,
