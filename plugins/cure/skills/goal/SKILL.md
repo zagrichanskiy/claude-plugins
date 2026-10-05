@@ -60,17 +60,19 @@ rest — a recipe, a module, a ticket id and name — rather than restating them
 The main session is the orchestrator. It does not read source or edit code. It dispatches agents,
 keeps the ledger and checks completeness.
 
-1. <One step, the agent that does it, and the file or recipe it touches.>
-2. ...
-N. Write `.notes/<slug>-retro.md`: per agent, what it did, findings raised and accepted, cost where
-   reported; what was effective; what was not; concrete changes to agents, skills or this format.
+1. Check the facts this file states: ticket, branch, base commit, and that every file it names
+   exists. Record a mismatch in the ledger, correct course, and go on.
+2. <One step, the agent that does it, and the file or recipe it touches.>
+3. ...
+N. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md` (see "The retrospective").
 
 ## Done when
 
 1. <Measurable, and provable by something this session runs. `pytest` passes in `src/foo`. The
    build exits 0. `ip addr show usb0` reports the address.>
 2. ...
-N. `.notes/<slug>-retro.md` exists and its summary is in the transcript.
+N. The retrospective exists, holds a "Proposed changes" table, and its summary is in the
+   transcript.
 
 ## Rules
 
@@ -83,6 +85,8 @@ N. `.notes/<slug>-retro.md` exists and its summary is in the transcript.
   orchestrator does not re-read files an agent already read.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - Run `test-author` only for a behaviour change that has no test.
+- Stop when the diff passes <N> changed lines (`git diff --shortstat <base>`) and report what is
+  left.
 - Stop after <N> turns and report what is left.
 ```
 
@@ -125,8 +129,30 @@ context on every turn.
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
 | Retrospective | The last work item and the last done-when item before the turn bound. |
 
-The retrospective records how the agents performed, what was effective, what was not, and what to
-change. Its findings feed later changes to the agents, the skills and this format.
+## The retrospective
+
+It lives in `~/.claude/retros/`, not in `.notes/`. A working note is deleted when its work merges,
+and a retrospective there is deleted with it before anyone acts on it.
+
+It holds, in this order:
+
+| Section | Content |
+|---|---|
+| Measurements | Turns used of the bound. Per agent: dispatches, tokens where reported, review rounds, findings per severity, findings accepted. Changed lines against the cap. |
+| Where it went wrong | Each event with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
+| Proposed changes | One row per change: target file (agent, skill, knowledge file, project `CLAUDE.md`, or this format), the change, the evidence row it rests on, the expected effect. |
+
+A proposal with no evidence row is not made. The session writes proposals only; it never edits a
+plugin or a skill. The user applies them in the plugin repository.
+
+## Sizing a goal
+
+Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and a done-when list the
+user can re-run. The changed-line cap in the rules is a stop signal, not the scope. A goal that
+reaches it stops and reports instead of growing.
+
+Size a goal from earlier retrospectives. The "Measurements" table of a similar goal gives turns,
+tokens and lines.
 
 ## Running it
 
@@ -146,6 +172,10 @@ Two things worth saying once when handing it over:
 ## Notes
 
 - One goal, one file. A brief covering two unrelated outcomes converges on neither.
+- Carry every work item inline, by id and text. Do not point at another note by `file:line`. Notes
+  are deleted and edited, and the reference goes stale without an error.
+- Write the goal just before it runs. A goal written days ahead carries facts that have drifted.
+  Work item 1 catches some of them, not all.
 - Keep rejected options out. The evaluator re-reads this file every turn and a rejected option in it
   reads as work to do. If the rationale is worth keeping, it goes in the ticket or the design
   document.
