@@ -122,6 +122,35 @@ soft-offer closers.
 | `UserPromptSubmit` | `flat-reminder.sh` | Adds a two-rule reminder as hidden context on every prompt. |
 | `PreToolUse` | `flat-artifact-check.sh` | Denies `git commit`, `gh pr`/`gh issue` `create`/`edit`/`comment`, and ClickUp create/update/comment calls whose text has an identifier without its name or a soft-offer closer. Code spans and fenced blocks are not checked. |
 
+**Status line** — the terminal status line under the input box.
+
+| File | Description |
+|---|---|
+| `statusline/statusline.sh` | Renders session cost, 5-hour and 7-day rate-limit use with hours to reset, cached daily and weekly `ccusage` totals, a context-window bar, the model and the git branch. |
+
+Claude Code reads `statusLine` only from a settings file, never from a plugin manifest, so it cannot
+be loaded as a plugin component. Point `~/.claude/settings.json` at a shim that resolves the newest
+installed copy:
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "bash /Users/<you>/.claude/statusline-command.sh"
+}
+```
+
+```sh
+# ~/.claude/statusline-command.sh
+shopt -s nullglob
+dirs=(~/.claude/plugins/cache/zagrichanskiy/cure/*/statusline/statusline.sh)
+[ ${#dirs[@]} -eq 0 ] && exit 0
+script=$(printf '%s\n' "${dirs[@]}" | sort -V | tail -1)
+exec bash "$script"
+```
+
+Requires `jq`, `git` and `npx` on `PATH`. `ccusage` runs `--offline` against a pinned version, so
+nothing here reaches the network.
+
 ## Reviewing a change
 
 Two advisory agents reviewing one pull request group independently cost 4.4 M weighted input tokens
@@ -173,6 +202,7 @@ plugins/<name>/
   skills/<name>/SKILL.md          one directory per skill, auto-discovered
   output-styles/<name>.md         one file per output style, auto-discovered
   hooks/hooks.json                hook registrations; scripts beside it, auto-discovered
+  statusline/statusline.sh        status line script, wired up through a settings shim
   knowledge/                      reference material the agents read at run time
     design-advisor/lang/          per-language supplements, loaded only for the target's language
     reviewer/lang/                per-language pitfall supplements for the reviewer

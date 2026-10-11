@@ -133,3 +133,13 @@ There is no user-level copy to fall back on, so a broken commit here removes the
 
 The Linux machine carried an older, self-contained `designer.md` predating the split into
 `knowledge/design-advisor/`. It was discarded, not merged — the split version supersedes it.
+
+## A status line cannot be a plugin component
+
+Claude Code loads plugin components from a fixed set — `skills`, `agents`, `hooks`, `mcp`, `lsp`,
+`output-style`, `channel`. `statusLine` is not among them; it is read only from a settings file
+(user, project or policy). `plugins/cure/statusline/statusline.sh` therefore ships here but is
+reached through `~/.claude/statusline-command.sh`, a shim that globs
+`~/.claude/plugins/cache/zagrichanskiy/cure/*/statusline/statusline.sh` and execs the highest
+version. The shim is the one piece that has to exist on each machine outside this repository; it
+carries no logic that changes, so a version bump needs no edit to it.
