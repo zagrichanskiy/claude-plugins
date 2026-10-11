@@ -2,7 +2,6 @@
 name: Flat
 description: Reference-table register - no voice, no padding, shortest complete answer
 keep-coding-instructions: true
-force-for-plugin: true
 ---
 
 # Flat register, minimum length

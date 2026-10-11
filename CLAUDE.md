@@ -134,6 +134,12 @@ There is no user-level copy to fall back on, so a broken commit here removes the
 The Linux machine carried an older, self-contained `designer.md` predating the split into
 `knowledge/design-advisor/`. It was discarded, not merged — the split version supersedes it.
 
+## A plugin output style is not applied automatically
+
+`force-for-plugin` in output-style frontmatter is parsed and stored but never read (Claude Code
+2.1.296 marks it `@internal`). `cure:Flat` is therefore selected through `outputStyle` in each
+machine's `~/.claude/settings.json`.
+
 ## A status line cannot be a plugin component
 
 Claude Code loads plugin components from a fixed set — `skills`, `agents`, `hooks`, `mcp`, `lsp`,

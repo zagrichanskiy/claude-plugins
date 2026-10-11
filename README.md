@@ -110,9 +110,10 @@ the project's conventions, test command and run command from the repo.
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
 | `review-change` | `/cure:review-change` | Runs a multi-agent review as a pipeline: the collector once, then the reviewing agents in parallel against its digest, then one merged report triaged into MUST-FIX, SHOULD-CONSIDER, NITPICK and `enhancement`. A round passes when no MUST-FIX or SHOULD-CONSIDER is open. A re-check mode skips the collector on a small diff. |
 
-**Output style** — `Flat` (`plugins/cure/output-styles/flat.md`), shown as `cure:Flat`. It sets
-`force-for-plugin: true`, so it applies whenever `cure` is enabled and overrides the user's
-`outputStyle` setting. It keeps Claude Code's coding instructions.
+**Output style** — `Flat` (`plugins/cure/output-styles/flat.md`), keyed as `cure:Flat`. It keeps
+Claude Code's coding instructions. Select it once per machine with `"outputStyle": "cure:Flat"` in
+`~/.claude/settings.json`; `force-for-plugin` is internal to Claude Code and has no effect on
+2.1.296.
 
 **Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
 soft-offer closers.
