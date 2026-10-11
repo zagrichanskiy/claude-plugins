@@ -110,6 +110,18 @@ the project's conventions, test command and run command from the repo.
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
 | `review-change` | `/cure:review-change` | Runs a multi-agent review as a pipeline: the collector once, then the reviewing agents in parallel against its digest, then one merged report triaged into MUST-FIX, SHOULD-CONSIDER, NITPICK and `enhancement`. A round passes when no MUST-FIX or SHOULD-CONSIDER is open. A re-check mode skips the collector on a small diff. |
 
+**Output style** — `Flat` (`plugins/cure/output-styles/flat.md`), shown as `cure:Flat`. It sets
+`force-for-plugin: true`, so it applies whenever `cure` is enabled and overrides the user's
+`outputStyle` setting. It keeps Claude Code's coding instructions.
+
+**Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
+soft-offer closers.
+
+| Event | Script | Effect |
+|---|---|---|
+| `UserPromptSubmit` | `flat-reminder.sh` | Adds a two-rule reminder as hidden context on every prompt. |
+| `PreToolUse` | `flat-artifact-check.sh` | Denies `git commit`, `gh pr`/`gh issue` `create`/`edit`/`comment`, and ClickUp create/update/comment calls whose text has an identifier without its name or a soft-offer closer. Code spans and fenced blocks are not checked. |
+
 ## Reviewing a change
 
 Two advisory agents reviewing one pull request group independently cost 4.4 M weighted input tokens
@@ -153,12 +165,14 @@ Every agent states its own `model` and `effort`, by role:
 
 ```
 .claude-plugin/marketplace.json   marketplace manifest (name, owner, plugin list)
-scripts/lint-plugin.py            frontmatter and manifest lint, run in CI
+scripts/lint-plugin.py            frontmatter, manifest and hooks lint, run in CI
 .github/workflows/validate.yml    runs the lint on every push and pull request
 plugins/<name>/
   .claude-plugin/plugin.json      plugin manifest (name, version, metadata)
   agents/<name>.md                one file per agent, auto-discovered
   skills/<name>/SKILL.md          one directory per skill, auto-discovered
+  output-styles/<name>.md         one file per output style, auto-discovered
+  hooks/hooks.json                hook registrations; scripts beside it, auto-discovered
   knowledge/                      reference material the agents read at run time
     design-advisor/lang/          per-language supplements, loaded only for the target's language
     reviewer/lang/                per-language pitfall supplements for the reviewer
