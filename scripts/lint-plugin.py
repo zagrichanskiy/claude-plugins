@@ -25,6 +25,7 @@ SKILL_KEYS = {
     "name", "description", "allowed-tools", "model", "argument-hint", "arguments",
     "disable-model-invocation", "user-invocable", "version", "license", "metadata",
 }
+OUTPUT_STYLE_KEYS = {"name", "description", "keep-coding-instructions", "force-for-plugin"}
 
 KEY = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(.*)$")
 
@@ -107,9 +108,46 @@ def check_skill(path):
     check_enum(path, keys, "model", MODELS)
 
 
+def check_output_style(path):
+    keys = frontmatter(path)
+    if keys is None:
+        fail(path, "no frontmatter block")
+        return
+    if "description" not in keys:
+        fail(path, "missing description: — /output-style lists the style without one")
+    for key in sorted(set(keys) - OUTPUT_STYLE_KEYS):
+        fail(path, f"unknown frontmatter key {key!r}; it is ignored silently")
+    check_enum(path, keys, "keep-coding-instructions", {"true", "false"})
+    check_enum(path, keys, "force-for-plugin", {"true", "false"})
+
+
+def check_hooks(path):
+    """hooks.json must wrap the event map in a top-level "hooks" key, or it fails to load."""
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError as error:
+        fail(path, f"invalid JSON: {error}")
+        return
+    if not isinstance(data, dict) or not isinstance(data.get("hooks"), dict):
+        fail(path, 'no top-level "hooks" object; the file fails to load')
+        return
+    for groups in data["hooks"].values():
+        for group in groups:
+            for hook in group.get("hooks", []):
+                command = hook.get("command", "")
+                script = re.search(r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+?)[\"']?(?:\s|$)", command)
+                if not script:
+                    continue
+                target = path.parent.parent / script.group(1)
+                if not target.is_file():
+                    fail(path, f"hook command names {script.group(1)!r}, which does not exist")
+                elif not target.stat().st_mode & 0o111:
+                    fail(path, f"{script.group(1)} is not executable")
+
+
 def bundled_dirs(plugin_root):
     """Directories a plugin ships beside its agents and skills, read at run time."""
-    skip = {"agents", "skills", "commands", "hooks", ".claude-plugin"}
+    skip = {"agents", "skills", "commands", "hooks", "output-styles", ".claude-plugin"}
     return [d.name for d in plugin_root.iterdir() if d.is_dir() and d.name not in skip]
 
 
@@ -159,6 +197,10 @@ def main():
         check_agent(path)
     for path in sorted(ROOT.glob("plugins/*/skills/*/SKILL.md")):
         check_skill(path)
+    for path in sorted(ROOT.glob("plugins/*/output-styles/*.md")):
+        check_output_style(path)
+    for path in sorted(ROOT.glob("plugins/*/hooks/hooks.json")):
+        check_hooks(path)
     for plugin_root in sorted(ROOT.glob("plugins/*")):
         if not plugin_root.is_dir():
             continue
