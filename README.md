@@ -126,7 +126,14 @@ soft-offer closers.
 
 | File | Description |
 |---|---|
-| `statusline/statusline.sh` | Renders session cost, 5-hour and 7-day rate-limit use with hours to reset, cached daily and weekly `ccusage` totals, a context-window bar, the model and the git branch. |
+| `statusline/statusline.sh` | Renders four groups: rate-limit use (5-hour and 7-day, each with the time until it resets), the context-window bar, cost (the session unlabeled, then cached `ccusage` totals for today as `1d` and this week as `7d`), then the model and the git branch. |
+
+```
+5h 1% 5h · 7d 8% 6d | ctx ▓░░░░░░░░░ 6% | $0.76 · 1d $58.78 · 7d $58.78 | Opus 5.5 · main
+```
+
+The colours are chosen for a dark background. On a light terminal theme set
+`CURE_STATUSLINE_THEME=light` in the environment Claude Code starts from.
 
 Claude Code reads `statusLine` only from a settings file, never from a plugin manifest, so it cannot
 be loaded as a plugin component. Point `~/.claude/settings.json` at a shim that resolves the newest
@@ -148,8 +155,10 @@ script=$(printf '%s\n' "${dirs[@]}" | sort -V | tail -1)
 exec bash "$script"
 ```
 
-Requires `jq`, `git` and `npx` on `PATH`. `ccusage` runs `--offline` against a pinned version, so
-nothing here reaches the network.
+Requires `jq`, `git`, `bc` and `npx` on `PATH`; runs on macOS and Linux. `ccusage` runs `--offline`
+against a pinned version, so nothing here reaches the network. Offline prices are the ones bundled
+with that version: a model released after the pin costs `$0.00` until `NPX_PKG` in the script is
+bumped.
 
 ## Reviewing a change
 
