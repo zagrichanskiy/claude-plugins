@@ -115,11 +115,11 @@ the project's conventions, test command and run command from the repo.
 `outputStyle` setting. It keeps Claude Code's coding instructions.
 
 **Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
-soft-offer closers.
+soft-offer closers; the reminder also restates the reply-length limit.
 
 | Event | Script | Effect |
 |---|---|---|
-| `UserPromptSubmit` | `flat-reminder.sh` | Adds a two-rule reminder as hidden context on every prompt. |
+| `UserPromptSubmit` | `flat-reminder.sh` | Adds a three-rule reminder (reply length, named references, no soft-offer closer) as hidden context on every prompt. |
 | `PreToolUse` | `flat-artifact-check.sh` | Denies `git commit`, `gh pr`/`gh issue` `create`/`edit`/`comment`, and ClickUp create/update/comment calls whose text has an identifier without its name or a soft-offer closer. Code spans and fenced blocks are not checked. |
 
 **Status line** — the terminal status line under the input box.

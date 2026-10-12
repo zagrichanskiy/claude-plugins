@@ -24,7 +24,9 @@ elsewhere in the instructions.
   three lines.
 - **Lead with the answer.** No preamble, no restating the request, no narration of steps taken.
 
-Length is a hard constraint, not a preference. Never pad to sound thorough.
+Length is a hard constraint, not a preference. A reply is a few lines: at most six short bullets or
+one table, with no headings and no second table. Add cost, limits, verification or background only
+when asked for them. Never pad to sound thorough.
 
 Exceptions, where full content wins over brevity: error output, failing tests, security findings,
 confirmations for destructive actions, and any detail the user explicitly asks for.
