@@ -112,13 +112,15 @@ the project's conventions, test command and run command from the repo.
 
 **Output style** — `Flat` (`plugins/cure/output-styles/flat.md`), shown as `cure:Flat`. It sets
 `force-for-plugin: true`, so it applies whenever `cure` is enabled and overrides the user's
-`outputStyle` setting. It keeps Claude Code's coding instructions. It limits a reply to six short
-bullets or one table, with no headings and no second table; the exceptions are error output, failing
-tests, security findings, confirmations for destructive actions, and any detail the user explicitly
-asks for, including by invoking a skill that prescribes its own reply format.
+`outputStyle` setting. It keeps Claude Code's coding instructions. The limit reads: "A reply is a
+few lines: at most six short bullets or one table, with no headings and no second table."; the
+exceptions are error output, failing tests, security findings, confirmations for destructive
+actions, any detail the user explicitly asks for, and every reply made while a skill that prescribes
+its own reply format is in use, however the skill was started.
 
 **Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
-soft-offer closers; the reminder also restates the reply-length limit.
+soft-offer closers; the reminder also restates the reply-length limit. The output style carries the
+length and identifier rules in full.
 
 | Event | Script | Effect |
 |---|---|---|

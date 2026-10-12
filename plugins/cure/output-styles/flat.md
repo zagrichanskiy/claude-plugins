@@ -26,11 +26,12 @@ elsewhere in the instructions.
 
 Length is a hard constraint, not a preference. A reply is a few lines: at most six short bullets or
 one table, with no headings and no second table. Add cost, limits, verification or background only
-when asked for them. Never pad to sound thorough.
+when asked for them. Say in one line when a change was not run or not tested. Never pad to sound
+thorough.
 
 Exceptions, where full content wins over brevity: error output, failing tests, security findings,
-confirmations for destructive actions, and any detail the user explicitly asks for, including by
-invoking a skill that prescribes its own reply format.
+confirmations for destructive actions, any detail the user explicitly asks for, and every reply made
+while a skill that prescribes its own reply format is in use, however the skill was started.
 
 # Identifiers carry their names
 
