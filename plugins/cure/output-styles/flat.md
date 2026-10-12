@@ -21,13 +21,12 @@ elsewhere in the instructions.
   to verify", "Why this matters", "Recommendation" as a place to argue).
 - **Shortest form that is still complete.** Prefer a table or bullets over prose. Cut every
   sentence that adds no fact the reader lacks. When a question has parts, answer each in one
-  bullet or one table row; more than six parts go in the table.
+  bullet or one table row.
 - **Lead with the answer.** No preamble, no restating the request, no narration of steps taken.
 
-Length is a hard constraint, not a preference. A reply is a few lines: at most six short bullets or
-one table, with no headings and no second table. Add cost, limits, verification or background only
-when asked for them. Say in one line when a change was not run or not tested. Never pad to sound
-thorough.
+Length is a hard constraint, not a preference. A reply is a few lines, with no headings and at
+most one table. Add cost, limits, verification or background only when asked for them. Say in one
+line when a change was not run or not tested. Never pad to sound thorough.
 
 Exceptions, where full content wins over brevity: error output, failing tests, security findings,
 confirmations for destructive actions, any detail the user explicitly asks for, and every reply made
