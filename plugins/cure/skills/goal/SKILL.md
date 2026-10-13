@@ -52,27 +52,34 @@ the reasoning that would otherwise be re-litigated.
 
 ## Context
 
-<Where the work happens and which decisions are already settled. Point at the files that hold the
-rest — a recipe, a module, a ticket id and name — rather than restating them.>
+<Where the work happens. Then "Settled:" and the decisions already taken, as a list. Point at the
+files that hold the rest — a recipe, a module, a ticket id and name — rather than restating them.>
 
 ## Work
 
 The main session is the orchestrator. It does not read source or edit code. It dispatches agents,
 keeps the ledger and checks completeness.
 
-1. Check the facts this file states: ticket, branch, base commit, and that every file it names
-   exists. Record a mismatch in the ledger, correct course, and go on.
+1. Run `git fetch`; check that `main` equals `origin/main`. Check the other facts this file states:
+   ticket, branch, base commit, and that every file it names exists. Record a mismatch in the
+   ledger and correct course. A Settled fact proven false is the failure exit in "Done when".
 2. <One step, the agent that does it, and the file or recipe it touches.>
 3. ...
-N. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md` (see "The retrospective").
+N-1. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md` (see "The retrospective").
+N. Delete the ledger and the working notes. The goal file and the retrospective stay.
 
 ## Done when
 
 1. <Measurable, and provable by something this session runs. `pytest` passes in `src/foo`. The
    build exits 0. `ip addr show usb0` reports the address.>
 2. ...
-N. The retrospective exists, holds a "Proposed changes" table, and its summary is in the
+N-2. The retrospective exists, holds a "Proposed changes" table, and its summary is in the
    transcript.
+N-1. `ls .notes/` shows neither the ledger nor the working notes.
+
+Also done when a Settled fact or the title is proven false, <N> turns have passed, <N> rounds
+ended on a measured failure, or the diff passes <N> lines (`git diff --shortstat <base>`); the
+retrospective names the cause, and the final message starts with `failed:`.
 
 ## Rules
 
@@ -85,9 +92,6 @@ N. The retrospective exists, holds a "Proposed changes" table, and its summary i
   orchestrator does not re-read files an agent already read.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - Run `test-author` only for a behaviour change that has no test.
-- Stop when the diff passes <N> changed lines (`git diff --shortstat <base>`) and report what is
-  left.
-- Stop after <N> turns and report what is left.
 ```
 
 ## Writing the done-when list
@@ -100,8 +104,19 @@ Each item needs one measurable end state and the check that demonstrates it. Add
 that must survive the work — what must not change, what must keep passing — as their own items;
 those are the ones a goal quietly breaks.
 
-Always end the list with a turn bound. Without one a goal that cannot converge runs until something
-else stops it.
+Rules for the items:
+
+- Every outcome named in the title has an item that measures it. An outcome with no item passes
+  unproven.
+- Each command states its preconditions (a venv, a tool, a login, a running service), or a work
+  item sets them up.
+- A measured prompt set never asks about state the run changes, such as the branch's commits.
+- A measured item states samples per prompt and the pass threshold, for example 3 runs, all pass.
+
+Always end with the failure exit shown in the template. The `/goal` Stop hook blocks every stop
+that is not a met condition. A cap that only says "stop" blocks every turn after it. The exit
+lets a failed run end: also done when the cap is reached, the retrospective names the cause, and
+the final message starts with `failed:`.
 
 ## Name the tools, not the intention
 
@@ -123,11 +138,11 @@ context on every turn.
 |---|---|
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
-| Review-then-fix split | Round 1 produces a triaged fix list, not fixes; "backlog" names only the `NITPICK` and `enhancement` items, never a `MUST-FIX` or `SHOULD-CONSIDER`. Fixes ship as small PRs per component, each with at most 2 review rounds, the cap counted per PR and not across the whole effort. A `MUST-FIX` or `SHOULD-CONSIDER` still open after round 2 stops that PR; the orchestrator reports it to the user instead of starting a round 3. The fix step commits each round with explicit paths, new files included, before the re-check runs. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes; "backlog" names only the `NITPICK` and `enhancement` items, never a `MUST-FIX` or `SHOULD-CONSIDER`. Fixes ship as small PRs per component, each with at most 2 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. The round cap is a failure exit in the template form. A `MUST-FIX` or `SHOULD-CONSIDER` still open after round 2 stops that PR; the orchestrator reports it to the user instead of starting a round 3. The fix step commits each round with explicit paths, new files included, before the re-check runs. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; see the `review-change` skill for the triage words. A ledger file holds every finding and its status. State a token budget per agent per round in the goal; `review-change` defaults to 400k tokens per agent per round if the goal states none. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
-| Retrospective | The last work item and the last done-when item before the turn bound. |
+| Retrospective | The second-last work item and the done-when item before the clean-up item. |
 
 ## The retrospective
 
