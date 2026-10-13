@@ -104,12 +104,13 @@ those are the ones a goal quietly breaks.
 Rules for the items:
 
 - Every outcome named in the title has an item that measures it. An outcome with no item passes
-  unproven.
+  unproven. An outcome is measured with its qualifiers: "one PR against `main`" needs an item that
+  compares both the count and the base, not the count alone.
 - An outcome stated as a value (a version, a count) is compared with that value, not only printed.
 - Each command states its preconditions (a venv, a tool, a login, a running service), or a work item
   sets them up, or work item 1 checks them. Work item 1 checks every executable a done-when command
-  starts with, one check each (`gh auth status`, `claude --version`, `python3 --version`), not only
-  these examples.
+  starts with, except one that a work item builds or installs, one check each (`gh auth status`,
+  `claude --version`, `python3 --version`), not only these examples.
 - An item that measures replies to a fixed prompt set never asks about state the run changes, such
   as the branch's commits.
 - An item that measures a model's replies to a fixed prompt set states samples per prompt and the
@@ -125,8 +126,10 @@ so the summary is printed, not just written to a file.
 
 The clean-up work item and its done-when item are copied from the template with only the path slots
 filled. Never shorten or merge them to meet the length limit. Write the ledger path in full in both,
-even when Context names it, and write out each deleted working file. The work item says the goal
-file and the retrospective are kept. The done-when `ls` lists the same paths. Save characters in
+even when Context names it, and write out each deleted working file. Every file or directory a work
+item creates outside version control (a temporary copy, a run directory, a worktree, a fixture) is
+written as a path in that work item. The same path is in the clean-up item and in its done-when
+`ls`. The work item says the goal file and the retrospective are kept. Save characters in
 Context or the work steps.
 
 A Settled statement is a decision or fact the goal rests on. A false one fails the run. A
