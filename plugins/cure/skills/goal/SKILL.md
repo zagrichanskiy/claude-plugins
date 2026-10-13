@@ -52,44 +52,40 @@ the reasoning that would otherwise be re-litigated.
 
 ## Context
 
-<Where the work happens. Then "Settled:" and the decisions already taken, as a list. Point at the
-files that hold the rest — a recipe, a module, a ticket id and name — rather than restating them.>
+<Where the work happens. "Settled:" then the decisions and facts the goal rests on, as a list.>
 
 ## Work
 
-The main session is the orchestrator. It does not read source or edit code. It dispatches agents,
-keeps the ledger and checks completeness.
+The main session is the orchestrator: it dispatches agents, keeps the ledger, checks completeness.
+It does not read source or edit code.
 
-1. Run `git fetch`; check that `main` equals `origin/main`. Check the other facts this file states:
-   ticket, branch, base commit, and that every file it names exists. Record a mismatch in the
-   ledger and correct course. A Settled fact proven false is the failure exit in "Done when".
-2. <One step, the agent that does it, and the file or recipe it touches.>
-3. ...
-N-1. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md` (see "The retrospective").
-N. Delete the ledger and the working notes. The goal file and the retrospective stay.
+1. Run `git fetch`; check that `main` equals `origin/main`. Check the other facts: ticket, branch,
+   named files, each tool Done-when uses (`gh auth status`). A false Settled statement or a failed
+   fetch is a failure cause. Other mismatch: record it, base the work on `origin/main`.
+2. <One step, its agent, the file or recipe it touches.>
+N-1. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print its summary.
+N. Delete `<ledger path>` and `<each working file this goal created>`. Keep the goal file, the
+   retrospective, `.notes/<slug>-backlog.md`. The failure path skips this item.
 
 ## Done when
 
-1. <Measurable, and provable by something this session runs. `pytest` passes in `src/foo`. The
-   build exits 0. `ip addr show usb0` reports the address.>
-2. ...
-N-2. The retrospective exists, holds a "Proposed changes" table, and its summary is in the
-   transcript.
-N-1. `ls .notes/` shows neither the ledger nor the working notes.
+1. <Measurable by something this session runs: `pytest` passes in `src/foo`.>
+N-1. The retrospective exists with a "Proposed changes" table; its summary is in the transcript.
+N. `ls <ledger path> <working files>` reports "No such file" for each.
 
-Also done when a Settled fact or the title is proven false, <N> turns have passed, <N> rounds
-ended on a measured failure, or the diff passes <N> lines (`git diff --shortstat <base>`); the
-retrospective names the cause, and the final message starts with `failed:`.
+Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or a
+`MUST-FIX` or `SHOULD-CONSIDER` is open after review round 2, or the diff passes <lines> lines
+(`git diff --shortstat <base>`), or a Settled statement is proven false or the title's outcome is
+unachievable; and (b) the retrospective's summary, naming the cause, is in the transcript; and (c)
+the final message starts with `failed:`.
 
 ## Rules
 
-- Ask nothing. Every open question was answered before this goal started; decide the rest from the
-  code and state the assumption.
-- Establish scope with `grep` and `glob` first. Read a whole file only once it matters.
-- <Agent plan: which agent does which step, what runs in parallel, which advisor to consult on a
-  hard question.>
-- Save tokens: pass agents paths and ids, not file content. Ask for findings or results only. The
-  orchestrator does not re-read files an agent already read.
+- Ask nothing. Decide from the code; state the assumption. Scope with `grep` first.
+- <Agent plan: who does which step, what runs in parallel, which advisor to consult.>
+- Pass agents paths and ids, not content. Ask for findings only.
+- When a failure cause holds: stop, write the retrospective with the cause and what is left, keep
+  the ledger, end with a message starting `failed:`.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - Run `test-author` only for a behaviour change that has no test.
 ```
@@ -108,15 +104,24 @@ Rules for the items:
 
 - Every outcome named in the title has an item that measures it. An outcome with no item passes
   unproven.
-- Each command states its preconditions (a venv, a tool, a login, a running service), or a work
-  item sets them up.
-- A measured prompt set never asks about state the run changes, such as the branch's commits.
-- A measured item states samples per prompt and the pass threshold, for example 3 runs, all pass.
+- An outcome stated as a value (a version, a count) is compared with that value, not only printed.
+- Each command states its preconditions (a venv, a tool, a login, a running service), or work item 1
+  checks them. Work item 1 checks each tool the commands use, for example `gh auth status`.
+- An item that measures replies to a fixed prompt set never asks about state the run changes, such
+  as the branch's commits.
+- An item that measures a model's replies to a fixed prompt set states samples per prompt and the
+  pass threshold, for example 3 runs, all pass.
+- Write the repository's base branch in the fact check. For base `main` the file says `main` equals
+  `origin/main`.
 
 Always end with the failure exit shown in the template. The `/goal` Stop hook blocks every stop
-that is not a met condition. A cap that only says "stop" blocks every turn after it. The exit
-lets a failed run end: also done when the cap is reached, the retrospective names the cause, and
-the final message starts with `failed:`.
+that is not a met condition, so a cap that only says "stop" blocks every stop after it. The exit is
+a conjunction: a failure cause holds, the retrospective's summary naming the cause is in the
+transcript, and the final message starts with `failed:`. The evaluator reads the transcript only,
+so the summary is printed, not just written to a file.
+
+A Settled statement is a decision or fact the goal rests on. A false one fails the run. A
+mismatch in ticket, branch or base commit is recorded and corrected.
 
 ## Name the tools, not the intention
 
@@ -138,7 +143,7 @@ context on every turn.
 |---|---|
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
-| Review-then-fix split | Round 1 produces a triaged fix list, not fixes; "backlog" names only the `NITPICK` and `enhancement` items, never a `MUST-FIX` or `SHOULD-CONSIDER`. Fixes ship as small PRs per component, each with at most 2 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. The round cap is a failure exit in the template form. A `MUST-FIX` or `SHOULD-CONSIDER` still open after round 2 stops that PR; the orchestrator reports it to the user instead of starting a round 3. The fix step commits each round with explicit paths, new files included, before the re-check runs. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes; "backlog" names only the `NITPICK` and `enhancement` items, never a `MUST-FIX` or `SHOULD-CONSIDER`. Fixes ship as small PRs per component, each with at most 2 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after round 2 takes the failure exit; no round 3 starts. The fix step commits each round with explicit paths, new files included, before the re-check runs. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; see the `review-change` skill for the triage words. A ledger file holds every finding and its status. State a token budget per agent per round in the goal; `review-change` defaults to 400k tokens per agent per round if the goal states none. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
@@ -153,7 +158,8 @@ It holds, in this order:
 
 | Section | Content |
 |---|---|
-| Measurements | Turns used of the bound. Per agent: dispatches, tokens where reported, review rounds, findings per severity, findings accepted. Changed lines against the cap. |
+| Outcome | "met", or "failed: <cause>, what is left". |
+| Measurements | Turns used of the cap. Per agent: dispatches, tokens where reported, review rounds, measured-failure rounds, findings per severity, findings accepted. Changed lines against the cap. |
 | Where it went wrong | Each event with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
 | Proposed changes | One row per change: target file (agent, skill, knowledge file, project `CLAUDE.md`, or this format), the change, the evidence row it rests on, the expected effect. |
 
@@ -163,8 +169,8 @@ plugin or a skill. The user applies them in the plugin repository.
 ## Sizing a goal
 
 Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and a done-when list the
-user can re-run. The changed-line cap in the rules is a stop signal, not the scope. A goal that
-reaches it stops and reports instead of growing.
+user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
+reaches it takes the failure exit instead of growing.
 
 Size a goal from earlier retrospectives. The "Measurements" table of a similar goal gives turns,
 tokens and lines.
