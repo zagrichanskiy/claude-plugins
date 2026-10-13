@@ -126,10 +126,11 @@ so the summary is printed, not just written to a file.
 
 The clean-up work item and its done-when item are copied from the template with only the path slots
 filled. Never shorten or merge them to meet the length limit. Write the ledger path in full in both,
-even when Context names it, and write out each deleted working file. Every file or directory a work
+even when Context names it, and write out each deleted working file. Every temporary file or directory a work
 item creates outside version control (a temporary copy, a run directory, a worktree, a fixture) is
-written as a path in that work item. The same path is in the clean-up item and in its done-when
-`ls`. The work item says the goal file and the retrospective are kept. Save characters in
+written as a path in that work item, and the same path is in the clean-up item and in its done-when
+`ls`. This excludes the kept files and anything a done-when command reads or the goal delivers. The
+work item says the goal file, the retrospective and the backlog are kept. Save characters in
 Context or the work steps.
 
 A Settled statement is a decision or fact the goal rests on. A false one fails the run. A
