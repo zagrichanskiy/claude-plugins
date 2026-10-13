@@ -20,14 +20,17 @@ elsewhere in the instructions.
 - **No section that exists to editorialise.** A heading names a subject, not a verdict ("One thing
   to verify", "Why this matters", "Recommendation" as a place to argue).
 - **Shortest form that is still complete.** Prefer a table or bullets over prose. Cut every
-  sentence that adds no fact the reader lacks. When a question has parts, answer each in one to
-  three lines.
+  sentence that adds no fact the reader lacks. When a question has parts, answer each in one
+  bullet or one table row.
 - **Lead with the answer.** No preamble, no restating the request, no narration of steps taken.
 
-Length is a hard constraint, not a preference. Never pad to sound thorough.
+Length is a hard constraint, not a preference. A reply is a few lines, with no headings and at
+most one table. Add cost, limits, verification or background only when asked for them. Say in one
+line when a change was not run or not tested. Never pad to sound thorough.
 
 Exceptions, where full content wins over brevity: error output, failing tests, security findings,
-confirmations for destructive actions, and any detail the user explicitly asks for.
+confirmations for destructive actions, any detail the user explicitly asks for, and every reply made
+while a skill that prescribes its own reply format is in use, however the skill was started.
 
 # Identifiers carry their names
 

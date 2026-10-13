@@ -112,14 +112,19 @@ the project's conventions, test command and run command from the repo.
 
 **Output style** — `Flat` (`plugins/cure/output-styles/flat.md`), shown as `cure:Flat`. It sets
 `force-for-plugin: true`, so it applies whenever `cure` is enabled and overrides the user's
-`outputStyle` setting. It keeps Claude Code's coding instructions.
+`outputStyle` setting. It keeps Claude Code's coding instructions. The limit reads: "A reply is a
+few lines, with no headings and at most one table."; the exceptions are error output, failing tests,
+security findings, confirmations for destructive actions, any detail the user explicitly asks for,
+and every reply made while a skill that prescribes its own reply format is in use, however the skill
+was started.
 
 **Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
-soft-offer closers.
+soft-offer closers; the reminder also restates the reply-length limit. The output style carries the
+length and identifier rules in full.
 
 | Event | Script | Effect |
 |---|---|---|
-| `UserPromptSubmit` | `flat-reminder.sh` | Adds a two-rule reminder as hidden context on every prompt. |
+| `UserPromptSubmit` | `flat-reminder.sh` | Adds a three-rule reminder (reply length, named references, no soft-offer closer) as hidden context on every prompt. |
 | `PreToolUse` | `flat-artifact-check.sh` | Denies `git commit`, `gh pr`/`gh issue` `create`/`edit`/`comment`, and ClickUp create/update/comment calls whose text has an identifier without its name or a soft-offer closer. Code spans and fenced blocks are not checked. |
 
 **Status line** — the terminal status line under the input box.
