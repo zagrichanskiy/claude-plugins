@@ -100,6 +100,19 @@ def test_launched_job_with_a_higher_id_holds_the_resource_against_a_lower_unlaun
     assert h.claude.started == []
 
 
+# --- R2-C1: a launched job may claim a resource that a lower-id unlaunched job names --------------------
+
+def test_launched_job_may_claim_a_resource_named_by_a_lower_unlaunched_job(h, tmp_path):
+    low = h.new(tmp_path, repo=OTHER)
+    (h.root / "jobs" / low / "handoff.md").write_text(handoff_text((OTHER,), device="bench"), encoding="utf-8")
+    high = h.new(tmp_path)
+    assert h.run("launch", high) == 0
+    assert h.run("claim", high, "device:bench") == 0
+    listed = h.listed()
+    assert listed[low]["blocked-by"] == [high]
+    assert listed[high]["blocked-by"] == []
+
+
 # --- R1-D2: one invalid job does not take the others down -----------------------------------------------
 
 def _break(h, job_id, how):
