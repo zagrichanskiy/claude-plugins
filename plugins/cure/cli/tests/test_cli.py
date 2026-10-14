@@ -112,7 +112,7 @@ def test_domain_error_prints_error_line_on_stderr_and_returns_one(h, capsys):
 def test_other_exceptions_are_not_caught(h, monkeypatch):
     def boom():
         raise RuntimeError("bug")
-    monkeypatch.setattr(h.cli.jobs, "views", boom)
+    monkeypatch.setattr(h.cli.jobs, "listing", boom)
     with pytest.raises(RuntimeError):
         h.run("list")
 
@@ -288,11 +288,12 @@ def test_prune_with_nothing_to_remove_prints_nothing(h, tmp_path):
     assert h.lines == []
 
 
-def test_a_malformed_state_file_makes_list_exit_one_naming_the_file(h, tmp_path, capsys):
+def test_a_malformed_state_file_makes_list_show_the_job_invalid_naming_the_file(h, tmp_path, capsys):
     job_id = h.new(tmp_path)
     (h.root / "jobs" / job_id / "dispatch.jsonl").write_text("garbage\n", encoding="utf-8")
-    assert h.run("list") == 1
-    assert "dispatch.jsonl" in capsys.readouterr().err
+    h.lines.clear()
+    assert h.run("list") == 0
+    assert "invalid" in h.lines[0] and "dispatch.jsonl" in h.lines[0]
 
 
 # --- main and the environment ---------------------------------------------------------------------------

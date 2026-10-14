@@ -40,6 +40,19 @@ class HalfCreated(NamedTuple):
     mtime: datetime
 
 
+class InvalidJob(NamedTuple):
+    """A jobs/<id> whose stored files cannot be read. Its state and resources are unknown."""
+    id: str
+    dir: Path
+    #: The error. It names the file.
+    problem: str
+
+
+class Snapshot(NamedTuple):
+    records: list[JobRecord]
+    invalid: list[InvalidJob]
+
+
 class JobStore:
     def __init__(self, root: Path):
         self.root = Path(root)
@@ -84,23 +97,32 @@ class JobStore:
         return record
 
     def load_all(self) -> list[JobRecord]:
+        """The readable jobs, ascending id."""
+        return self.snapshot().records
+
+    def snapshot(self) -> Snapshot:
+        """Every job, ascending id. A job whose files do not read is an :class:`InvalidJob`."""
         try:
             with _store_errors(self._jobs):
                 names = sorted(os.listdir(self._jobs))
         except StoreError as e:
             if isinstance(e.__cause__, FileNotFoundError):
-                return []
+                return Snapshot([], [])
             raise
-        records = []
+        records, invalid = [], []
         for name in names:
             # An interrupted `new` leaves an empty jobs/<id> or a jobs/.new-*
             # directory. Neither is a job.
             if not ids.is_valid(name) or not (self._jobs / name).is_dir():
                 continue
-            record = self._read(name)
+            try:
+                record = self._read(name)
+            except (HandoffError, StoreError) as e:
+                invalid.append(InvalidJob(name, self._jobs / name, str(e)))
+                continue
             if record is not None:
                 records.append(record)
-        return records
+        return Snapshot(records, invalid)
 
     def append_event(self, job_id: str, event: Event) -> None:
         path = self.job_dir(job_id) / _EVENTS
@@ -147,6 +169,28 @@ class JobStore:
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temp)
+        return True
+
+    def rewrite_goal(self, job_id: str, change: Callable[[str], str]) -> bool:
+        """Replace ``goal.md`` with ``change(text)`` in one step. False when the text is unchanged."""
+        target = self.goal_path(job_id)
+        text, _ = _read_text(target)
+        if text is None:
+            raise UnknownJob(f"job {job_id}: {target} does not exist")
+        changed = change(text)
+        if changed == text:
+            return False
+        with _store_errors(target):
+            descriptor, temp = tempfile.mkstemp(prefix=".goal-", suffix=".tmp", dir=target.parent)
+            try:
+                with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+                    sink.write(changed)
+                os.chmod(temp, stat.S_IMODE(os.stat(target).st_mode))
+                os.replace(temp, target)
+            except BaseException:
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(temp)
+                raise
         return True
 
     def restore_result(self, job_id: str, run: int) -> None:

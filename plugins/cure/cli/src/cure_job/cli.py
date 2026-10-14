@@ -25,6 +25,7 @@ from .commands.list import ListCommand
 from .commands.new import NewCommand
 from .commands.prune import PruneCommand
 from .errors import CureJobError
+from .goal import PLUGIN_ROOT
 from .help import HelpFormatter, style
 from .providers.jobs import JobsProvider
 from .store import JobStore
@@ -40,9 +41,9 @@ _flush_print = functools.partial(print, flush=True)
 
 class Cli:
     def __init__(self, *, root: Path, claude: Claude, clock: Clock = local_now,
-                 out: Callable[[str], None] = _flush_print):
+                 out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT):
         self.out = out
-        self.jobs = JobsProvider(JobStore(root), claude, clock)
+        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root)
         self._commands = [NewCommand(self), ListCommand(self), LaunchCommand(self),
                           ClaimCommand(self), CloseCommand(self), FinishCommand(self), PruneCommand(self)]
         self._parser = self._build_parser()

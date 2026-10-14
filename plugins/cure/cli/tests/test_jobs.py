@@ -1,4 +1,4 @@
-"""``JobsProvider``: the six operations, their refusals and the writes they make, with fake seams."""
+"""``JobsProvider``: the seven operations, their refusals and the writes they make, with fake seams."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -156,11 +156,11 @@ def test_views_propagate_a_claude_failure(jobs, claude, clock):
         jobs.views()
 
 
-def test_views_name_a_malformed_dispatch_file(jobs, store, clock):
+def test_listing_names_a_malformed_dispatch_file(jobs, store, clock):
     job_id = new_job(jobs, clock)
     (store.job_dir(job_id) / "dispatch.jsonl").write_text("garbage\n", encoding="utf-8")
-    with pytest.raises(StoreError, match="dispatch.jsonl"):
-        jobs.views()
+    assert jobs.views() == []
+    assert "dispatch.jsonl" in jobs.listing().invalid[0].problem
 
 
 # --- launch -----------------------------------------------------------------------------------------

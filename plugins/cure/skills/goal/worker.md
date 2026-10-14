@@ -29,6 +29,10 @@ again, take the `failed:` exit without the `finish` report.
 | `--pr` | URL | A pull request was opened |
 | `--kept` | path, repeatable | Each file left in the repository |
 
+Each text value (`--question`, `--retro`, `--pr`, `--kept`) is one line. A long question stays one
+line, its parts separated by `; `. Exit 2 means the arguments are wrong: fix them before the retry,
+and do not repeat the same command.
+
 ## Final message
 
 - It restates each done-when item with its evidence.

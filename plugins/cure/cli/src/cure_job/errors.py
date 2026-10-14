@@ -39,3 +39,7 @@ class StoreError(CureJobError):
 
 class ClaudeError(CureJobError):
     """The ``claude`` binary is missing, timed out, failed or printed unusable output."""
+
+
+class ClaudeOutcomeUnknown(ClaudeError):
+    """The binary was started and did not finish, so a session may exist."""

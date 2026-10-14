@@ -11,7 +11,7 @@ import shlex
 import subprocess
 from typing import Protocol, Sequence
 
-from .errors import ClaudeError
+from .errors import ClaudeError, ClaudeOutcomeUnknown
 
 
 class Claude(Protocol):
@@ -62,7 +62,7 @@ class ClaudeCli:
         except OSError as e:
             raise ClaudeError(f"{command}: cannot run: {e.strerror or e}") from e
         except subprocess.TimeoutExpired as e:
-            raise ClaudeError(f"{command}: no exit within {self.TIMEOUT_SECONDS} seconds") from e
+            raise ClaudeOutcomeUnknown(f"{command}: no exit within {self.TIMEOUT_SECONDS} seconds") from e
         if done.returncode != 0:
             raise ClaudeError(f"{command}: exit {done.returncode}{_first_line(done.stderr)}")
         return done.stdout

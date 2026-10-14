@@ -10,7 +10,7 @@ from .base import Command
 class PruneCommand(Command):
     name = "prune"
     usage = "cure-job prune"
-    help = "remove finished jobs past their retention period"
+    help = "remove finished jobs past their retention period and half-created job directories"
     description = ("Remove done jobs after 14 days, failed and abandoned jobs after 30 days, "
                    "and half-created job directories after one day. "
                    "Print each removed directory path, then each removed id")

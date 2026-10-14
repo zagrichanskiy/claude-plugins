@@ -42,4 +42,6 @@ class NewCommand(Command):
 def _slug_arg(text: str) -> str:
     if not job_id.slugify(text):
         raise argparse.ArgumentTypeError(f"no character in [a-z0-9]: {text!r}")
+    if job_id.ends_in_run_marker(text):
+        raise argparse.ArgumentTypeError(f"ends in -r<digits>, the run marker of a session name: {text!r}")
     return text
