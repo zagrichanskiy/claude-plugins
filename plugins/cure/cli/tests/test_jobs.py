@@ -6,11 +6,12 @@ from datetime import timedelta
 import pytest
 
 from cure_job.errors import (ClaudeError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob)
+from cure_job.claude import SessionStatus
 from cure_job.events import Claim, Closed, Launched
 from cure_job.frontmatter import parse
 from cure_job.providers.jobs import JobsProvider
 from cure_job.resource import DEVICE_BENCH
-from cure_job.state import State
+from cure_job.state import LAUNCH_GRACE, State
 from cure_job.store import JobStore
 from tests.builders import NOW, handoff_text, set_age
 from tests.fakes import FakeClaude, FakeClock
@@ -132,9 +133,9 @@ def test_views_report_running_then_lost_as_the_session_changes(jobs, claude, clo
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
     assert state_map(jobs)[job_id] is State.RUNNING
-    claude.alive[job_id] = False
+    claude.statuses[job_id] = SessionStatus.STOPPED
     assert state_map(jobs)[job_id] is State.LOST
-    del claude.alive[job_id]
+    del claude.statuses[job_id]
     clock.advance(timedelta(seconds=61))
     assert state_map(jobs)[job_id] is State.LOST
 
@@ -142,7 +143,7 @@ def test_views_report_running_then_lost_as_the_session_changes(jobs, claude, clo
 def test_launched_becomes_lost_after_the_grace_period(jobs, claude, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
-    del claude.alive[job_id]
+    del claude.statuses[job_id]
     assert state_map(jobs)[job_id] is State.LAUNCHED
     clock.advance(timedelta(seconds=61))
     assert state_map(jobs)[job_id] is State.LOST
@@ -188,7 +189,7 @@ def test_launch_leaves_the_job_launched_then_running(jobs, claude, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
     assert state_map(jobs)[job_id] is State.RUNNING
-    del claude.alive[job_id]
+    del claude.statuses[job_id]
     assert state_map(jobs)[job_id] is State.LAUNCHED
 
 
@@ -232,7 +233,7 @@ def test_launch_refuses_a_job_whose_resource_is_held_naming_holder_and_resource(
 def test_launch_of_a_lost_job_uses_the_next_run_and_session_name(jobs, claude, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
-    claude.alive[job_id] = False
+    claude.statuses[job_id] = SessionStatus.STOPPED
     assert jobs.launch(job_id) == job_id + "-r2"
     assert state_map(jobs)[job_id] is State.RUNNING
     assert jobs.store.load(job_id).run == 2
@@ -306,7 +307,7 @@ def test_launch_event_write_failure_names_the_unrecorded_session(jobs, claude, s
 def test_launch_runs_sessions_at_most_once(jobs, claude, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
-    claude.alive[job_id] = False
+    claude.statuses[job_id] = SessionStatus.STOPPED
     claude.sessions_calls = 0
     jobs.launch(job_id)
     assert claude.sessions_calls == 1
@@ -403,10 +404,10 @@ def test_close_abandons_a_job_in_each_closable_state(jobs, claude, store, clock,
     elif setup in ("lost", "needs-input"):
         jobs.launch(first)
         if setup == "lost":
-            claude.alive[first] = False
+            claude.statuses[first] = SessionStatus.STOPPED
         else:
             (store.job_dir(first) / "result.md").write_text("---\nstatus: needs-input\n---\n", encoding="utf-8")
-            claude.alive.pop(first)
+            claude.statuses.pop(first)
     assert state_map(jobs)[target] is expected
     jobs.close(target, "no longer needed")
     assert state_map(jobs)[target] is State.ABANDONED
@@ -424,7 +425,7 @@ def test_close_refuses_launched_and_running_and_says_to_stop_the_session(jobs, c
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
     if not live:
-        del claude.alive[job_id]
+        del claude.statuses[job_id]
     with pytest.raises(JobStateError, match=job_id):
         jobs.close(job_id)
     assert not any(isinstance(e, Closed) for e in jobs.store.load(job_id).events)
@@ -519,3 +520,53 @@ def test_prune_compares_file_mtime_with_the_clock(jobs, store, clock):
 
 def test_prune_with_no_jobs_is_empty(jobs):
     assert jobs.prune() == []
+
+
+# --- stalled: close and launch refuse while the idle session is alive -------------------------------------
+
+def stall(jobs, claude, clock):
+    """A launched job whose session is idle with no result, past the launch grace."""
+    job_id = new_job(jobs, clock, approved=True)
+    jobs.launch(job_id)
+    claude.statuses[job_id] = SessionStatus.IDLE
+    clock.advance(LAUNCH_GRACE + timedelta(seconds=1))
+    return job_id
+
+
+def test_idle_session_is_running_within_the_grace_and_stalled_after_it(jobs, claude, clock):
+    job_id = new_job(jobs, clock, approved=True)
+    jobs.launch(job_id)
+    claude.statuses[job_id] = SessionStatus.IDLE
+    clock.advance(LAUNCH_GRACE)
+    assert state_map(jobs)[job_id] is State.RUNNING
+    clock.advance(timedelta(seconds=1))
+    assert state_map(jobs)[job_id] is State.STALLED
+
+
+def test_close_refuses_a_stalled_job_and_names_the_session(jobs, claude, clock):
+    job_id = stall(jobs, claude, clock)
+    with pytest.raises(JobStateError, match=job_id):
+        jobs.close(job_id)
+    assert not any(isinstance(e, Closed) for e in jobs.store.load(job_id).events)
+
+
+def test_launch_refuses_a_stalled_job_and_starts_nothing(jobs, claude, clock):
+    job_id = stall(jobs, claude, clock)
+    started = len(claude.started)
+    with pytest.raises(JobStateError, match="stalled"):
+        jobs.launch(job_id)
+    assert len(claude.started) == started
+    assert jobs.store.load(job_id).run == 1
+
+
+def test_stalled_job_can_be_closed_once_its_session_is_stopped(jobs, claude, clock):
+    job_id = stall(jobs, claude, clock)
+    claude.statuses[job_id] = SessionStatus.STOPPED
+    jobs.close(job_id, "abandoned by the user")
+    assert state_map(jobs)[job_id] is State.ABANDONED
+
+
+def test_stalled_job_can_be_launched_again_once_its_session_is_stopped(jobs, claude, clock):
+    job_id = stall(jobs, claude, clock)
+    claude.statuses[job_id] = SessionStatus.STOPPED
+    assert jobs.launch(job_id) == job_id + "-r2"

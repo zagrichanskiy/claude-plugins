@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from cure_job.claude import SessionStatus
 from cure_job.cli import Cli
 from cure_job.clock import format_local, local_now, parse_local
 from cure_job.errors import JobStateError, ResourceHeld
@@ -63,7 +64,7 @@ def test_finish_refuses_a_job_without_a_launched_event(jobs, store, clock):
 
 def test_finish_refuses_a_closed_job(jobs, store, clock, claude):
     job_id = make_job(jobs, store, clock)
-    claude.alive.update({k: False for k in claude.alive})
+    claude.statuses.update({k: SessionStatus.STOPPED for k in claude.statuses})
     jobs.close(job_id, "stop")
     with pytest.raises(JobStateError, match="abandoned"):
         jobs.finish(job_id, Report(ResultStatus.DONE))
@@ -171,7 +172,7 @@ def test_cli_finish_without_a_launched_event_exits_one(h, tmp_path):
 
 def test_cli_finish_of_a_closed_job_exits_one(h, tmp_path):
     job_id = h.job(tmp_path)
-    h.claude.alive.update({k: False for k in h.claude.alive})
+    h.claude.statuses.update({k: SessionStatus.STOPPED for k in h.claude.statuses})
     assert h.run("close", job_id) == 0
     assert h.run("finish", job_id, "--status", "done") == 1
 

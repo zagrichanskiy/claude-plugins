@@ -23,6 +23,7 @@ from .commands.finish import FinishCommand
 from .commands.launch import LaunchCommand
 from .commands.list import ListCommand
 from .commands.new import NewCommand
+from .commands.origin import OriginCommand
 from .commands.prune import PruneCommand
 from .errors import CureJobError
 from .goal import PLUGIN_ROOT
@@ -45,7 +46,8 @@ class Cli:
         self.out = out
         self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root)
         self._commands = [NewCommand(self), ListCommand(self), LaunchCommand(self),
-                          ClaimCommand(self), CloseCommand(self), FinishCommand(self), PruneCommand(self)]
+                          ClaimCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
+                          PruneCommand(self)]
         self._parser = self._build_parser()
 
     def _build_parser(self) -> argparse.ArgumentParser:

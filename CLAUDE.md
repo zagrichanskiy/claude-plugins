@@ -28,12 +28,13 @@ An *unknown* key is ignored just as quietly, so a typo costs the setting rather 
 `efort: high` is not a failure, it is an agent at default effort. `scripts/lint-plugin.py` is the
 gate — it checks that every agent carries `name:` (matching the file name), `tools:` and
 `description:`, that every skill carries `description:` and uses `allowed-tools:`, that no key is
-unknown, and that `model:` and `effort:` hold accepted values:
+unknown, and that `model:`, `effort:` and `autoCompactWindow:` hold accepted values:
 
 | Key | Accepted values |
 |---|---|
 | `model` | `opus`, `sonnet`, `haiku`, `fable`, `inherit` |
 | `effort` | `low`, `medium`, `high`, `xhigh`, `max` |
+| `autoCompactWindow` | an integer from 100000 to 1000000 |
 
 Run it before every commit; CI runs it on every pull request and every push to `main`. `claude plugin validate .`
 checks the manifests only — it says nothing about agent or skill frontmatter, which is why the lint

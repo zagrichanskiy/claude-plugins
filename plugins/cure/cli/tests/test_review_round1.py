@@ -189,8 +189,15 @@ def test_new_refuses_a_slug_that_ends_in_a_run_suffix(h, tmp_path):
 
 # --- R1-C5: goal files name the current plugin root ----------------------------------------------------
 
+def plugin_with_rules(path):
+    """A plugin root that holds the goal rules file, which ``launch`` requires."""
+    (path / "skills" / "goal").mkdir(parents=True)
+    (path / "skills" / "goal" / "rules.md").write_text("rules", encoding="utf-8")
+    return path
+
+
 def test_launch_rewrites_a_versioned_cure_job_path_to_the_current_plugin_root(root, tmp_path):
-    current = tmp_path / "plugin" / "0.19.0"
+    current = plugin_with_rules(tmp_path / "plugin" / "0.19.0")
     h = Harness(root, plugin_root=current)
     job_id = h.new(tmp_path)
     h.goal(job_id).write_text(f"run {OLD_ROOT}/bin/cure-job finish\nand {OLD_ROOT}/bin/cure-job claim\n",
@@ -201,7 +208,7 @@ def test_launch_rewrites_a_versioned_cure_job_path_to_the_current_plugin_root(ro
 
 
 def test_launch_leaves_a_goal_without_a_plugin_path_unchanged(root, tmp_path):
-    h = Harness(root, plugin_root=tmp_path / "plugin" / "0.19.0")
+    h = Harness(root, plugin_root=plugin_with_rules(tmp_path / "plugin" / "0.19.0"))
     job_id = h.new(tmp_path)
     text = "do the work\nsee /home/u/other/bin/cure-job-notes\n"
     h.goal(job_id).write_text(text, encoding="utf-8")

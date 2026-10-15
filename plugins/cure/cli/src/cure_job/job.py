@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .events import Claim, Closed, Event, Launched
+from .events import Claim, Closed, Event, Launched, Origin
 from .handoff import Handoff
 from .result import Result
 
@@ -37,6 +37,12 @@ class JobRecord:
     @property
     def closed(self) -> Closed | None:
         return next((event for event in self.events if isinstance(event, Closed)), None)
+
+    @property
+    def origin(self) -> str | None:
+        """The latest origin event's address, else the handoff's ``origin``."""
+        origins = [event for event in self.events if isinstance(event, Origin)]
+        return origins[-1].address if origins else self.handoff.origin
 
     @property
     def resources(self) -> frozenset[str]:

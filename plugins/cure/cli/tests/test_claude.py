@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from cure_job.claude import ClaudeCli
+from cure_job.claude import ClaudeCli, SessionStatus
 from cure_job.errors import ClaudeError
 from tests.conftest import FAKE_CLAUDE
 
@@ -38,26 +38,56 @@ def test_sessions_runs_agents_json_all(cli, fake_state):
     assert calls(fake_state)[0]["argv"] == ["agents", "--json", "--all"]
 
 
-def test_session_with_pid_is_alive_and_without_is_stopped(cli, fake_state):
-    (fake_state / "agents.json").write_text(json.dumps([
-        {"name": "live", "pid": 4242, "status": "busy"},
-        {"name": "stopped", "state": "idle"},
-    ]), encoding="utf-8")
-    assert cli.sessions() == {"live": True, "stopped": False}
+def write_agents(fake_state, entries):
+    (fake_state / "agents.json").write_text(json.dumps(entries), encoding="utf-8")
 
 
-def test_name_listed_twice_is_alive_when_any_entry_is(cli, fake_state):
-    (fake_state / "agents.json").write_text(json.dumps([
-        {"name": "dup"}, {"name": "dup", "pid": 1}, {"name": "dup2", "pid": 1}, {"name": "dup2"},
-    ]), encoding="utf-8")
-    assert cli.sessions() == {"dup": True, "dup2": True}
+# Field shapes as printed by `claude agents --json --all` on Claude Code 2.1.300.
+@pytest.mark.parametrize("entry, expected", [
+    ({"name": "n", "pid": 4242, "state": "idle", "status": "idle", "kind": "background"}, SessionStatus.IDLE),
+    ({"name": "n", "pid": 4242, "state": "working", "status": "busy", "kind": "background"}, SessionStatus.BUSY),
+    ({"name": "n", "pid": 4242, "state": "blocked", "status": "waiting", "kind": "background"}, SessionStatus.BUSY),
+    ({"name": "n", "pid": 4242}, SessionStatus.BUSY),
+    ({"name": "n", "pid": 4242, "status": "something-new"}, SessionStatus.BUSY),
+    ({"name": "n", "kind": "background"}, SessionStatus.STOPPED),
+    ({"name": "n", "state": "idle"}, SessionStatus.STOPPED),
+])
+def test_entry_maps_to_a_session_status(cli, fake_state, entry, expected):
+    write_agents(fake_state, [entry])
+    assert cli.sessions() == {"n": expected}
+
+
+def test_unlisted_name_is_absent(cli, fake_state):
+    write_agents(fake_state, [{"name": "listed", "pid": 1, "status": "idle"}])
+    assert "other" not in cli.sessions()
+
+
+@pytest.mark.parametrize("statuses, expected", [
+    (("busy", "idle"), SessionStatus.BUSY),
+    (("idle", "busy"), SessionStatus.BUSY),
+    (("idle", "stopped"), SessionStatus.IDLE),
+    (("stopped", "idle"), SessionStatus.IDLE),
+    (("busy", "stopped"), SessionStatus.BUSY),
+    (("stopped", "busy"), SessionStatus.BUSY),
+    (("stopped", "stopped"), SessionStatus.STOPPED),
+])
+def test_name_listed_twice_takes_the_strongest_status_whatever_the_order(cli, fake_state, statuses, expected):
+    shapes = {"busy": {"pid": 1, "status": "busy"}, "idle": {"pid": 2, "status": "idle"}, "stopped": {}}
+    write_agents(fake_state, [{"name": "dup", **shapes[s]} for s in statuses])
+    assert cli.sessions() == {"dup": expected}
+
+
+def test_distinct_names_keep_their_own_status(cli, fake_state):
+    write_agents(fake_state, [{"name": "a", "pid": 1, "status": "idle"}, {"name": "b", "pid": 2, "status": "busy"},
+                              {"name": "c"}])
+    assert cli.sessions() == {"a": SessionStatus.IDLE, "b": SessionStatus.BUSY, "c": SessionStatus.STOPPED}
 
 
 def test_entries_without_a_string_name_are_skipped(cli, fake_state):
     (fake_state / "agents.json").write_text(json.dumps([
         {"pid": 1}, {"name": 5, "pid": 1}, "text", 3, {"name": "ok", "pid": 1},
     ]), encoding="utf-8")
-    assert cli.sessions() == {"ok": True}
+    assert cli.sessions() == {"ok": SessionStatus.BUSY}
 
 
 def test_sessions_rejects_output_that_is_not_a_json_array(cli, fake_state):
@@ -86,9 +116,9 @@ def test_start_without_extra_arguments(cli, fake_state, tmp_path):
     assert calls(fake_state)[0]["argv"] == ["--bg", "--name", "job-1", "prompt"]
 
 
-def test_started_session_is_listed_alive(cli, tmp_path):
+def test_started_session_is_listed_busy(cli, tmp_path):
     cli.start("job-1", str(tmp_path), "prompt")
-    assert cli.sessions() == {"job-1": True}
+    assert cli.sessions() == {"job-1": SessionStatus.BUSY}
 
 
 def test_start_with_a_cwd_that_is_not_a_directory_raises(cli, tmp_path):

@@ -14,6 +14,10 @@ from pathlib import Path
 #: directory in the plugin cache.
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 
+#: The rules every goal file names in its read-first line, relative to the
+#: plugin root. ``launch`` refuses while it is missing.
+RULES = Path("skills", "goal", "rules.md")
+
 # Starts at "/" or "~", so a leading "@" or quote stays in place.
 _CACHED_ROOT = re.compile(r"[/~][^\s\"'`<>()\[\]]*?/plugins/cache/[^/\s]+/cure/[^/\s]+/")
 

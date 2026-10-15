@@ -7,8 +7,9 @@ directory. A worker session then runs the goal and cannot reach the user.
 
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
-- Read `~/.claude/cure/defaults.md` before the question round. A missing file means no defaults. Do
-  not ask a fork it answers; mark that decision `(default)` under Settled.
+- Read `defaults.md` under `${CURE_JOB_ROOT:-~/.claude/cure}` before the question round. A missing
+  file means no defaults. Do not ask a fork it answers; mark that decision `(default)` under
+  Settled.
 - Take the repository's build, review and verify agents and its PR skill from the handoff's
   `## Tools` section.
 

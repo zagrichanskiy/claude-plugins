@@ -5,6 +5,7 @@ the :class:`Claude` protocol, so a test passes a fake.
 """
 from __future__ import annotations
 
+import enum
 import json
 import os
 import shlex
@@ -14,9 +15,23 @@ from typing import Protocol, Sequence
 from .errors import ClaudeError, ClaudeOutcomeUnknown
 
 
+class SessionStatus(enum.Enum):
+    BUSY = "busy"
+    IDLE = "idle"
+    STOPPED = "stopped"
+
+
+#: The key and value `claude agents --json` puts on a live session that waits
+#: for input. A live entry with any other value, or none, is busy.
+IDLE_MARK = ("status", "idle")
+
+#: A name listed more than once takes its strongest entry.
+_STRENGTH = {SessionStatus.BUSY: 2, SessionStatus.IDLE: 1, SessionStatus.STOPPED: 0}
+
+
 class Claude(Protocol):
-    def sessions(self) -> dict[str, bool]:
-        """Session name to alive, for every session the binary lists."""
+    def sessions(self) -> dict[str, SessionStatus]:
+        """Session name to status, for every session the binary lists."""
 
     def start(self, name: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
         """Start one background session. Returns when the binary has returned."""
@@ -28,7 +43,7 @@ class ClaudeCli:
     def __init__(self, binary: str):
         self.binary = binary
 
-    def sessions(self) -> dict[str, bool]:
+    def sessions(self) -> dict[str, SessionStatus]:
         argv = [self.binary, "agents", "--json", "--all"]
         stdout = self._run(argv)
         try:
@@ -37,14 +52,15 @@ class ClaudeCli:
             entries = None
         if not isinstance(entries, list):
             raise ClaudeError(f"{shlex.join(argv)}: the output is not a JSON array")
-        alive: dict[str, bool] = {}
+        found: dict[str, SessionStatus] = {}
         for entry in entries:
             if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
                 continue
-            # A stopped session stays listed under --all, without a pid. A name
-            # may be listed more than once, and one live entry is enough.
-            alive[entry["name"]] = alive.get(entry["name"], False) or "pid" in entry
-        return alive
+            status = _status(entry)
+            known = found.get(entry["name"])
+            if known is None or _STRENGTH[status] > _STRENGTH[known]:
+                found[entry["name"]] = status
+        return found
 
     def start(self, name: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
         argv = [self.binary, "--bg", "--name", name, *extra_args, prompt]
@@ -66,6 +82,14 @@ class ClaudeCli:
         if done.returncode != 0:
             raise ClaudeError(f"{command}: exit {done.returncode}{_first_line(done.stderr)}")
         return done.stdout
+
+
+def _status(entry: dict) -> SessionStatus:
+    # A stopped session stays listed under --all, without a pid.
+    if "pid" not in entry:
+        return SessionStatus.STOPPED
+    key, value = IDLE_MARK
+    return SessionStatus.IDLE if entry.get(key) == value else SessionStatus.BUSY
 
 
 def _first_line(stderr: str) -> str:

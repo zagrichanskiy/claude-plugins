@@ -37,6 +37,10 @@ class StoreError(CureJobError):
     """The state root cannot be read or written, or ``dispatch.jsonl`` is malformed."""
 
 
+class PluginError(CureJobError):
+    """A file the cure plugin ships is missing."""
+
+
 class ClaudeError(CureJobError):
     """The ``claude`` binary is missing, timed out, failed or printed unusable output."""
 

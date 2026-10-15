@@ -16,7 +16,7 @@ from tests.builders import NOW, handoff_text
 from tests.conftest import FAKE_CLAUDE
 from tests.fakes import FakeClaude, FakeClock
 
-COMMANDS = ["new", "list", "launch", "claim", "close", "prune"]
+COMMANDS = ["new", "list", "launch", "claim", "origin", "close", "prune"]
 
 
 class Harness:
@@ -176,7 +176,7 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
     assert [item["id"] for item in data] == [first, second]
     assert data[0] == {
         "id": first, "state": "queued", "dir": str(h.root / "jobs" / first), "run": 0, "session": None,
-        "resources": ["/work/video-core"], "blocked-by": [], "problem": None}
+        "resources": ["/work/video-core"], "blocked-by": [], "problem": None, "origin": None}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
 
 
@@ -253,6 +253,90 @@ def test_claim_refused_returns_one_with_holder_in_message(h, tmp_path, capsys):
     second = h.new(tmp_path, repos=("/work/b",))
     assert h.run("claim", second, "device:bench") == 1
     assert f"device:bench is held by {first}" in capsys.readouterr().err
+
+
+# --- origin ---------------------------------------------------------------------------------------------
+
+def _origin_of(h, job_id):
+    h.lines.clear()
+    h.run("list", "--json")
+    return {item["id"]: item for item in json.loads(h.lines[0])}[job_id]["origin"]
+
+
+def _new_with_handoff_origin(h, tmp_path, address):
+    h.clock.advance(timedelta(minutes=1))
+    source = tmp_path / "handoff-origin.md"
+    source.write_text(handoff_text().replace("device: none", f"device: none\norigin: {address}"), encoding="utf-8")
+    h.lines.clear()
+    assert h.run("new", "--slug", "o", str(source)) == 0
+    return h.lines[0]
+
+
+def test_origin_prints_nothing_and_list_json_exposes_it(h, tmp_path):
+    job_id = h.new(tmp_path)
+    h.lines.clear()
+    assert h.run("origin", job_id, "session-a") == 0
+    assert h.lines == []
+    assert _origin_of(h, job_id) == "session-a"
+
+
+def test_origin_is_null_without_event_or_handoff_field(h, tmp_path):
+    assert _origin_of(h, h.new(tmp_path)) is None
+
+
+def test_latest_origin_event_wins(h, tmp_path):
+    job_id = h.new(tmp_path)
+    h.run("origin", job_id, "session-a")
+    h.run("origin", job_id, "session-b")
+    assert _origin_of(h, job_id) == "session-b"
+    lines = (h.root / "jobs" / job_id / "dispatch.jsonl").read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line) for line in lines]
+    assert [e["address"] for e in events if e["event"] == "origin"] == ["session-a", "session-b"]
+    assert all("at" in e for e in events if e["event"] == "origin")
+
+
+def test_handoff_origin_field_is_the_fallback(h, tmp_path):
+    job_id = _new_with_handoff_origin(h, tmp_path, "from-handoff")
+    assert _origin_of(h, job_id) == "from-handoff"
+
+
+def test_origin_event_overrides_the_handoff_field(h, tmp_path):
+    job_id = _new_with_handoff_origin(h, tmp_path, "from-handoff")
+    h.run("origin", job_id, "from-event")
+    assert _origin_of(h, job_id) == "from-event"
+
+
+def test_origin_survives_launch(h, tmp_path):
+    job_id = h.new(tmp_path)
+    h.approve(job_id)
+    h.run("origin", job_id, "session-a")
+    h.run("launch", job_id)
+    assert _origin_of(h, job_id) == "session-a"
+
+
+def test_origin_does_not_change_state_or_resources(h, tmp_path):
+    job_id = h.new(tmp_path)
+    h.lines.clear()
+    h.run("list", "--json")
+    before = json.loads(h.lines[0])[0]
+    h.run("origin", job_id, "session-a")
+    h.lines.clear()
+    h.run("list", "--json")
+    after = json.loads(h.lines[0])[0]
+    assert {k: v for k, v in after.items() if k != "origin"} == {k: v for k, v in before.items() if k != "origin"}
+
+
+def test_origin_for_unknown_id_is_refused(h, capsys):
+    assert h.run("origin", "261013-1800-video-core-x", "session-a") == 1
+    assert "261013-1800-video-core-x" in capsys.readouterr().err
+    assert not (h.root / "jobs" / "261013-1800-video-core-x").exists()
+
+
+@pytest.mark.parametrize("argv", [["origin"], ["origin", "261013-1800-video-core-x"], ["origin", "../etc", "a"]])
+def test_origin_usage_errors_exit_two(h, capsys, argv):
+    with pytest.raises(SystemExit) as caught:
+        h.cli.run(argv)
+    assert caught.value.code == 2
 
 
 def test_close_prints_nothing_and_abandons(h, tmp_path):
@@ -353,3 +437,37 @@ def test_main_reads_the_environment_on_each_call(tmp_path, monkeypatch, capsys):
 def test_main_bare_returns_zero(capsys):
     assert main([]) == 0
     assert "new" in capsys.readouterr().out
+
+
+# --- launch guard: the goal rules file ----------------------------------------------------------------
+
+def test_launch_without_the_goal_rules_file_exits_one_and_changes_nothing(root, tmp_path, capsys):
+    # Assumes the seam is Cli(plugin_root=...), which the rules file is resolved against.
+    plugin = tmp_path / "plugin-without-rules"
+    (plugin / "skills" / "goal").mkdir(parents=True)
+    h = Harness(root)
+    h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
+    job_id = h.new(tmp_path)
+    h.approve(job_id)
+    job_dir = root / "jobs" / job_id
+    (job_dir / "result.md").write_text("---\nstatus: needs-input\n---\nquestion", encoding="utf-8")
+    events_before = (job_dir / "events.md").read_bytes() if (job_dir / "events.md").exists() else None
+    names_before = sorted(p.name for p in job_dir.iterdir())
+    assert h.run("launch", job_id) == 1
+    assert str(plugin / "skills" / "goal" / "rules.md") in capsys.readouterr().err
+    assert h.claude.started == []
+    assert (job_dir / "result.md").exists()
+    assert sorted(p.name for p in job_dir.iterdir()) == names_before
+    if events_before is not None:
+        assert (job_dir / "events.md").read_bytes() == events_before
+
+
+def test_launch_with_the_goal_rules_file_present_succeeds(root, tmp_path):
+    plugin = tmp_path / "plugin-with-rules"
+    (plugin / "skills" / "goal").mkdir(parents=True)
+    (plugin / "skills" / "goal" / "rules.md").write_text("rules", encoding="utf-8")
+    h = Harness(root)
+    h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
+    job_id = h.new(tmp_path)
+    h.approve(job_id)
+    assert h.run("launch", job_id) == 0

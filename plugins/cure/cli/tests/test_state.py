@@ -7,6 +7,7 @@ from datetime import timedelta
 
 import pytest
 
+from cure_job.claude import SessionStatus
 from cure_job.events import Claim, Closed, Launched
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
@@ -14,6 +15,7 @@ from cure_job.result import ResultStatus
 from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, needs_sessions
 from tests.builders import NOW, make_record, result_of
 
+BUSY, IDLE, STOPPED = SessionStatus.BUSY, SessionStatus.IDLE, SessionStatus.STOPPED
 A = "261013-1000-video-core-a"
 B = "261013-1001-video-core-b"
 C = "261013-1002-video-core-c"
@@ -63,18 +65,18 @@ def test_row_4_malformed_result_is_needs_input_and_keeps_the_job_open():
 
 def test_row_5_live_session_is_running():
     record = make_record(A, events=(launched(A),))
-    assert state_of(record, {A: True}) is State.RUNNING
+    assert state_of(record, {A: BUSY}) is State.RUNNING
 
 
 def test_row_5_latest_launch_names_the_session_checked():
     record = make_record(A, events=(launched(A, 1), launched(A, 2)))
-    assert state_of(record, {A: True, A + "-r2": False}) is State.LOST
-    assert state_of(record, {A: False, A + "-r2": True}) is State.RUNNING
+    assert state_of(record, {A: BUSY, A + "-r2": STOPPED}) is State.LOST
+    assert state_of(record, {A: STOPPED, A + "-r2": BUSY}) is State.RUNNING
 
 
 def test_row_6_stopped_session_is_lost_even_inside_the_grace_period():
     record = make_record(A, events=(launched(A, age=timedelta(seconds=1)),))
-    assert state_of(record, {A: False}) is State.LOST
+    assert state_of(record, {A: STOPPED}) is State.LOST
 
 
 def test_row_7_unlisted_session_inside_the_grace_period_is_launched():
@@ -114,22 +116,22 @@ def test_closed_beats_a_failed_result():
 
 def test_closed_beats_a_live_session():
     record = make_record(A, events=(launched(A), Closed("")))
-    assert state_of(record, {A: True}) is State.ABANDONED
+    assert state_of(record, {A: BUSY}) is State.ABANDONED
 
 
 def test_result_beats_a_live_session():
     record = make_record(A, events=(launched(A),), result=result_of(ResultStatus.DONE))
-    assert state_of(record, {A: True}) is State.DONE
+    assert state_of(record, {A: BUSY}) is State.DONE
 
 
 def test_needs_input_result_beats_a_live_session():
     record = make_record(A, events=(launched(A),), result=result_of(ResultStatus.NEEDS_INPUT))
-    assert state_of(record, {A: True}) is State.NEEDS_INPUT
+    assert state_of(record, {A: BUSY}) is State.NEEDS_INPUT
 
 
 def test_launched_beats_goal_file():
     record = make_record(A, goal=True, events=(launched(A),))
-    assert state_of(record, {A: True}) is State.RUNNING
+    assert state_of(record, {A: BUSY}) is State.RUNNING
 
 
 def test_goal_file_beats_queued_and_held():
@@ -145,7 +147,7 @@ def test_failed_result_is_failed_whatever_unproven_holds():
 
 @pytest.mark.parametrize("state, is_open", [
     (State.QUEUED, True), (State.HELD, True), (State.AWAITING_APPROVAL, True), (State.LAUNCHED, True),
-    (State.RUNNING, True), (State.LOST, True), (State.NEEDS_INPUT, True),
+    (State.RUNNING, True), (State.STALLED, True), (State.LOST, True), (State.NEEDS_INPUT, True),
     (State.DONE, False), (State.FAILED, False), (State.ABANDONED, False),
 ])
 def test_is_open(state, is_open):
@@ -154,7 +156,7 @@ def test_is_open(state, is_open):
 
 def test_state_values_are_the_documented_words():
     assert {s.value for s in State} == {
-        "queued", "held", "awaiting-approval", "launched", "running", "lost", "needs-input", "done",
+        "queued", "held", "awaiting-approval", "launched", "running", "stalled", "lost", "needs-input", "done",
         "failed", "abandoned"}
 
 
@@ -212,7 +214,7 @@ def test_blocked_by_is_empty_for_jobs_that_are_not_open():
 
 
 @pytest.mark.parametrize("sessions, age", [
-    ({A: False}, timedelta(minutes=5)),
+    ({A: STOPPED}, timedelta(minutes=5)),
     ({}, timedelta(minutes=5)),
 ])
 def test_lost_job_is_open_and_keeps_its_resources(sessions, age):
@@ -321,3 +323,49 @@ def test_needs_sessions_false_when_no_state_depends_on_sessions(record):
 
 def test_needs_sessions_false_for_no_records():
     assert not needs_sessions([])
+
+
+# --- stalled: a live session that is idle with no result ----------------------------------------------
+
+def test_idle_session_inside_the_grace_period_is_running():
+    record = make_record(A, events=(launched(A, age=timedelta(seconds=10)),))
+    assert state_of(record, {A: IDLE}) is State.RUNNING
+
+
+def test_idle_session_at_exactly_the_grace_period_is_still_running():
+    record = make_record(A, events=(launched(A, age=LAUNCH_GRACE),))
+    assert state_of(record, {A: IDLE}) is State.RUNNING
+
+
+def test_idle_session_past_the_grace_period_is_stalled():
+    record = make_record(A, events=(launched(A, age=LAUNCH_GRACE + timedelta(seconds=1)),))
+    assert state_of(record, {A: IDLE}) is State.STALLED
+
+
+def test_busy_session_past_the_grace_period_stays_running():
+    record = make_record(A, events=(launched(A, age=timedelta(hours=3)),))
+    assert state_of(record, {A: BUSY}) is State.RUNNING
+
+
+def test_idle_session_with_a_result_is_needs_input_not_stalled():
+    record = make_record(A, events=(launched(A, age=timedelta(hours=1)),),
+                         result=result_of(ResultStatus.NEEDS_INPUT))
+    assert state_of(record, {A: IDLE}) is State.NEEDS_INPUT
+
+
+def test_stalled_state_checks_the_session_of_the_latest_launch():
+    record = make_record(A, events=(launched(A, 1, age=timedelta(hours=2)), launched(A, 2, age=timedelta(hours=1))))
+    assert state_of(record, {A: IDLE, A + "-r2": BUSY}) is State.RUNNING
+    assert state_of(record, {A: BUSY, A + "-r2": IDLE}) is State.STALLED
+
+
+def test_stalled_has_a_session_and_is_open_but_not_launchable():
+    assert State.STALLED.value == "stalled"
+    assert State.STALLED.has_session
+    assert State.STALLED.is_open
+    assert not State.STALLED.is_launchable
+
+
+def test_stalled_job_keeps_its_resources():
+    stalled = make_record(A, events=(launched(A, age=timedelta(hours=1)),))
+    assert states([stalled, make_record(B)], {A: IDLE}) == {A: State.STALLED, B: State.HELD}

@@ -1,7 +1,8 @@
-"""The handoff: the two fields of ``handoff.md`` that the CLI consumes.
+"""The handoff: the fields of ``handoff.md`` that the CLI consumes.
 
-``repos`` and ``device`` name the resources a job locks. Every other field and
-section belongs to the dispatcher and is not checked here.
+``repos`` and ``device`` name the resources a job locks. ``origin``, optional,
+names the session the job reports back to. Every other field and section
+belongs to the dispatcher and is not checked here.
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ class Device(enum.Enum):
 class Handoff:
     repos: tuple[str, ...]
     device: Device
+    origin: str | None = None
 
     @property
     def launch_dir(self) -> str:
@@ -52,9 +54,12 @@ def parse_handoff(text: str) -> Handoff:
             repos.append(name)
     if not repos:
         raise HandoffError("repos is missing or empty")
+    origin = entries.get("origin")
+    if isinstance(origin, list):
+        raise HandoffError("origin is a list; expected one session name")
     device = entries.get("device")
     try:
-        return Handoff(repos=tuple(repos), device=Device(device))
+        return Handoff(repos=tuple(repos), device=Device(device), origin=origin or None)
     except ValueError:
         choices = " or ".join(member.value for member in Device)
         if device is None:

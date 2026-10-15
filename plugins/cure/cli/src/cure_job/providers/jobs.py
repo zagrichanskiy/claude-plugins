@@ -1,13 +1,14 @@
-"""The seven job operations.
+"""The eight job operations.
 
 Every operation except ``new`` and ``finish`` reads one snapshot of the state
 root, derives the job states from it and makes its writes. No operation holds a
 lock, so a check and its write are not atomic across processes.
 
 A job whose stored files do not read is invalid. ``list`` shows it, ``prune``
-skips it, and ``launch``, ``claim`` and ``close`` refuse it by id. Its resources
+skips it, and ``launch``, ``claim``, ``close`` and ``origin`` refuse it by id. Its resources
 and its launched events are unknown, so it may hold any resource whatever its
 id: ``launch`` and ``claim`` of every other job refuse while it exists.
+``close`` and ``origin`` name no resource, so they do not.
 """
 from __future__ import annotations
 
@@ -17,10 +18,10 @@ from typing import NamedTuple, Sequence
 
 from ..claude import Claude
 from ..clock import Clock
-from ..errors import (ClaudeError, ClaudeOutcomeUnknown, HandoffError, JobStateError, ResourceHeld, StoreError,
-                      UnknownJob)
-from ..events import Claim, Closed, Launched
-from ..goal import PLUGIN_ROOT, retarget
+from ..errors import (ClaudeError, ClaudeOutcomeUnknown, HandoffError, JobStateError, PluginError, ResourceHeld,
+                      StoreError, UnknownJob)
+from ..events import Claim, Closed, Launched, Origin
+from ..goal import PLUGIN_ROOT, RULES, retarget
 from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
@@ -77,6 +78,9 @@ class JobsProvider:
             name = next(name for name in sorted(record.resources) if held[name] != job_id)
             raise ResourceHeld(name, held[name])
         _refuse_invalid(listing, "launch")
+        rules = self.plugin_root / RULES
+        if not rules.is_file():
+            raise PluginError(f"launch refused: {rules} does not exist; the goal file names it")
         self.store.rewrite_goal(job_id, lambda text: retarget(text, self.plugin_root))
         # result-<run>.md takes the number of the run that wrote it.
         archived = self.store.archive_result(job_id, record.run)
@@ -131,6 +135,11 @@ class JobsProvider:
         if not view.state.is_open:
             raise JobStateError(f"job {job_id} is {view.state.value}; close needs an open job")
         self.store.append_event(job_id, Closed(reason))
+
+    def set_origin(self, job_id: str, address: str) -> None:
+        """Record ``address`` as the session ``job_id`` reports back to. The latest one wins."""
+        self._find(self.listing(), job_id)
+        self.store.append_event(job_id, Origin(address, self.clock()))
 
     def finish(self, job_id: str, report: Report) -> Path:
         """Write ``report`` as the ``result.md`` of a launched job and return its path.

@@ -16,10 +16,11 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 MODELS = {"opus", "sonnet", "haiku", "fable", "inherit"}
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+AUTO_COMPACT_WINDOW = (100000, 1000000)
 
 AGENT_KEYS = {
     "name", "description", "tools", "model", "effort", "color", "memory",
-    "disable-model-invocation", "isolation",
+    "disable-model-invocation", "isolation", "autoCompactWindow",
 }
 SKILL_KEYS = {
     "name", "description", "allowed-tools", "model", "argument-hint", "arguments",
@@ -64,6 +65,15 @@ def check_enum(path, keys, key, allowed):
         fail(path, f"{key}: {value!r} is not one of {sorted(allowed)}")
 
 
+def check_int_range(path, keys, key, bounds):
+    value = keys.get(key)
+    if value is None:
+        return
+    low, high = bounds
+    if not re.fullmatch(r"[0-9]+", value) or not low <= int(value) <= high:
+        fail(path, f"{key}: {value!r} is not an integer from {low} to {high}")
+
+
 def check_trailing_newline(path):
     data = path.read_bytes()
     if data and not data.endswith(b"\n"):
@@ -89,6 +99,7 @@ def check_agent(path):
         fail(path, f"unknown frontmatter key {key!r}; it is ignored silently")
     check_enum(path, keys, "model", MODELS)
     check_enum(path, keys, "effort", EFFORTS)
+    check_int_range(path, keys, "autoCompactWindow", AUTO_COMPACT_WINDOW)
 
 
 def check_skill(path):

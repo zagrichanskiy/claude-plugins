@@ -26,11 +26,19 @@ class Closed:
     reason: str
 
 
-Event = Union[Launched, Claim, Closed]
+@dataclass(frozen=True)
+class Origin:
+    """The session a job reports back to. The latest one wins."""
+    address: str
+    at: datetime
+
+
+Event = Union[Launched, Claim, Closed, Origin]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
 _CLOSED = "closed"
+_ORIGIN = "origin"
 
 
 def encode(event: Event) -> str:
@@ -38,6 +46,8 @@ def encode(event: Event) -> str:
         fields = {"event": _LAUNCHED, "run": event.run, "session": event.session, "at": format_local(event.at)}
     elif isinstance(event, Claim):
         fields = {"event": _CLAIM, "resource": event.resource}
+    elif isinstance(event, Origin):
+        fields = {"event": _ORIGIN, "address": event.address, "at": format_local(event.at)}
     else:
         fields = {"event": _CLOSED, "reason": event.reason}
     return json.dumps(fields, separators=(",", ":"))
@@ -59,6 +69,8 @@ def decode(line: str) -> Event | None:
         return Claim(_text(fields, "resource"))
     if kind == _CLOSED:
         return Closed(_text(fields, "reason"))
+    if kind == _ORIGIN:
+        return Origin(_text(fields, "address"), parse_local(_text(fields, "at")))
     return None
 
 

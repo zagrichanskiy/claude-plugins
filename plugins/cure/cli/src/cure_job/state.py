@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable, Mapping, Sequence
 
+from .claude import SessionStatus
 from .job import JobRecord
 from .result import ResultStatus
 
@@ -22,6 +23,7 @@ class State(enum.Enum):
     AWAITING_APPROVAL = "awaiting-approval"
     LAUNCHED = "launched"
     RUNNING = "running"
+    STALLED = "stalled"
     LOST = "lost"
     NEEDS_INPUT = "needs-input"
     DONE = "done"
@@ -35,7 +37,7 @@ class State(enum.Enum):
     @property
     def has_session(self) -> bool:
         """The job's session may be alive, so the job cannot be closed or launched."""
-        return self in (State.LAUNCHED, State.RUNNING)
+        return self in (State.LAUNCHED, State.RUNNING, State.STALLED)
 
     @property
     def is_launchable(self) -> bool:
@@ -43,7 +45,9 @@ class State(enum.Enum):
 
 
 #: `claude --bg` returns before `claude agents` lists the session. For this
-#: long after a launch, a session that is not listed is not yet lost.
+#: long after a launch, a session that is not listed is not yet lost, and an
+#: idle session is not yet stalled. Measured on Claude Code 2.1.300: listed
+#: within 0.255 seconds.
 LAUNCH_GRACE = timedelta(seconds=60)
 
 RETENTION = {
@@ -86,8 +90,8 @@ def holders(open_records: Iterable[JobRecord]) -> dict[str, str]:
     return found
 
 
-def derive(records: Sequence[JobRecord], sessions: Mapping[str, bool], now: datetime) -> list[JobView]:
-    """One view per record, ascending id. ``sessions`` maps a session name to alive."""
+def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], now: datetime) -> list[JobView]:
+    """One view per record, ascending id. ``sessions`` maps a session name to its status."""
     ordered = sorted(records, key=lambda record: record.id)
     # Whether a job is open needs neither sessions nor locks, and the holders
     # need the open set, so the terminal states are settled first.
@@ -121,17 +125,20 @@ def _terminal_state(record: JobRecord) -> State | None:
     return None
 
 
-def _open_state(record: JobRecord, sessions: Mapping[str, bool], now: datetime,
+def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: datetime,
                 blocked_by: tuple[str, ...]) -> State:
     if record.result is not None:
         return State.NEEDS_INPUT
     launches = record.launches
     if launches:
         latest = launches[-1]
-        alive = sessions.get(latest.session)
-        if alive:
+        status = sessions.get(latest.session)
+        within_grace = now - latest.at <= LAUNCH_GRACE
+        if status is SessionStatus.BUSY:
             return State.RUNNING
-        if alive is None and now - latest.at <= LAUNCH_GRACE:
+        if status is SessionStatus.IDLE:
+            return State.RUNNING if within_grace else State.STALLED
+        if status is None and within_grace:
             return State.LAUNCHED
         return State.LOST
     if record.has_goal:

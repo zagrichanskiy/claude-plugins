@@ -44,7 +44,7 @@ INVALID = "invalid"
 
 def _invalid_json(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
-            "resources": [], "blocked-by": [], "problem": job.problem}
+            "origin": None, "resources": [], "blocked-by": [], "problem": job.problem}
 
 
 def _as_json(view: JobView) -> dict:
@@ -55,6 +55,7 @@ def _as_json(view: JobView) -> dict:
         "dir": str(record.dir),
         "run": record.run,
         "session": record.session,
+        "origin": record.origin,
         "resources": sorted(record.resources),
         "blocked-by": list(view.blocked_by),
         "problem": record.result.problem if record.result else None,
