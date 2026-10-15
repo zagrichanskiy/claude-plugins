@@ -15,8 +15,9 @@ of every other job refuse while it exists. ``close``, ``origin``, ``stop`` and
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
-from typing import Mapping, NamedTuple, Sequence
+from typing import Callable, Mapping, NamedTuple, Sequence
 
 from ..claude import Claude, Session, SessionStatus
 from ..clock import Clock
@@ -38,12 +39,28 @@ class Listing(NamedTuple):
     sessions: Mapping[str, Session]
 
 
+class Stopped(NamedTuple):
+    session: str
+    #: False when the session was already not live and nothing was stopped.
+    was_live: bool
+
+
+#: How long ``stop`` waits for the listing to drop a stopped session, and how
+#: often it reads the listing meanwhile.
+STOP_TIMEOUT_SECONDS = 15.0
+STOP_POLL_SECONDS = 0.5
+
+
 class JobsProvider:
-    def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path = PLUGIN_ROOT):
+    def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path = PLUGIN_ROOT,
+                 sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
         self.store = store
         self.claude = claude
         self.clock = clock
         self.plugin_root = plugin_root
+        # The wait of ``stop``; a test passes a fake pair so that it never waits.
+        self.sleep = sleep
+        self.monotonic = monotonic
 
     def new(self, text: str, slug: str) -> str:
         """Queue the handoff ``text`` as a new job and return the job id."""
@@ -154,8 +171,13 @@ class JobsProvider:
             raise JobStateError(f"job {job_id} has a launched run; origin is recorded only before the first launch")
         self.store.append_event(job_id, Origin(address, self.clock()))
 
-    def stop(self, job_id: str) -> str:
-        """Stop the live session of the latest run of ``job_id`` and return the session name."""
+    def stop(self, job_id: str) -> Stopped:
+        """Stop the live session of the latest run of ``job_id``.
+
+        Returns when the binary lists no live entry under the session name. A
+        session that is already not live is not an error: relaunch and abandon
+        of a lost job start with ``stop``.
+        """
         snapshot = self.store.snapshot()
         # Always read: the answer is about the session, whatever the job state.
         sessions = self.claude.sessions()
@@ -164,13 +186,20 @@ class JobsProvider:
             raise JobStateError(f"job {job_id} has no launched run; nothing to stop")
         name = record.session
         session = sessions.get(name)
-        if session is None or session.status is SessionStatus.STOPPED:
-            raise JobStateError(f"session {name} is not live; nothing to stop")
+        if not _live(session):
+            return Stopped(name, was_live=False)
         if not session.ids or "" in session.ids:
             raise ClaudeError(f"session {name} is listed live without an id; claude stop needs one")
+        deadline = self.monotonic() + STOP_TIMEOUT_SECONDS
         for session_id in session.ids:
             self.claude.stop(session_id)
-        return name
+        # `claude stop` may return before the listing drops the pid, and a
+        # launch or close that follows at once would see the session alive.
+        while _live(self.claude.sessions().get(name)):
+            if self.monotonic() >= deadline:
+                raise ClaudeError(f"session {name} still live after claude stop")
+            self.sleep(STOP_POLL_SECONDS)
+        return Stopped(name, was_live=True)
 
     def mark_reported(self, job_id: str) -> None:
         """Record that the origin session was told of the latest run's result.
@@ -228,6 +257,10 @@ class JobsProvider:
             if invalid.id == job_id:
                 raise StoreError(f"job {job_id} is invalid: {invalid.problem}")
         raise UnknownJob(f"unknown job {job_id}: {self.store.job_dir(job_id)} holds no handoff.md")
+
+
+def _live(session: Session | None) -> bool:
+    return session is not None and session.status is not SessionStatus.STOPPED
 
 
 def _holders(views: list[JobView]) -> dict[str, str]:

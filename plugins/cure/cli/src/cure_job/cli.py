@@ -12,6 +12,7 @@ import argparse
 import functools
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -44,9 +45,10 @@ _flush_print = functools.partial(print, flush=True)
 
 class Cli:
     def __init__(self, *, root: Path, claude: Claude, clock: Clock = local_now,
-                 out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT):
+                 out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT,
+                 sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
         self.out = out
-        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root)
+        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic)
         self._commands = [NewCommand(self), ListCommand(self), LaunchCommand(self),
                           ClaimCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
                           FinishCommand(self), ReportedCommand(self), PruneCommand(self)]

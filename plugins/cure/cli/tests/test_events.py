@@ -51,6 +51,12 @@ def test_decode_ignores_unknown_keys():
     '{"event":"launched","run":"1","session":"s","at":"2026-10-13T17:42:05Z"}',
     '{"event":"launched","run":1,"session":"s"}',
     '{"event":"launched","run":1,"session":"s","at":"yesterday"}',
+    '{"event":"origin","at":"2026-10-13T17:42:05Z"}',
+    '{"event":"origin","address":"main"}',
+    '{"event":"origin","address":"main","at":"yesterday"}',
+    '{"event":"reported","at":"2026-10-13T17:42:05Z"}',
+    '{"event":"reported","run":1}',
+    '{"event":"reported","run":"1","at":"2026-10-13T17:42:05Z"}',
 ])
 def test_decode_rejects_bad_lines_with_value_error(line):
     with pytest.raises(ValueError):

@@ -108,7 +108,9 @@ def test_list_json_waiting_for_is_null_when_blocked_without_a_description(h, tmp
 # --- stop -------------------------------------------------------------------------------------------------
 
 def with_ids(h, session, ids, status=BUSY):
-    h.claude.sessions = lambda: {session: Session(status, None, tuple(ids))}
+    """List ``session`` live under ``ids`` until ``stop`` is called, then stopped."""
+    h.claude.sessions = lambda: {session: Session(SessionStatus.STOPPED) if h.claude.stopped
+                                 else Session(status, None, tuple(ids))}
 
 
 def test_stop_prints_the_session_name_and_stops_its_id(h, tmp_path):
@@ -140,19 +142,19 @@ def test_stop_refuses_a_job_with_no_launched_run(h, tmp_path, capsys):
     assert h.claude.stopped == []
 
 
-def test_stop_refuses_a_session_the_listing_does_not_have(h, tmp_path, capsys):
+def test_stop_of_a_session_the_listing_does_not_have_prints_not_live(h, tmp_path):
     job_id, session = launch(h, tmp_path)
     del h.claude.statuses[session]
-    assert h.run("stop", job_id) == 1
-    assert f"session {session} is not live" in capsys.readouterr().err
+    assert h.run("stop", job_id) == 0
+    assert h.lines == [f"{session} not live"]
     assert h.claude.stopped == []
 
 
-def test_stop_refuses_a_stopped_session(h, tmp_path, capsys):
+def test_stop_of_a_stopped_session_prints_not_live(h, tmp_path):
     job_id, session = launch(h, tmp_path)
     h.claude.statuses[session] = SessionStatus.STOPPED
-    assert h.run("stop", job_id) == 1
-    assert "is not live" in capsys.readouterr().err
+    assert h.run("stop", job_id) == 0
+    assert h.lines == [f"{session} not live"]
     assert h.claude.stopped == []
 
 
@@ -283,3 +285,72 @@ def test_origin_is_refused_once_the_job_has_a_launched_event(h, tmp_path, capsys
     assert "launched run" in capsys.readouterr().err
     assert events_text(h, job_id) == before
     assert h.listed()[job_id]["origin"] is None
+
+
+@pytest.mark.parametrize("address", ["", " main", "main ", "\tmain", "main\n", "main\nother", "a\nb"])
+def test_origin_with_an_empty_padded_or_multi_line_address_exits_two(h, tmp_path, address):
+    job_id = h.new(tmp_path)
+    with pytest.raises(SystemExit) as caught:
+        h.run("origin", job_id, address)
+    assert caught.value.code == 2
+    assert h.listed()[job_id]["origin"] is None
+
+
+# --- stop: the wait loop ----------------------------------------------------------------------------------
+
+class FakeTime:
+    """A monotonic clock that only the fake sleep advances, so the wait loop never really sleeps."""
+
+    def __init__(self):
+        self.now = 100.0
+        self.slept: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def stop_harness(root):
+    fake = FakeTime()
+    return Harness(root, sleep=fake.sleep, monotonic=fake.monotonic), fake
+
+
+def test_stop_polls_every_half_second_until_the_session_goes_down(root, tmp_path):
+    h, fake = stop_harness(root)
+    job_id, session = launch(h, tmp_path)
+    polls_live = 3
+    polled = []
+
+    def sessions():
+        if h.claude.stopped:
+            polled.append(1)
+            if len(polled) > polls_live:
+                return {session: Session(SessionStatus.STOPPED)}
+        return {session: Session(BUSY, None, (fake_id(session),))}
+
+    h.claude.sessions = sessions
+    assert h.run("stop", job_id) == 0
+    assert h.lines == [session]
+    assert fake.slept == [0.5] * polls_live
+    assert h.claude.stopped == [fake_id(session)]
+
+
+def test_stop_does_not_sleep_when_the_session_is_down_at_once(root, tmp_path):
+    h, fake = stop_harness(root)
+    job_id, session = launch(h, tmp_path)
+    assert h.run("stop", job_id) == 0
+    assert fake.slept == []
+
+
+def test_stop_fails_when_the_session_is_still_live_after_the_timeout(root, tmp_path, capsys):
+    h, fake = stop_harness(root)
+    job_id, session = launch(h, tmp_path)
+    h.claude.sessions = lambda: {session: Session(BUSY, None, (fake_id(session),))}
+    assert h.run("stop", job_id) == 1
+    assert "still live after claude stop" in capsys.readouterr().err
+    assert h.lines == []
+    assert h.claude.stopped == [fake_id(session)]
+    assert sum(fake.slept) == pytest.approx(15.0)

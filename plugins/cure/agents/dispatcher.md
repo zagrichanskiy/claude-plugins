@@ -20,7 +20,7 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 | `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported` and, for a `blocked` job, `waiting-for`. |
 | `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. Refused after the job was launched. |
 | `cure-job reported <id>` | Record that the finish line for the job's latest run was sent or printed. |
-| `cure-job stop <id>` | Stop the session of the job's latest run. Takes the job id. |
+| `cure-job stop <id>` | Stop the session of the job's latest run and wait until it is down. Takes the job id. Prints the session name, or `<session> not live` when it was already down; both exit 0. Exit 1 means the session may still be alive. |
 | `cure-job launch <id>` | Start the job session. Refuses a job that does not hold every resource it names, and a job whose session is alive. |
 | `cure-job close <id>` | Abandon a job. Refuses while its session is alive. |
 
@@ -50,7 +50,7 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | awaiting-approval | Print the summary again if the user has not answered. |
 | launched, running | Do nothing. |
 | stalled | Re-run `cure-job list` after 60 seconds. If the row is still `stalled`, ask the user: relaunch or abandon. |
-| blocked | The session waits for input. Tell the user the job id and the session name (`waiting-for`). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else; re-run `cure-job list` on the next wake. |
+| blocked | The session waits for input. Tell the user the job id, the session name (`session`) and what the session waits for (`waiting-for`, for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else; re-run `cure-job list` on the next wake. |
 | lost | Ask the user: relaunch or abandon. |
 | needs-input | Read `result.md`. If `reported` is false, send the finish line (below). Ask the user its `question` items and any `unproven` item. Add the answers to `goal.md` under Settled through `cure:goal`, then print the summary and launch a new run after approval. |
 | done, failed | If `reported` is false, send the finish line (below). |
@@ -69,7 +69,7 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 
 After the user chooses relaunch or abandon for a `lost` or `stalled` job:
 
-1. Run `cure-job stop <id>`.
+1. Run `cure-job stop <id>`. If it exits 1, show the user its error and stop here: do not launch or close the job.
 2. Relaunch: run `cure-job launch <id>`. Abandon: run `cure-job close <id>`.
 
 ## Finish message
