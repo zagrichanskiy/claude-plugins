@@ -78,7 +78,7 @@ needs-input`, and the final message starts with `needs-input:`.
 ```
 
 Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `SHOULD-CONSIDER` is
-open after review round 2". When the handoff's `delivery` is `commit` (the default), the generated
+open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated
 text carries no pull-request wording.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The
