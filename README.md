@@ -118,6 +118,12 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 | `crossSessionInbound` | Without `accept`, the session ignores messages from other sessions. |
 | `autoCompactWindow` | Compacts the main session at 200000 tokens. The key has no effect in the agent's frontmatter, so it is set here. |
 | `--name dispatcher` | Handoffs and job sessions address the dispatcher by this name. |
+| `"env":{"CURE_JOB_ROOT":"<path>"}` | Passes a non-default state root. It goes inside the `--settings` JSON, because a background session does not inherit the caller's environment. |
+
+| Requirement | Detail |
+|---|---|
+| Questions | Approval and other questions are answered in the dispatcher session (attach from `claude agents`). A message does not answer them. |
+| Workspace trust | Each repository a job runs in must have been opened in Claude Code once to accept the trust prompt. Otherwise `cure-job launch` fails with "Workspace not trusted". |
 
 Pin step: open `claude agents` and press ctrl+t on the dispatcher session. The session moves to the
 top of the list. The dispatcher is also started automatically by `cure:handoff` when its wake-up
