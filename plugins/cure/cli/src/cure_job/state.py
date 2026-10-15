@@ -24,6 +24,7 @@ class State(enum.Enum):
     LAUNCHED = "launched"
     RUNNING = "running"
     STALLED = "stalled"
+    BLOCKED = "blocked"
     LOST = "lost"
     NEEDS_INPUT = "needs-input"
     DONE = "done"
@@ -37,7 +38,7 @@ class State(enum.Enum):
     @property
     def has_session(self) -> bool:
         """The job's session may be alive, so the job cannot be closed or launched."""
-        return self in (State.LAUNCHED, State.RUNNING, State.STALLED)
+        return self in (State.LAUNCHED, State.RUNNING, State.STALLED, State.BLOCKED)
 
     @property
     def is_launchable(self) -> bool:
@@ -136,6 +137,10 @@ def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: d
         within_grace = now - latest.at <= LAUNCH_GRACE
         if status is SessionStatus.BUSY:
             return State.RUNNING
+        # A session that waits for a permission or an answer needs the user
+        # now, so no grace applies.
+        if status is SessionStatus.WAITING:
+            return State.BLOCKED
         if status is SessionStatus.IDLE:
             return State.RUNNING if within_grace else State.STALLED
         if status is None and within_grace:

@@ -11,7 +11,7 @@ class CloseCommand(Command):
     name = "close"
     usage = "cure-job close ID [--reason TEXT]"
     help = "abandon a job"
-    description = "Abandon a job that has no live session. It does not stop a session"
+    description = "Abandon a job that has no live session. It does not stop a session; use cure-job stop first"
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")

@@ -10,9 +10,9 @@ from .base import Command, job_id_arg
 class OriginCommand(Command):
     name = "origin"
     usage = "cure-job origin ID ADDRESS"
-    help = "set the session a job reports back to"
-    description = ("Set the session a job reports back to. The latest one wins over earlier ones "
-                   "and over the handoff's origin")
+    help = "set the session a job reports back to, before its first launch"
+    description = ("Set the session a job reports back to, before its first launch. The latest one wins "
+                   "over earlier ones and over the handoff's origin")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")

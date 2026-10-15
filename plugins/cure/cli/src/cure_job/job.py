@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .events import Claim, Closed, Event, Launched, Origin
+from .events import Claim, Closed, Event, Launched, Origin, Reported
 from .handoff import Handoff
 from .result import Result
 
@@ -33,6 +33,11 @@ class JobRecord:
     def session(self) -> str | None:
         launches = self.launches
         return launches[-1].session if launches else None
+
+    @property
+    def reported(self) -> bool:
+        """The origin session was told of the latest run's result."""
+        return self.run > 0 and any(isinstance(event, Reported) and event.run == self.run for event in self.events)
 
     @property
     def closed(self) -> Closed | None:

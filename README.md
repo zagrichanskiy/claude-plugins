@@ -104,18 +104,19 @@ the project's conventions, test command and run command from the repo.
 
 | Agent | Description |
 |---|---|
-| `dispatcher` | Scans the job queue (`cure-job list`) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, waits for approval, then runs `cure-job launch`. Handles lost, stalled, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit`, `autoCompactWindow: 200000` and no `Agent` tool. |
+| `dispatcher` | Scans the job queue (`cure-job list`) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, waits for approval, then runs `cure-job launch`. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
 
 Start it once per machine:
 
 ```sh
-claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept"}'
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'
 ```
 
 | Part | Reason |
 |---|---|
 | `--agent cure:dispatcher` | Claude Code 2.1.300 loads a plugin agent under its prefixed name. |
 | `crossSessionInbound` | Without `accept`, the session ignores messages from other sessions. |
+| `autoCompactWindow` | Compacts the main session at 200000 tokens. The key has no effect in the agent's frontmatter, so it is set here. |
 | `--name dispatcher` | Handoffs and job sessions address the dispatcher by this name. |
 
 Pin step: open `claude agents` and press ctrl+t on the dispatcher session. The session moves to the

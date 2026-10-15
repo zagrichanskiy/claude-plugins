@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from typing import Mapping
 
+from ..claude import Session
 from ..providers.jobs import JobsProvider
-from ..state import JobView
+from ..state import JobView, State
 from ..store import InvalidJob
 from .base import Command
 
@@ -22,7 +24,8 @@ class ListCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
-        rows = sorted([_as_json(view) for view in listing.views] + [_invalid_json(job) for job in listing.invalid],
+        rows = sorted([_as_json(view, listing.sessions) for view in listing.views]
+                      + [_invalid_json(job) for job in listing.invalid],
                       key=lambda row: row["id"])
         if args.json:
             self.cli.out(json.dumps(rows, separators=(",", ":")))
@@ -44,11 +47,15 @@ INVALID = "invalid"
 
 def _invalid_json(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
-            "origin": None, "resources": [], "blocked-by": [], "problem": job.problem}
+            "origin": None, "resources": [], "blocked-by": [], "problem": job.problem,
+            "waiting-for": None, "reported": None}
 
 
-def _as_json(view: JobView) -> dict:
+def _as_json(view: JobView, sessions: Mapping[str, Session]) -> dict:
     record = view.record
+    waiting_for = None
+    if view.state is State.BLOCKED:
+        waiting_for = sessions[record.session].waiting_for
     return {
         "id": record.id,
         "state": view.state.value,
@@ -59,4 +66,6 @@ def _as_json(view: JobView) -> dict:
         "resources": sorted(record.resources),
         "blocked-by": list(view.blocked_by),
         "problem": record.result.problem if record.result else None,
+        "waiting-for": waiting_for,
+        "reported": record.reported,
     }

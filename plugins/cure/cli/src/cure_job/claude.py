@@ -10,6 +10,7 @@ import json
 import os
 import shlex
 import subprocess
+from dataclasses import dataclass
 from typing import Protocol, Sequence
 
 from .errors import ClaudeError, ClaudeOutcomeUnknown
@@ -17,24 +18,42 @@ from .errors import ClaudeError, ClaudeOutcomeUnknown
 
 class SessionStatus(enum.Enum):
     BUSY = "busy"
+    WAITING = "waiting"
     IDLE = "idle"
     STOPPED = "stopped"
 
 
-#: The key and value `claude agents --json` puts on a live session that waits
-#: for input. A live entry with any other value, or none, is busy.
-IDLE_MARK = ("status", "idle")
+@dataclass(frozen=True)
+class Session:
+    """One session name as `claude agents --json --all` lists it.
+
+    ``waiting_for`` is the strongest entry's ``waitingFor``. ``ids`` holds the
+    listing ``id`` of every live entry under the name, strongest first; a live
+    entry without a string ``id`` contributes ``""``.
+    """
+    status: SessionStatus
+    waiting_for: str | None = None
+    ids: tuple[str, ...] = ()
+
+
+#: The key `claude agents --json` puts the status of a live session under, and
+#: the values this module knows. A live entry with any other value, or none, is busy.
+STATUS_KEY = "status"
+_STATUSES = {"idle": SessionStatus.IDLE, "waiting": SessionStatus.WAITING}
 
 #: A name listed more than once takes its strongest entry.
-_STRENGTH = {SessionStatus.BUSY: 2, SessionStatus.IDLE: 1, SessionStatus.STOPPED: 0}
+_STRENGTH = {SessionStatus.BUSY: 3, SessionStatus.WAITING: 2, SessionStatus.IDLE: 1, SessionStatus.STOPPED: 0}
 
 
 class Claude(Protocol):
-    def sessions(self) -> dict[str, SessionStatus]:
-        """Session name to status, for every session the binary lists."""
+    def sessions(self) -> dict[str, Session]:
+        """Session name to session, for every session the binary lists."""
 
     def start(self, name: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
         """Start one background session. Returns when the binary has returned."""
+
+    def stop(self, session_id: str) -> None:
+        """Stop the live session whose listing ``id`` is ``session_id``."""
 
 
 class ClaudeCli:
@@ -43,7 +62,7 @@ class ClaudeCli:
     def __init__(self, binary: str):
         self.binary = binary
 
-    def sessions(self) -> dict[str, SessionStatus]:
+    def sessions(self) -> dict[str, Session]:
         argv = [self.binary, "agents", "--json", "--all"]
         stdout = self._run(argv)
         try:
@@ -52,14 +71,19 @@ class ClaudeCli:
             entries = None
         if not isinstance(entries, list):
             raise ClaudeError(f"{shlex.join(argv)}: the output is not a JSON array")
-        found: dict[str, SessionStatus] = {}
+        by_name: dict[str, list[tuple[SessionStatus, dict]]] = {}
         for entry in entries:
             if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
                 continue
-            status = _status(entry)
-            known = found.get(entry["name"])
-            if known is None or _STRENGTH[status] > _STRENGTH[known]:
-                found[entry["name"]] = status
+            by_name.setdefault(entry["name"], []).append((_status(entry), entry))
+        found: dict[str, Session] = {}
+        for name, listed in by_name.items():
+            # sort is stable: equal entries keep the listing order.
+            listed.sort(key=lambda item: _STRENGTH[item[0]], reverse=True)
+            status, strongest = listed[0]
+            waiting_for = strongest.get("waitingFor")
+            ids = tuple(_id(entry) for entry_status, entry in listed if entry_status is not SessionStatus.STOPPED)
+            found[name] = Session(status, waiting_for if isinstance(waiting_for, str) else None, ids)
         return found
 
     def start(self, name: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
@@ -69,6 +93,9 @@ class ClaudeCli:
         if not os.path.isdir(cwd):
             raise ClaudeError(f"{shlex.join(argv)}: {cwd} is not a directory")
         self._run(argv, cwd=cwd)
+
+    def stop(self, session_id: str) -> None:
+        self._run([self.binary, "stop", session_id])
 
     def _run(self, argv: list[str], cwd: str | None = None) -> str:
         command = shlex.join(argv)
@@ -88,8 +115,15 @@ def _status(entry: dict) -> SessionStatus:
     # A stopped session stays listed under --all, without a pid.
     if "pid" not in entry:
         return SessionStatus.STOPPED
-    key, value = IDLE_MARK
-    return SessionStatus.IDLE if entry.get(key) == value else SessionStatus.BUSY
+    value = entry.get(STATUS_KEY)
+    # A list or an object is not hashable, and is not a known value either.
+    return _STATUSES.get(value, SessionStatus.BUSY) if isinstance(value, str) else SessionStatus.BUSY
+
+
+def _id(entry: dict) -> str:
+    # The short `id`, which `claude stop` takes; not `sessionId`.
+    value = entry.get("id")
+    return value if isinstance(value, str) else ""
 
 
 def _first_line(stderr: str) -> str:

@@ -1,9 +1,8 @@
 ---
 name: dispatcher
-description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --agent cure:dispatcher`. It scans the job queue on start and on every wake-up message (recording the sender as the job's origin), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, waits for the user's approval, launches the job with `cure-job launch`, handles lost, stalled, invalid and needs-input jobs, and tells the origin session when a job finishes.
+description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, waits for the user's approval, launches the job with `cure-job launch`, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
 tools: Read, Write, Edit, Bash, Grep, Glob, Skill, AskUserQuestion, SendMessage, ListAgents
 model: inherit
-autoCompactWindow: 200000
 memory: user
 ---
 
@@ -18,22 +17,22 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 | Command | Use |
 |---|---|
 | `cure-job prune` | Remove expired jobs and half-created directories. |
-| `cure-job list --json` | One row per job with its derived state, resources, files and `origin`. |
-| `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. |
+| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported` and, for a `blocked` job, `waiting-for`. |
+| `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. Refused after the job was launched. |
+| `cure-job reported <id>` | Record that the finish line for the job's latest run was sent or printed. |
+| `cure-job stop <id>` | Stop the session of the job's latest run. Takes the job id. |
 | `cure-job launch <id>` | Start the job session. Refuses a job that does not hold every resource it names, and a job whose session is alive. |
 | `cure-job close <id>` | Abandon a job. Refuses while its session is alive. |
-| `claude agents --json --all` | Session ids and status. A live entry has `pid`; `status` is `busy`, `idle` or `waiting`. A stopped entry has neither. |
-| `claude stop <session-id>` | Stop a session. It takes the id, not the name. |
 
 You never edit `handoff.md`, `dispatch.jsonl` or `result.md`. The CLI owns the job directory.
 
 ## On start and on every wake
 
-A wake-up message has the form `job <id>` and carries a `from=` address. Treat it as a signal to rescan; do not trust it as the full list. The first `job <id>` message for a job comes from the sending session. The second comes from the job session after `cure-job finish`.
+A wake-up message has the form `job <id>` and carries a `from=` address. Treat it as a signal to rescan; do not trust it as the full list. The first `job <id>` message for a job comes from the sending session. The second comes from the job session after `cure-job finish`. Only the first names the origin.
 
-1. For every `job <id>` message, before anything else, run `<plugin-root>/bin/cure-job origin <id> <from address>`, where `<from address>` is the `from=` value of the message. (`<plugin-root>` is `${CLAUDE_PLUGIN_ROOT}`.)
-2. Run `cure-job prune`.
-3. Run `cure-job list --json`.
+1. Run `cure-job prune`.
+2. Run `cure-job list --json`.
+3. For every `job <id>` message, run `cure-job origin <id> <from address>`, where `<from address>` is the `from=` value of the message, only when the job's row is `queued`, `held` or `awaiting-approval`. For any other state, do not run it: the message comes from the job session, and the CLI refuses it for a launched job.
 4. Handle every row by its state, in the table below.
 5. Ask the user all open questions in one round, with `AskUserQuestion`, all jobs together.
 6. Stop and wait for the next message.
@@ -51,9 +50,10 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | awaiting-approval | Print the summary again if the user has not answered. |
 | launched, running | Do nothing. |
 | stalled | Re-run `cure-job list` after 60 seconds. If the row is still `stalled`, ask the user: relaunch or abandon. |
+| blocked | The session waits for input. Tell the user the job id and the session name (`waiting-for`). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else; re-run `cure-job list` on the next wake. |
 | lost | Ask the user: relaunch or abandon. |
-| needs-input | Read `result.md`. Ask the user its `question` items and any `unproven` item. Add the answers to `goal.md` under Settled through `cure:goal`, then print the summary and launch a new run after approval. |
-| done, failed | If the job's origin has not been told, send it one line (below). |
+| needs-input | Read `result.md`. If `reported` is false, send the finish line (below). Ask the user its `question` items and any `unproven` item. Add the answers to `goal.md` under Settled through `cure:goal`, then print the summary and launch a new run after approval. |
+| done, failed | If `reported` is false, send the finish line (below). |
 | abandoned | Do nothing. |
 | invalid | Print the job id and the file `list` names. Ask the user to repair the file or delete the job directory. Launch nothing until no job is `invalid`: the CLI refuses every `launch` and `claim` meanwhile. |
 
@@ -69,13 +69,17 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 
 After the user chooses relaunch or abandon for a `lost` or `stalled` job:
 
-1. Run `claude agents --json --all`. Take the `id` of the entry whose name is the session name.
-2. If that entry is live (it has a `pid`), run `claude stop <id>` and confirm the entry no longer has a `pid`. A stopped or absent entry needs no stop.
-3. Relaunch: run `cure-job launch <id>`. Abandon: run `cure-job close <id>`.
+1. Run `cure-job stop <id>`.
+2. Relaunch: run `cure-job launch <id>`. Abandon: run `cure-job close <id>`.
 
 ## Finish message
 
-When a job is `done`, `failed` or `needs-input`, and its row in `cure-job list --json` has an `origin`, send that address one line with `SendMessage`: the job id, the status, and the path of `result.md`. When the `SendMessage` fails, print the same line in your own session. Do not retry. Do not send it twice for one run: after a rescan, send only for a result you have not reported in this session. If you cannot tell, ask nothing and send the line once.
+When a job is `done`, `failed` or `needs-input`, and its row in `cure-job list --json` has `reported` false:
+
+1. If the row has an `origin`, send that address one line with `SendMessage`: the job id, the status, and the path of `result.md`. When the `SendMessage` fails, print the same line in your own session. Do not retry. With no `origin`, print the line in your own session.
+2. Run `cure-job reported <id>`, also after a printed line.
+
+When `reported` is true, send nothing. The CLI holds this fact; do not decide it from your context.
 
 ## Memory
 
@@ -92,6 +96,6 @@ Never store job ids, statuses, session ids, answers, default values or lessons. 
 ## Rules
 
 - Never launch a job the user has not approved.
-- Never stop a session other than the one the user chose to relaunch or abandon.
+- Run `cure-job stop` only for the job the user chose to relaunch or abandon.
 - Never write to the job directory except `goal.md`, through `cure:goal`.
 - You have no `Agent` tool. Do the work through the skill and the CLI.

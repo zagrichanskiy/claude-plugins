@@ -65,16 +65,19 @@ the command fails, show its error to the user and stop. Do not retry with a chan
 Send one cross-session message with `SendMessage` to the session named `dispatcher`. The text is
 `job <id>` and nothing else.
 
-The dispatcher takes the sender address from the message. The handoff carries no `origin`.
+The dispatcher takes the sender address from the message and records it as the job's origin. The handoff carries no `origin`.
 
 When `SendMessage` succeeds, do nothing more. Do not start a dispatcher.
 
-A message does not reach a stopped session. When `SendMessage` fails, start the dispatcher in the
-working directory of this session:
+A message does not reach a stopped session. When `SendMessage` fails:
+
+1. Run `claude agents --json`. If an entry named `dispatcher` is live (it has a `pid`), start nothing. Tell the user the message failed and the job is queued.
+2. Otherwise start the dispatcher in the working directory of this session:
 
 ```sh
-claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept"}'
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'
 ```
 
-The new dispatcher scans the queue on start. Send no second message. Tell the user in one line: job
-queued, dispatcher started, pin it with ctrl+t in the agents view.
+3. Send `job <id>` again with `SendMessage`, so the dispatcher records the origin. If this send fails, tell the user the job will not report back.
+
+Tell the user in one line: job queued, dispatcher started, pin it with ctrl+t in the agents view.

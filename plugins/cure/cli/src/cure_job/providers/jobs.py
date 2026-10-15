@@ -1,37 +1,41 @@
-"""The eight job operations.
+"""The ten job operations.
 
-Every operation except ``new`` and ``finish`` reads one snapshot of the state
-root, derives the job states from it and makes its writes. No operation holds a
-lock, so a check and its write are not atomic across processes.
+Every operation except ``new``, ``finish`` and ``reported`` reads one snapshot
+of the state root, derives the job states from it and makes its writes.
+``finish`` and ``reported`` read only their own job. No operation holds a lock,
+so a check and its write are not atomic across processes.
 
 A job whose stored files do not read is invalid. ``list`` shows it, ``prune``
-skips it, and ``launch``, ``claim``, ``close`` and ``origin`` refuse it by id. Its resources
-and its launched events are unknown, so it may hold any resource whatever its
-id: ``launch`` and ``claim`` of every other job refuse while it exists.
-``close`` and ``origin`` name no resource, so they do not.
+skips it, and ``launch``, ``claim``, ``close``, ``origin``, ``stop``, ``finish``
+and ``reported`` refuse it by id. Its resources and its launched events are
+unknown, so it may hold any resource whatever its id: ``launch`` and ``claim``
+of every other job refuse while it exists. ``close``, ``origin``, ``stop`` and
+``reported`` name no resource, so they do not.
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import NamedTuple, Sequence
+from typing import Mapping, NamedTuple, Sequence
 
-from ..claude import Claude
+from ..claude import Claude, Session, SessionStatus
 from ..clock import Clock
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, HandoffError, JobStateError, PluginError, ResourceHeld,
                       StoreError, UnknownJob)
-from ..events import Claim, Closed, Launched, Origin
+from ..events import Claim, Closed, Launched, Origin, Reported
 from ..goal import PLUGIN_ROOT, RULES, retarget
 from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
 from ..state import HALF_CREATED_AGE, JobView, State, derive, expired, holders, lock_rank, needs_sessions
-from ..store import InvalidJob, JobStore
+from ..store import InvalidJob, JobStore, Snapshot
 
 
 class Listing(NamedTuple):
     views: list[JobView]
     invalid: list[InvalidJob]
+    #: The session list the views were derived from; empty when it was not read.
+    sessions: Mapping[str, Session]
 
 
 class JobsProvider:
@@ -60,7 +64,11 @@ class JobsProvider:
         # The session list costs one run of the binary, so it is read only
         # when the state of some job depends on it.
         sessions = self.claude.sessions() if needs_sessions(snapshot.records) else {}
-        return Listing(derive(snapshot.records, sessions, self.clock()), snapshot.invalid)
+        return self._listing(snapshot, sessions)
+
+    def _listing(self, snapshot: Snapshot, sessions: Mapping[str, Session]) -> Listing:
+        statuses = {name: session.status for name, session in sessions.items()}
+        return Listing(derive(snapshot.records, statuses, self.clock()), snapshot.invalid, sessions)
 
     def launch(self, job_id: str, claude_args: Sequence[str] = ()) -> str:
         """Start the next run of ``job_id`` and return the session name."""
@@ -131,15 +139,52 @@ class JobsProvider:
         view = self._find(self.listing(), job_id)
         if view.state.has_session:
             raise JobStateError(f"job {job_id} is {view.state.value}; stop session "
-                                f"{view.record.session} first")
+                                f"{view.record.session} first: cure-job stop {job_id}")
         if not view.state.is_open:
             raise JobStateError(f"job {job_id} is {view.state.value}; close needs an open job")
         self.store.append_event(job_id, Closed(reason))
 
     def set_origin(self, job_id: str, address: str) -> None:
-        """Record ``address`` as the session ``job_id`` reports back to. The latest one wins."""
-        self._find(self.listing(), job_id)
+        """Record ``address`` as the session ``job_id`` reports back to. The latest one wins.
+
+        Refused once the job has a launched run: the run reads its origin at start.
+        """
+        view = self._find(self.listing(), job_id)
+        if view.record.launches:
+            raise JobStateError(f"job {job_id} has a launched run; origin is recorded only before the first launch")
         self.store.append_event(job_id, Origin(address, self.clock()))
+
+    def stop(self, job_id: str) -> str:
+        """Stop the live session of the latest run of ``job_id`` and return the session name."""
+        snapshot = self.store.snapshot()
+        # Always read: the answer is about the session, whatever the job state.
+        sessions = self.claude.sessions()
+        record = self._find(self._listing(snapshot, sessions), job_id).record
+        if not record.launches:
+            raise JobStateError(f"job {job_id} has no launched run; nothing to stop")
+        name = record.session
+        session = sessions.get(name)
+        if session is None or session.status is SessionStatus.STOPPED:
+            raise JobStateError(f"session {name} is not live; nothing to stop")
+        if not session.ids or "" in session.ids:
+            raise ClaudeError(f"session {name} is listed live without an id; claude stop needs one")
+        for session_id in session.ids:
+            self.claude.stop(session_id)
+        return name
+
+    def mark_reported(self, job_id: str) -> None:
+        """Record that the origin session was told of the latest run's result.
+
+        Reads only this job. A second call for the same run writes nothing.
+        """
+        record = self.store.load(job_id)
+        if not record.launches:
+            raise JobStateError(f"job {job_id} has no launched run; nothing to report")
+        if record.result is None:
+            raise JobStateError(f"job {job_id} has no result: {self.store.result_path(job_id)} does not exist")
+        if record.reported:
+            return
+        self.store.append_event(job_id, Reported(record.run, self.clock()))
 
     def finish(self, job_id: str, report: Report) -> Path:
         """Write ``report`` as the ``result.md`` of a launched job and return its path.
