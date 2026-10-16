@@ -1,0 +1,47 @@
+# Direct run
+
+The user invokes `/cure:goal` in a working session and runs the goal in a session of their own.
+
+## Where it goes
+
+`.notes/goal-<slug>.md` in the repository the work happens in, `.notes/` excluded through
+`$(git rev-parse --git-dir)/info/exclude` as the `note` skill describes.
+
+A goal file is a working file. Its end is the merge of the work it describes. Say so in the report,
+and delete it when that lands.
+
+## Questions
+
+In the question round, ask with `AskUserQuestion` and wait for the answer. Each question carries its
+own context: the situation, the options, the consequence of each, and a recommendation. Write it
+for a reader who has not followed the run.
+
+## Template text
+
+The template's mode slots take the text below. Delete the slot text that stays unused. The
+read-first line is the template's, naming `rules.md` only.
+
+Exits, in the template's exits slot. There is no closing done-when item.
+
+```markdown
+Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
+<review cause>, or the diff passes <lines> lines (`git diff --shortstat <base>`), or `git fetch` or
+a tool check failed, or a Settled statement is false or the title's outcome is unachievable, or an
+asked question was dismissed or left unanswered; and (b) the retrospective's summary, naming the
+cause, is in the transcript; and (c) the final message starts with `failed:`.
+```
+
+A Solo exit has (a) without `<rounds>` and `<review cause>`, then the final-message clause as (b).
+
+## Launch line
+
+```
+/goal @.notes/goal-<slug>.md
+```
+
+Say once when handing it over:
+
+- Pair it with auto mode, or every unapproved tool call stops the goal for a permission prompt.
+- A rate limit does not clear a goal. Claude Code waits and continues. An exhausted credit balance,
+  an auth failure, an unrecoverable context overflow and an unavailable model do clear it, with a
+  warning; `/goal` again resumes.

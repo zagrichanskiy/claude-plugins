@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""Run the cure-job CLI from the plugin tree, with no install step."""
+import os
+import sys
+
+# realpath, so that a symlink to this file still finds the plugin root.
+_PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, os.path.join(_PLUGIN_ROOT, "cli", "src"))
+
+from cure_job.cli import main  # noqa: E402
+
+raise SystemExit(main())

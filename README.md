@@ -100,6 +100,37 @@ the project's conventions, test command and run command from the repo.
 | `verifier` | Drives the change end-to-end in the real application to confirm the behaviour works, rather than that the suite passes. Never edits. |
 | `skill-author` | Creates and updates Claude Code skills from a description or source material, including the skills in this repository. |
 
+*Dispatcher* — a long-lived background session that turns handoff files into running job sessions.
+
+| Agent | Description |
+|---|---|
+| `dispatcher` | Scans the job queue (`cure-job list`) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, waits for approval, then runs `cure-job launch`. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
+
+Start it once per machine:
+
+```sh
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'
+```
+
+| Part | Reason |
+|---|---|
+| `--agent cure:dispatcher` | Claude Code 2.1.300 loads a plugin agent under its prefixed name. |
+| `crossSessionInbound` | Without `accept`, the session ignores messages from other sessions. |
+| `autoCompactWindow` | Compacts the main session at 200000 tokens. The key has no effect in the agent's frontmatter, so it is set here. |
+| `--name dispatcher` | Handoffs and job sessions address the dispatcher by this name. |
+| `"env":{"CURE_JOB_ROOT":"<path>"}` | Passes a non-default state root. It goes inside the `--settings` JSON, because a background session does not inherit the caller's environment. |
+
+| Requirement | Detail |
+|---|---|
+| Questions | Approval and other questions are answered in the dispatcher session (attach from `claude agents`). A message does not answer them. |
+| Workspace trust | Each repository a job runs in must have been opened in Claude Code once to accept the trust prompt. Otherwise `cure-job launch` fails with "Workspace not trusted". |
+
+Pin step: open `claude agents` and press ctrl+t on the dispatcher session. The session moves to the
+top of the list. The dispatcher is also started automatically by `cure:handoff` when its wake-up
+message fails; the manual command above stays. A stopped dispatcher cannot receive messages, so run
+`claude agents` after a reboot and start it again when it is not listed; its start scan finds
+every job that finished while it was stopped.
+
 **Skills** — invoked as `/cure:<name>`.
 
 | Skill | Invocation | Description |
