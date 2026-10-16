@@ -16,13 +16,6 @@ Turn an idea just discussed in this session into a self-contained goal file
 under `~/.claude/ideas/`, so it can be implemented later without replaying the
 conversation.
 
-## When to use
-
-The user wants to record an idea, design, or proposal for later — not implement
-it now. Common phrasings: "save this idea", "capture this", "write this down for
-later", "/cure:capture-idea". Often invoked right after reaching agreement on
-a design in conversation.
-
 ## Steps
 
 1. **Identify the idea.** Default to the most recently discussed proposal in

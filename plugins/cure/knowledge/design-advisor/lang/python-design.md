@@ -2,8 +2,7 @@
 
 Load this only in **design mode** when the target contains Python (`.py`, `.pyi`). It adds Python
 idiom to `checklist-design.md` and gives the Python form of the patterns in `patterns-design.md`;
-it does not repeat them. Where the project has its own Python conventions, they win over this
-file — cite them.
+it does not repeat them.
 
 Sources: PEP 8, PEP 20 (the Zen of Python), PEP 484/544 (typing, protocols), Ramalho (*Fluent
 Python*), Slatkin (*Effective Python*).

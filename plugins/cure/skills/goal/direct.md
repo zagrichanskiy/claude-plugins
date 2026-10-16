@@ -12,12 +12,9 @@ and delete it when that lands.
 
 ## Questions
 
-In the question round, ask with `AskUserQuestion` and wait for the answer. Each question carries its
-own context: the situation, the options, the consequence of each, and a recommendation. Write it
-for a reader who has not followed the run.
+In the question round, ask with `AskUserQuestion` and wait for the answer.
 
-A fork whose options differ in nothing the user would see is not asked: take the recommended option
-and record it as an assumption.
+Record a fork with no user-visible effect as an assumption.
 
 ## Template text
 

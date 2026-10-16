@@ -2,8 +2,7 @@
 
 Load this only in **design mode** when the target contains C++ (`.cpp`, `.cc`, `.cxx`, `.hpp`,
 `.hh`, `.hxx`, or a `.h` included from C++). It adds C++ idiom to `checklist-design.md` and gives
-the C++ form of the patterns in `patterns-design.md`; it does not repeat them. Where the project
-has its own C++ conventions, they win over this file — cite them.
+the C++ form of the patterns in `patterns-design.md`; it does not repeat them.
 
 Sources are cited by their usual short names: the *C++ Core Guidelines* (Stroustrup & Sutter,
 rule IDs such as `C.20`), Meyers (*Effective C++*, *Effective Modern C++*), Sutter & Alexandrescu
@@ -19,11 +18,6 @@ rule. An entry here adds design content beyond the rule it cites.
   constructor restricts who builds a value; it checks nothing about the values. Ask for a class
   only when a relation between field values can be broken by a hand-built value (`x ⊆ y`,
   `a ⇒ b`).
-- **Construction that can fail as a normal outcome** is a factory returning `std::expected<T, E>`
-  (or `std::optional<T>`), not a half-built object with an `is_valid()` check (extends `C.41`).
-- **An enum over a `bool` parameter that selects behaviour.**
-- **Sum types for closed sets** — `std::variant` over two `std::optional` members of which one is
-  set, and over a `kind` field with members that are meaningful only for some kinds.
 
 ## Ownership in the signature
 
@@ -57,12 +51,8 @@ rule. An entry here adds design content beyond the rule it cites.
 - **`std::variant` + `std::visit`** — closed set, value semantics, exhaustive at compile time.
 - **Templates and concepts** — variation fixed at build time; flag a template parameter nobody
   varies, and a concept-constrained template where a plain function suffices.
-- **Type erasure** (`std::function`, `std::move_only_function`, hand-written) — value-semantic
-  polymorphism for callbacks and strategies.
 - **CRTP** — static polymorphism or mix-ins; flag it where a free function or a virtual call on a
   cold path would do.
-- **Non-virtual interface** (Sutter) — a public non-virtual function that calls a private virtual;
-  fits when the base must enforce pre/postconditions around every implementation.
 
 ## Members versus free functions
 
@@ -70,8 +60,6 @@ rule. An entry here adds design content beyond the rule it cites.
   item 23): a free function that enforces a type's invariant (`add_entry(registry&, ...)`) belongs
   in that type, and so does a function that only asks questions of one type. Flag callers that
   mutate fields directly and bypass the function that enforces the invariant.
-- **Decompose orchestrators into stages** (extends `F.2`). Stages are pure functions from inputs to
-  a named struct; see the pipeline item in `checklist-design.md`.
 - **Pure logic in an anonymous namespace is untestable.** A string transformation or a decision
   function reachable only through a class that does I/O is a finding under §15 (Testability); the
   fix is an internal header or a small value type, not a friend test.
@@ -98,8 +86,6 @@ yours.
 - **Blocking work on the executor thread** stalls every coroutine on it; flag synchronous I/O,
   long loops without a suspension point, and blocking calls inside constructors that run before the
   loop starts.
-- **Level versus edge** — a condition such as "work is pending" modelled by an event or timer
-  cancellation loses notifications with no waiter; the design needs a latched flag or a re-check.
 
 ## Physical design (Lakos)
 

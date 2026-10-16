@@ -80,6 +80,7 @@ prevents — a rule ID is a lookup handle, never the argument.
 
 ## Report
 
+- State the diff reviewed.
 - Rank findings most-severe first, each tagged exactly one of `MUST-FIX`,
   `SHOULD-CONSIDER`, `NITPICK`. `MUST-FIX` is a defect that breaks behaviour,
   security or a contract; `SHOULD-CONSIDER` is a defect with a local, bounded
@@ -93,7 +94,7 @@ prevents — a rule ID is a lookup handle, never the argument.
 - End with the reading footer on its own line:
   `Read: <N> files in full, <M> sampled; digest: used | absent.`
 - End with exactly one verdict line:
-  - `SATISFIED` — only `NITPICK` or `enhancement` items remain.
+  - `SATISFIED` — no `MUST-FIX` or `SHOULD-CONSIDER` remains.
   - `NOT SATISFIED — N MUST-FIX or SHOULD-CONSIDER findings above.`
 
 ## Rules
@@ -106,5 +107,3 @@ prevents — a rule ID is a lookup handle, never the argument.
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in the report.
-- Report back concisely: the diff reviewed, ranked findings with failing
-  scenarios, and a clear overall verdict.

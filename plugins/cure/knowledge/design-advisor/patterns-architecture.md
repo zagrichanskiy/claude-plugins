@@ -24,8 +24,6 @@ Every pattern observation in a review is exactly one of these five, and the revi
   power cut, restart, flood — in which the missing or misapplied pattern bites.
 - **Every pattern costs indirection, latency or resources.** Say what it costs on the target
   hardware, and demand a present force for each one; the rest are speculative (YAGNI).
-- **Prefer the platform's instance.** A service that hand-rolls reconnection, supervision or
-  configuration layering beside the platform's own mechanism creates two behaviours to debug.
 
 ## Structure (Buschmann, Meunier, Rohnert, Sommerlad & Stal, *POSA 1*; Bass, Clements & Kazman)
 

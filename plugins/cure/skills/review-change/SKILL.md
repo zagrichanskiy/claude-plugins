@@ -7,12 +7,8 @@ allowed-tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 # Review change
 
 Two advisory agents reviewing one pull request group independently cost 4.4 M weighted input tokens
-across 249 requests, and six of their findings were the same finding reached twice. Neither agent
-was wrong. The cost was structural: each ran its own collection pass over the same source before it
-judged anything.
-
-This skill separates collection from judgement. Collection happens once, cheaply, and produces an
-artifact. Judgement happens in parallel against that artifact.
+across 249 requests and reached six findings twice, because each ran its own collection pass. This
+skill collects once and judges in parallel against the result.
 
 **It does not divide the source between the agents.** Each reviewer still decides for itself what to
 open; the digest makes that decision informed rather than exhaustive. Assigned areas and forbidden
@@ -28,13 +24,9 @@ repositories. Resolve it with `git diff --stat <base>...HEAD`, `gh pr view`, `gh
 agent in the run inherits this boundary, so it is written once here rather than re-derived five
 times.
 
-State in the same line whether the target is a **C++ change**: at least one path in the target's
-file list ends in `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`, `.hxx`, `.ipp`, `.tpp` or `.inl`,
-and the change does not delete that file. A change that only deletes C++ files is not a C++ change.
-Take the file list from the command that resolved the target: `git diff --name-only
-<base>...<head>`, or `gh pr diff <number> --name-only` for a pull request, one list per repository
-for a multi-repository target. Never substitute a local `git diff` for a pull request that is not
-checked out. The collector's `cpp` row in §10 uses the same list. A C++ change runs the two waves of
+State in the same line whether the target is a **C++ change**: one with at least one *Changed C++
+file*, as `${CLAUDE_PLUGIN_ROOT}/agents/collector.md` *Gating signals* defines it. Never substitute
+a local `git diff` for a pull request that is not checked out. A C++ change runs the two waves of
 step 3a; any other change runs step 3.
 Record `--with architect` when the user passed it; step 3a uses it.
 
@@ -85,10 +77,7 @@ area whose agent raised nothing before; only that agent is placed to find it.
 Give each resumed agent the ledger ids still open, from `.notes/<slug>-ledger.md`, and a diff range
 (`git diff <last-round-ref>..HEAD`) instead of a digest. Give a fresh agent the diff range only, with
 no ledger ids: they would be a topic brief, which step 3 forbids. Do not re-run the collector to
-produce a digest. The fix step commits each round with explicit paths, new files included, before
-the round closes. `<last-round-ref>` is the commit this round reviewed — HEAD when its agents were
-dispatched, not the fix commit; see step 5. `git diff` on an uncommitted round misses untracked
-files, so a round is not closed until it is committed.
+produce a digest. `<last-round-ref>` and the commit of each round: see step 5.
 
 ### 2. Collect once
 
@@ -279,7 +268,8 @@ produced.
   Agreement is a confidence signal, **not a rank boost**: agents at different altitudes can only
   overlap on behaviour, so boosting agreement would promote behaviour over structure again.
 - **Keep the evidence.** Every entry keeps its `path:line` and its concrete failing scenario or
-  forces. Drop the reasoning and the entry becomes an assertion the author cannot act on.
+  forces. Drop the reasoning and the entry becomes an assertion the author cannot act on. A
+  finding cited to the digest instead of the source is unverified.
 - **Keep the suggested change.** Proposed decompositions, interface declarations and pattern
   recommendations are the designer's and architect's deliverable; a finding reduced to its
   diagnosis loses the part the author asked for.
@@ -316,12 +306,12 @@ one: that pays for the reading again and counts as a second agent over the targe
     delta still understates the resumed agent's true cost: each request re-reads its full context,
     so the reading is paid for again even though it does not show up in the delta.
   - Flag any agent whose reported usage is at or over its token budget (step 1).
-- The fix step commits each round with explicit paths, new files included. Record HEAD at the
+- The fix step commits each round with explicit paths, new files included, before the round
+  closes. Record HEAD at the
   start of this round — before the fix commit, when its agents were dispatched — as
   `<last-round-ref>` for the next round's re-check test (step 1a). Update
   `.notes/<slug>-ledger.md` with the round's finding ids and their status.
-- Give the digest a `supersedes_when` that names the report, and sweep it once the report is
-  delivered — see the `note` skill.
+- Sweep the digest once the report is delivered — see the `note` skill.
 - If the report is large enough that the author will work from it over several sessions, persist it
   where the project keeps documents and hand back the path, not the whole text.
 
@@ -329,13 +319,6 @@ one: that pays for the reading again and counts as a second agent over the targe
 
 - **Never dispatch the same agent twice over one target** to raise confidence. Dispatch a second
   *kind* of agent, or verify the specific finding.
-- **Never assign files or areas to a reviewing agent.** State the target; let it choose.
-- **Never gate a `cg-*` agent or `architect` on your own reading of the change.** Step 3a gates
-  them on the digest's §10 rows and on `--with architect`, nothing else. `security-expert`,
-  `ui-reviewer` and `ux-reviewer` keep their step 3 conditions.
-- **Never brief an agent with another agent's topics.** Context yes; topics no.
 - **Never merge the altitudes into one ranking.** One section per altitude, each at full depth.
-- **Never let the digest be the evidence.** A finding cited to the digest instead of the source is
-  unverified, and the digest was written by an agent that was told not to judge.
 - **Never re-run the collector to answer one question.** Read the file.
 - **Never drop an earlier must-fix without checking it.** Not raised this round is not resolved.

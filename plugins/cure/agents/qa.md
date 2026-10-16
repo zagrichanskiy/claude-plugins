@@ -50,5 +50,4 @@ blocks the change.
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in the report.
-- Report back concisely: the command run, the pass/fail counts, coverage if
-  measured, per-failure detail, and the verdict.
+- State the command run.

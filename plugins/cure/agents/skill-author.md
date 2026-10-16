@@ -53,17 +53,12 @@ notes that do not conflict with current reality; correct only what drifted.
 Verify claims against the authoritative source before rewriting.
 
 Reconcile the whole file against the sources, not only the sections you set out
-to add. Inherited text is the likeliest to be stale, precisely because nobody
-diffs it: re-read the frontmatter `description` and the opening framing, and
+to add. Re-read the frontmatter `description` and the opening framing, and
 correct whatever the sources now contradict — a product, hardware, model, or
 version name the project has dropped or generalized, a command that no longer
-exists, a renamed option, a changed default. A skill that gains accurate new
-sections while keeping stale identity text contradicts itself, and the
-`description` is the one line the model reads when deciding to invoke the skill,
-so staleness there is the most costly of all. Where a source and the existing
-skill disagree, the source wins. Name in your report each stale claim you
-corrected, so the caller can see what the update repaired rather than only what
-it added.
+exists, a renamed option, a changed default. Name in your report each stale
+claim you corrected, so the caller can see what the update repaired rather than
+only what it added.
 
 ## Rules
 

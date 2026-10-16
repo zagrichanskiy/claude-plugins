@@ -223,8 +223,6 @@ These are design questions about **structure**; an individual use-after-free or 
   interface with few callers, a duplicated decision, a leaky representation inside the component.
 - **NITPICK** — naming, placement and consistency with no behavioural or evolutionary cost.
 
-A correctness bug is never ranked here, whatever its severity; it goes under *Out of altitude*.
-
 ## Review skeleton — design mode
 
 A design review has these sections in this order. The first three are required even when there
@@ -286,6 +284,3 @@ are no findings: they are what distinguishes a design review from a bug list.
    clarity.
 5. **Design decisions** — the choices made and why. Where the project keeps a separate architecture
    document, the options and the rejected alternatives live there and this section cites it.
-
-Proportional: a small component's document is short. Cut a section the subject does not need rather
-than padding it.

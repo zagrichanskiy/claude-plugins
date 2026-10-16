@@ -33,11 +33,9 @@ Skip:
 - Anything traceable to an employer. See the constraint in `CLAUDE.md`; when in doubt, leave it out
   and name the omission in the pull request body.
 
-## The section that matters
+## I had assumed
 
-**`I had assumed` is why the library exists.** Everything else in a note is available in a reference
-book. What is not available anywhere is which model the reader held, and the specific observation
-that broke it:
+Write the model the user held and the observation that broke it:
 
 > I had assumed the discovered MTU propagated backwards and changed the links themselves. It does
 > not — link MTUs are fixed, and only the original sender stores a number, per destination, in its

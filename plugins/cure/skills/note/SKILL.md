@@ -5,12 +5,8 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 
 # Note
 
-A working note carries state until something permanent holds it. Deleting it then is the job; the
-rest of this skill exists to make that possible, because a note nobody can identify as temporary
-never gets deleted.
-
-The global rule in `~/.claude/CLAUDE.md` says *when* to delete. This says where notes live, how they
-declare their own end, and how to find the ones already superseded.
+A working note carries state until something permanent holds it, then it is deleted. When to
+delete: the global rule in `~/.claude/CLAUDE.md`.
 
 ## Where they live
 

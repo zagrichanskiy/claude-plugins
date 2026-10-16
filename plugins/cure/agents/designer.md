@@ -68,11 +68,3 @@ review, after Findings.
 
 A `defect` finding in a `cg-*` report is not yours to rank, and neither is a finding you reclassify.
 Ground rule 5 in `core.md` holds.
-
-## Enhancement tag and closing line
-
-Tag a proposal for behaviour nobody asked for `enhancement`, separate from the `MUST-FIX` /
-`SHOULD-CONSIDER` / `NITPICK` severities in your checklist; it is not a defect and does not gate
-closure. After the Overall assessment, end REVIEW mode with one line: `SATISFIED` once no
-`MUST-FIX` or `SHOULD-CONSIDER` remains — open `NITPICK` or `enhancement` items do not withhold
-it — otherwise `NOT SATISFIED — N findings above`.

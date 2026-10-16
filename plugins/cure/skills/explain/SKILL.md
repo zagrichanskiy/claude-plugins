@@ -8,9 +8,7 @@ allowed-tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 A conversation, not a document. The user is deciding something and needs the mechanism first.
 
 The explanation is a **tree**: named nodes, each answering one question, traversed one per
-message. Questions during a node become its children. The tree is the whole method — without it
-a burst of follow-ups collapses into one unreadable answer, which is the failure this skill exists
-to prevent.
+message. Questions during a node become its children.
 
 ## The tree
 
@@ -97,16 +95,12 @@ means the map grew.
 
 ## Run
 
-**One node per message, under 400 words.** This is a hard budget, not a target.
-
-**Overflow is the branch signal.** When a node cannot be answered inside the budget, that is the
-skill working: say so, branch it into children, and answer the first child. Never write a longer
-message instead. Length creeping up across a session is the single most common way this skill fails.
+**One node per message, under 400 words.** When a node does not fit, say so, branch it into
+children and answer the first child. Never write a longer message instead.
 
 **A burst of questions is branched, not answered.** More than three questions in one message: sort
 each into *answer now* (one line), *new child node*, or *already covered*. Print the updated tree,
-then answer one node. Answering eight questions at depth in one message is the failure mode,
-however well each individual answer reads.
+then answer one node.
 
 **Stay on the node until they move on.** Follow-ups are the point. A follow-up is not a signal you
 were wrong — answer what was asked.
@@ -228,8 +222,7 @@ anywhere else.
 Never send it a node reached by `skip`, and never send it anything confidential; `~/knowledge`
 holds general technical knowledge only, and its `CLAUDE.md` governs.
 
-The librarian opens its pull request when the first level closes and pushes to the same branch as
-later levels land, so the user reviews as the work arrives. Paste the link the first time, and say
+Paste the link the first time, and say
 it was updated on each run after that. Record captured nodes in the saved tree's `captured:` list and the
 pull request URL in `capture_pr:`, and hand both to the librarian, so a later session extends the
 same pull request and never sends the same node twice.

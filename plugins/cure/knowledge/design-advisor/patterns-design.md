@@ -27,8 +27,6 @@ Every pattern observation in a review is exactly one of these five, and the revi
   only when a second case is already known, or when it is the seam a test needs.
 - **Prefer the project's existing instance** of a pattern over a new one (Ousterhout —
   consistency). Two Observer mechanisms in one codebase are worse than one imperfect one.
-- **Name the pattern in the suggested change** so the author can look it up, and give the
-  participants as declarations in the target language, not as prose.
 
 ## Creational (Gamma, Helm, Johnson & Vlissides, *Design Patterns* — GoF)
 
@@ -81,7 +79,7 @@ Every pattern observation in a review is exactly one of these five, and the revi
   that it must not know. *Misuse signs*: subscriber lifetime is undefined (a notification into a
   destroyed subscriber), notifications re-enter the producer, ordering between subscribers is
   relied on but not specified, an edge-triggered notification is used for a level condition (work
-  is pending) and a notification with no waiter is lost.
+  is pending) and a notification with no waiter is lost; fix with a latched flag or a re-check.
 - **Command** — *fits when* requests must be queued, retried, logged, undone or sent elsewhere.
   *Missing* when a retry or queue stores loose arguments and re-derives the action.
 - **Template Method** — *fits when* a fixed algorithm has a few varying steps and the variants are
@@ -146,8 +144,7 @@ Newer practice extends this volume:
 
 - **Structured concurrency** (Sústrik; Smith, *Notes on structured concurrency*) — every task has a
   parent scope that outlives it and waits for it. *Missing* when spawned tasks outlive their owner
-  and each must defend itself against a destroyed owner at every suspension point. That defence,
-  repeated by hand, is a design finding: the structure should make the idiom unnecessary.
+  and each must defend itself against a destroyed owner at every suspension point.
 - **Producer–consumer with a bounded queue** — *fits when* rates differ. *Misuse*: an unbounded
   queue (a memory leak that waits for load).
 
