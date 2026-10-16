@@ -53,7 +53,10 @@ Then, and only then, write the file. The mode file says where it goes.
 **The goal file carries the context. The ticket stays thin.** A fresh session opens with `/goal
 @<file>` and nothing else, so whatever it needs to act must be in the file or reachable from it.
 
-**Keep it under 4000 characters** — the limit on a `/goal` condition. Reference rather than restate:
+Keep it short: the evaluator re-reads the whole file every turn. No `/goal` length limit was
+observed. Goals of 4317-5871 characters ran under `/goal @<file>` on Claude Code 2.1.301, and one of
+4532 characters on 2.1.302. Measure the file with `wc -c <file>` after writing it and report the
+count. Reference rather than restate:
 the repository's `CLAUDE.md` already covers conventions, layout and working style, and the code and
 recipes say what they contain. Name the file to read; do not summarise it. What the file must hold
 outright is what reading the repository will not tell you — the decisions taken in conversation and
@@ -130,7 +133,7 @@ The evaluator reads the transcript only, so the summary is printed, not just wri
 exit clause depends on text that exists only in a shipped file.
 
 The clean-up work item and its done-when item are copied from the template with only the path slots
-filled. Never shorten or merge them to meet the length limit. Write the ledger path in full in both
+filled. Never shorten or merge them to save characters. Write the ledger path in full in both
 (Light and Full), even when Context names it, and write out each deleted working file. Every
 temporary file or directory a work item creates outside version control (a temporary copy, a run
 directory, a worktree, a prompt or briefs file, a fixture) is written as a path in that work item,
