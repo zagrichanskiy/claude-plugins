@@ -104,7 +104,7 @@ the project's conventions, test command and run command from the repo.
 
 | Agent | Description |
 |---|---|
-| `dispatcher` | Scans the job queue (`cure-job list`) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, waits for approval, then runs `cure-job launch`. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
+| `dispatcher` | Scans the job queue (`cure-job list`) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, then runs `cure-job launch`: at once for a Solo or Light job with no open item, otherwise after approval. It alone asks a job's questions. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
 
 Start it once per machine:
 
@@ -124,9 +124,10 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 |---|---|
 | Questions | Approval and other questions are answered in the dispatcher session (attach from `claude agents`). A message does not answer them. |
 | Workspace trust | Each repository a job runs in must have been opened in Claude Code once to accept the trust prompt. Otherwise `cure-job launch` fails with "Workspace not trusted". |
+| Defaults | Copy `plugins/cure/skills/dispatch/defaults.md` to `${CURE_JOB_ROOT:-~/.claude/cure}/defaults.md` and edit it. Without the file, every fork goes to the question round. |
 
 Pin step: open `claude agents` and press ctrl+t on the dispatcher session. The session moves to the
-top of the list. The dispatcher is also started automatically by `cure:handoff` when its wake-up
+top of the list. The dispatcher is also started automatically by `cure:dispatch` when its wake-up
 message fails; the manual command above stays. A stopped dispatcher cannot receive messages, so run
 `claude agents` after a reboot and start it again when it is not listed; its start scan finds
 every job that finished while it was stopped.
@@ -136,6 +137,7 @@ every job that finished while it was stopped.
 | Skill | Invocation | Description |
 |---|---|---|
 | `goal` | `/cure:goal` | Writes the brief that `/goal @<file>` runs from: asks every open question in one round first, then an orchestrator-led work list with an agent per step and a closing retrospective that writes evidence-backed change proposals to `~/.claude/retros/`, a review-then-fix split with a severity floor, designer and live-verification gates, a measurable done-when list and the standing rules, under 4000 characters. |
+| `dispatch` | `/cure:dispatch` | Hands a task from the current session to the dispatcher as a queued job: fills a handoff file from the session's context, writes it with `cure-job new` and sends the dispatcher the job id. |
 | `capture-idea` | `/cure:capture-idea` | Captures an idea or design just discussed in a session as a structured goal file under `~/.claude/ideas/`, in a form a fresh session can pick up cold. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |

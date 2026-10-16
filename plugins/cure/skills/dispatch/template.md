@@ -12,6 +12,8 @@ delivery: commit
 ## Settled
 
 - Decision taken in the session, with the reason in one clause.
+- Resource risk: <resource>: <the user's words>. Omit when the user said nothing.
+- Branch: <why this branch>. Omit for other work.
 
 ## Work
 
@@ -24,6 +26,7 @@ delivery: commit
 ## Tools
 
 - Build: the repository's build agent or command.
+- Implement: the agent that writes the change.
 - Review: the repository's review agent.
 - Verify: the repository's verify agent or command.
 - PR: the repository's pull request skill.
