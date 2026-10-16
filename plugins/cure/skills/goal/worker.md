@@ -42,14 +42,23 @@ and do not repeat the same command.
 
 ## `needs-input:`
 
-1. Skip clean-up. Keep the ledger and the working files.
+1. Skip clean-up. Keep the ledger and the working files. Keep the session: do not stop it.
 2. Run `finish` with `--status needs-input`, one `--question` per question and `--kept` for each
    kept file.
 3. Each question states the situation, the options, the consequence of each and a recommendation,
    for a reader who has not followed the run.
 4. Send the message, then print the final message starting with `needs-input:`.
 
-A later run continues from the ledger.
+The dispatcher resumes this session after the user answers. It adds the answers to the goal file
+under Settled and sets the goal again with `/goal @<goal file>`. After the resume:
+
+1. Read this file and the goal file again.
+2. Take the answers from Settled. The questions of the earlier `needs-input:` exit are closed.
+3. Continue from the ledger, at the work item that stopped.
+
+The resume is a new run in this session. Its exit follows "Every exit, in order" again. When the
+session is gone, the dispatcher launches a new run in a new session. It also continues from the
+ledger.
 
 ## Keep rules
 

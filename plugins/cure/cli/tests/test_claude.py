@@ -229,6 +229,23 @@ def test_duplicate_names_list_live_ids_strongest_first_and_skip_stopped(cli, fak
     assert cli.sessions()["d"].ids == ("busy0001", "idle0001")
 
 
+def test_a_live_and_a_stopped_entry_give_the_live_uuid_and_both_ids(cli, fake_state):
+    write_agents(fake_state, [
+        {"name": "d", "id": "stopped01", "sessionId": "uuid-stopped"},
+        {"name": "d", "pid": 1, "status": "idle", "id": "idle0001", "sessionId": "uuid-live"},
+        {"name": "e", "id": "other001", "sessionId": "uuid-other"},
+    ])
+    found = cli.sessions()
+    assert (found["d"].uuid, found["d"].all_ids, found["d"].ids) == ("uuid-live", ("idle0001", "stopped01"),
+                                                                      ("idle0001",))
+    assert (found["e"].uuid, found["e"].all_ids) == ("uuid-other", ("other001",))
+
+
+def test_an_entry_without_a_session_id_has_no_uuid(cli, fake_state):
+    write_agents(fake_state, [{"name": "n", "pid": 1, "status": "idle", "id": "ab12cd34"}])
+    assert cli.sessions()["n"].uuid is None
+
+
 @pytest.mark.parametrize("statuses, expected", [
     (("idle", "waiting", "busy", "stopped"), SessionStatus.BUSY),
     (("stopped", "idle", "waiting"), SessionStatus.WAITING),

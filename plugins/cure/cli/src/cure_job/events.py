@@ -40,13 +40,28 @@ class Reported:
     at: datetime
 
 
-Event = Union[Launched, Claim, Closed, Origin, Reported]
+@dataclass(frozen=True)
+class StopIssued:
+    """``cure-job stop`` ran for run ``run``. The launch grace no longer applies to that run."""
+    run: int
+    at: datetime
+
+
+@dataclass(frozen=True)
+class SessionsRemoved:
+    """``cure-job remove-sessions`` left no session of the job listed."""
+    at: datetime
+
+
+Event = Union[Launched, Claim, Closed, Origin, Reported, StopIssued, SessionsRemoved]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
 _CLOSED = "closed"
 _ORIGIN = "origin"
 _REPORTED = "reported"
+_STOPPED = "stopped"
+_SESSIONS_REMOVED = "sessions-removed"
 
 
 def encode(event: Event) -> str:
@@ -58,6 +73,10 @@ def encode(event: Event) -> str:
         fields = {"event": _ORIGIN, "address": event.address, "at": format_local(event.at)}
     elif isinstance(event, Reported):
         fields = {"event": _REPORTED, "run": event.run, "at": format_local(event.at)}
+    elif isinstance(event, StopIssued):
+        fields = {"event": _STOPPED, "run": event.run, "at": format_local(event.at)}
+    elif isinstance(event, SessionsRemoved):
+        fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     else:
         fields = {"event": _CLOSED, "reason": event.reason}
     return json.dumps(fields, separators=(",", ":"))
@@ -73,6 +92,10 @@ def decode(line: str) -> Event | None:
         return Launched(_run(fields), _text(fields, "session"), parse_local(_text(fields, "at")))
     if kind == _REPORTED:
         return Reported(_run(fields), parse_local(_text(fields, "at")))
+    if kind == _STOPPED:
+        return StopIssued(_run(fields), parse_local(_text(fields, "at")))
+    if kind == _SESSIONS_REMOVED:
+        return SessionsRemoved(parse_local(_text(fields, "at")))
     if kind == _CLAIM:
         return Claim(_text(fields, "resource"))
     if kind == _CLOSED:

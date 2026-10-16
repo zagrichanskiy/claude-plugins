@@ -16,7 +16,8 @@ from tests.builders import NOW, handoff_text
 from tests.conftest import FAKE_CLAUDE
 from tests.fakes import FakeClaude, FakeClock
 
-COMMANDS = ["new", "list", "launch", "claim", "stop", "origin", "close", "reported", "prune"]
+COMMANDS = ["new", "list", "launch", "resume", "claim", "stop", "origin", "close", "reported", "remove-sessions",
+            "prune"]
 
 
 class Harness:
@@ -177,7 +178,7 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
     assert data[0] == {
         "id": first, "state": "queued", "dir": str(h.root / "jobs" / first), "run": 0, "session": None,
         "resources": ["/work/video-core"], "blocked-by": [], "problem": None, "origin": None,
-        "waiting-for": None, "reported": False}
+        "waiting-for": None, "reported": False, "sessions-removed": False}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
 
 

@@ -17,12 +17,14 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 | Command | Use |
 |---|---|
 | `cure-job prune` | Remove expired jobs and half-created directories. |
-| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported` and, for a `blocked` job, `waiting-for`. |
+| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported`, `sessions-removed` and, for a `blocked` job, `waiting-for`. |
 | `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. Refused after the job was launched. |
 | `cure-job reported <id>` | Record that the finish line for the job's latest run was sent or printed. |
 | `cure-job stop <id>` | Stop the session of the job's latest run and wait until it is down. Takes the job id. Prints the session name, or `<session> not live` when it was already down; both exit 0. Exit 1 means the session may still be alive. |
-| `cure-job launch <id>` | Start the job session. Refuses a job that does not hold every resource it names, and a job whose session is alive. |
+| `cure-job launch <id>` | Start the job session. Refuses a job that does not hold every resource it names, and a job whose session is alive. Refuses a `needs-input` job whose session is listed live, with `job <id> is needs-input and its session <name> is live; continue it: cure-job resume <id>`. A `needs-input` job whose session is gone or listed stopped launches. |
 | `cure-job close <id>` | Abandon a job. Refuses while its session is alive. |
+| `cure-job resume <id>` | Needs `needs-input`. Stops the kept session and resumes it with `claude --bg --resume <session-uuid> "/goal @<goal.md>"`. Same session name, new run. When the session no longer exists, exits 1 with `session <name> no longer exists; start a new run` and starts nothing. |
+| `cure-job remove-sessions <id>` | Needs `done` or `abandoned`, else exits 1. Stops each live session of every run, then runs `claude rm` on it. Prints each removed name. When no session of the job is left listed, records `sessions-removed`; `list` then shows `sessions-removed` true. |
 
 You never edit `handoff.md`, `dispatch.jsonl` or `result.md`. The CLI owns the job directory.
 
@@ -48,13 +50,14 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | queued | If the job holds its resources, run `cure:goal` with the handoff file and the job directory. Then print the summary (below). |
 | held | Do nothing. Do not draft a goal for a job that does not hold its resources. |
 | awaiting-approval | Print the summary again if the user has not answered. |
-| launched, running | Do nothing. |
+| launched, running | Do nothing. For 60 seconds after a launch or a resume, a session that `claude agents` does not list yet, or lists stopped, shows as `launched`, not `lost`. After `cure-job stop`, a session listed stopped shows as `lost` at once. |
 | stalled | Re-run `cure-job list` after 60 seconds. If the row is still `stalled`, ask the user: relaunch or abandon. |
 | blocked | The session waits for input. Tell the user the job id, the session name (`session`) and what the session waits for (`waiting-for`, for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else; re-run `cure-job list` on the next wake. |
 | lost | Ask the user: relaunch or abandon. |
-| needs-input | Read `result.md`. If `reported` is false, send the finish line (below). Ask the user its `question` items and any `unproven` item. Add the answers to `goal.md` under Settled through `cure:goal`, then print the summary and launch a new run after approval. |
-| done, failed | If `reported` is false, send the finish line (below). |
-| abandoned | Do nothing. |
+| needs-input | Read `result.md`. If `reported` is false, send the finish line (below). Ask the user its `question` items and any `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
+| done | If `reported` is false, send the finish message (below). Then, if `sessions-removed` is false, run `cure-job remove-sessions <id>`. If it exits non-zero, show its error and continue. The next wake retries. |
+| failed | If `reported` is false, send the finish line (below). Keep the sessions: the user inspects them. |
+| abandoned | If `sessions-removed` is false, run `cure-job remove-sessions <id>`. If it exits non-zero, show its error and continue. The next wake retries. |
 | invalid | Print the job id and the file `list` names. Ask the user to repair the file or delete the job directory. Launch nothing until no job is `invalid`: the CLI refuses every `launch` and `claim` meanwhile. |
 
 ## Goal and approval
@@ -65,12 +68,22 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 4. Wait for the user's approval. Never launch an unapproved goal.
 5. After approval run `cure-job launch <id>`. Show the command's output.
 
+## Answer and resume
+
+The worker session of a `needs-input` job stays alive. After the user answers:
+
+1. Add the answers to `goal.md` under Settled through `cure:goal`, with the one run line `job.md` gives. The line holds for a resume and for a new run.
+2. Run `cure-job resume <id>`. The user's answer is the approval; print no summary. The resume is a new run in the same session; its finish is reported like any run's.
+3. If `resume` exits 1 with `session <name> no longer exists`, run `cure-job launch <id>` with the same `goal.md`. This starts a new run in a new session, which continues from the ledger.
+
+Never send `/goal continue`: it sets the literal condition "continue". Never resume a live session without the `claude stop` that `resume` runs: that starts a copy of the session.
+
 ## Relaunch and abandon
 
-After the user chooses relaunch or abandon for a `lost` or `stalled` job:
+After the user chooses relaunch or abandon for a `lost` or `stalled` job, or abandon for a `needs-input` job:
 
 1. Run `cure-job stop <id>`. If it exits 1, show the user its error and stop here: do not launch or close the job.
-2. Relaunch: run `cure-job launch <id>`. Abandon: run `cure-job close <id>`.
+2. Relaunch: run `cure-job launch <id>`. Abandon: run `cure-job close <id>`, then `cure-job remove-sessions <id>`. If `remove-sessions` exits non-zero, show the user its error. The `abandoned` row retries it on the next wake.
 
 ## Finish message
 
@@ -95,7 +108,8 @@ Never store job ids, statuses, session ids, answers, default values or lessons. 
 
 ## Rules
 
-- Never launch a job the user has not approved.
+- Never launch a job the user has not approved. A resume after the user's answer needs no other approval.
+- Remove every session of a `done` or `abandoned` job. Never remove the sessions of a `failed` job.
 - Run `cure-job stop` only for the job the user chose to relaunch or abandon.
 - Never write to the job directory except `goal.md`, through `cure:goal`.
 - You have no `Agent` tool. Do the work through the skill and the CLI.

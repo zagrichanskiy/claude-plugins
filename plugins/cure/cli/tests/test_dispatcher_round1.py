@@ -216,18 +216,20 @@ def test_reported_is_false_for_a_job_that_was_never_launched(h, tmp_path):
 
 
 def test_a_relaunch_makes_reported_false_for_the_new_run(h, tmp_path):
-    job_id, _ = launch(h, tmp_path)
+    job_id, session = launch(h, tmp_path)
     write_result(h, job_id, NEEDS_INPUT_RESULT)
     assert h.run("reported", job_id) == 0
+    del h.claude.statuses[session]  # launch refuses while the needs-input session is live
     assert h.run("launch", job_id) == 0
     row = h.listed()[job_id]
     assert (row["run"], row["reported"]) == (2, False)
 
 
 def test_reporting_the_second_run_marks_only_the_second_run(h, tmp_path):
-    job_id, _ = launch(h, tmp_path)
+    job_id, session = launch(h, tmp_path)
     write_result(h, job_id, NEEDS_INPUT_RESULT)
     assert h.run("reported", job_id) == 0
+    del h.claude.statuses[session]  # launch refuses while the needs-input session is live
     assert h.run("launch", job_id) == 0
     write_result(h, job_id)
     assert h.run("reported", job_id) == 0

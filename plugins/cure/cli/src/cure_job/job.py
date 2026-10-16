@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .events import Claim, Closed, Event, Launched, Origin, Reported
+from .events import Claim, Closed, Event, Launched, Origin, Reported, SessionsRemoved, StopIssued
 from .handoff import Handoff
 from .result import Result
 
@@ -38,6 +38,16 @@ class JobRecord:
     def reported(self) -> bool:
         """The origin session was told of the latest run's result."""
         return self.run > 0 and any(isinstance(event, Reported) and event.run == self.run for event in self.events)
+
+    @property
+    def stop_issued(self) -> bool:
+        """``cure-job stop`` ran for the latest run."""
+        return self.run > 0 and any(isinstance(event, StopIssued) and event.run == self.run for event in self.events)
+
+    @property
+    def sessions_removed(self) -> bool:
+        """``cure-job remove-sessions`` left no session of the job listed."""
+        return any(isinstance(event, SessionsRemoved) for event in self.events)
 
     @property
     def closed(self) -> Closed | None:
