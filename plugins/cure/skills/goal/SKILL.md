@@ -40,7 +40,8 @@ would actually recommend between, with the consequence of each spelled out.
 A question is a choice that changes behaviour the user would see, or a place where the source
 (conversation, handoff or design document) is silent or contradictory on such a choice. Never decide
 a question silently. A mechanical choice that the code or the conventions determine is decided by
-the session and recorded as an assumption.
+the session and recorded as an assumption. A fork whose options differ in nothing the user would see
+is not a question: take the recommended option and record it as the mode file says.
 
 Print the chosen agent tier and its reason as part of the round (see "Agent tier"). When there is
 no question, print the tier decision alone and ask nothing. The user can override the tier.
@@ -192,7 +193,8 @@ A Solo goal differs from the template as follows:
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
 - Rules: the one line "Tier: Solo."
 
-The review-round failure cause in the exit text, by tier:
+The review-round cap and failure cause come from this tier rule, or from the user's own statement
+in a direct run. A cap in a handoff or a design source is never copied into the goal. The failure cause in the exit text, by tier:
 
 | Tier | `<review cause>` |
 |---|---|

@@ -10,8 +10,15 @@ directory. A worker session then runs the goal and cannot reach the user.
 - Read `defaults.md` under `${CURE_JOB_ROOT:-~/.claude/cure}` before the question round. A missing
   file means no defaults. Do not ask a fork it answers; mark that decision `(default)` under
   Settled.
-- Take the repository's build, review and verify agents and its PR skill from the handoff's
-  `## Tools` section.
+- Take the repository's build, implement, review and verify agents and its PR skill from the
+  handoff's `## Tools` section.
+- Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
+  each defaults row with key `resource risk` whose scope matches into Settled verbatim, marked
+  `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
+  job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
+  or drop these lines to meet the length limit.
+- Take `<review cause>` from "Agent tier" in `SKILL.md`, and the review-round cap from "Delegate,
+  then reflect" (Full) and "Agent tier" (Light). Never copy a review-round cap from the handoff.
 
 ## Where it goes
 
@@ -29,7 +36,8 @@ directory belongs to the CLI: the goal never deletes it.
 ## Questions
 
 The dispatcher asks the user in the question round. The questions are the handoff's `## Open` items
-plus any fork `defaults.md` does not answer. Ask them with `AskUserQuestion`, record the answers
+plus any fork `defaults.md` does not answer, except a fork with no user-visible effect: record its
+recommended option under Settled as `(recommended)` and do not ask it. Ask them with `AskUserQuestion`, record the answers
 under Settled, then write `<job>/goal.md`. Each question carries its own context: the situation,
 the options, the consequence of each, and a recommendation.
 

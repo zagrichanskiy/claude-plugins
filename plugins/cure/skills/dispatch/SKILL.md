@@ -1,10 +1,10 @@
 ---
-name: handoff
-description: Hand a task from the current working session to the dispatcher as a queued job. Fills a handoff file from the session's context, writes it with `cure-job new`, and sends the `dispatcher` session the job id. Use when the user says "hand this off", "queue this as a job", "send this to the dispatcher", or "/cure:handoff".
+name: dispatch
+description: Hand a task from the current working session to the dispatcher as a queued job. Fills a handoff file from the session's context, writes it with `cure-job new`, and sends the `dispatcher` session the job id. Use when the user says "hand this off", "queue this as a job", "send this to the dispatcher", "dispatch this", or "/cure:dispatch".
 allowed-tools: Read, Bash, Grep, Glob, SendMessage
 ---
 
-# Handoff
+# Dispatch
 
 The session is busy. Ask nothing that the context answers. Do not do the task. Queue it.
 
@@ -12,7 +12,7 @@ The session is busy. Ask nothing that the context answers. Do not do the task. Q
 
 Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. Write its value in place of `<plugin-root>` in every command below.
 
-1. Read `${CLAUDE_PLUGIN_ROOT}/skills/handoff/template.md`.
+1. Read `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/template.md`.
 2. Fill the template from the session's context (table below).
 3. Write the handoff with `cure-job new` (below). Keep the printed job id.
 4. Send the dispatcher the job id (below).
@@ -25,12 +25,19 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | `repos` | Absolute git toplevels, from `git -C <dir> rev-parse --show-toplevel`. The first is the launch directory. |
 | `device` | `bench` when the work needs the hardware bench, else `none`. |
 | `outcome` | One sentence. |
-| `ticket`, `branch`, `base`, `delivery` | Only when the user stated them. Otherwise omit the key; `defaults.md` supplies it. `delivery` is `commit` or `pr`. |
+| `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. A new ticket or branch only when the user asked for one. |
+| `base`, `delivery` | Only when the user stated them. Otherwise omit the key; the defaults file supplies it. `delivery` is `commit` or `pr`. |
 | `## Settled` | Decisions taken in the session, each with its reason. |
-| `## Work` | The steps, in order. |
+| Resource risk | One Settled line per resource the user rated in the session, in the user's words, for example "Resource risk: bench is a test stand; any action on it is approved". Omit when the user said nothing. |
+| `## Work` | The steps, in order. No review-round cap: the goal skill's tier rule sets it. |
 | `## Done when` | Numbered checks that the job can run and show. |
-| `## Tools` | The repository's build, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. |
+| `## Tools` | The repository's build, implement, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. Implement names an agent, never only "implementer". |
 | `## Open` | Questions only the user can answer. Omit the section when there are none. |
+
+A small change does not affect customers: a fix, a small refactoring, a doc edit.
+
+The defaults file is `${CURE_JOB_ROOT:-~/.claude/cure}/defaults.md`. A missing file means no
+defaults. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/defaults.md` is an example of it.
 
 Omit `id` and `created`. `cure-job new` sets them.
 

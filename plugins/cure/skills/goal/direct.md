@@ -16,6 +16,9 @@ In the question round, ask with `AskUserQuestion` and wait for the answer. Each 
 own context: the situation, the options, the consequence of each, and a recommendation. Write it
 for a reader who has not followed the run.
 
+A fork whose options differ in nothing the user would see is not asked: take the recommended option
+and record it as an assumption.
+
 ## Template text
 
 The template's mode slots take the text below. Delete the slot text that stays unused. The

@@ -11,6 +11,8 @@ add one.
   `origin/<base>`. Other mismatch: record it, use the corrected value.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.
+- A fork whose options differ in nothing the user would see is not a question: take the recommended
+  option and record it as an assumption.
 - Asking: when the goal file names `worker.md`, take the `needs-input:` exit as `worker.md` says.
   Otherwise ask with `AskUserQuestion` and wait. Each question states the situation, the options,
   the consequence of each and a recommendation, for a reader who has not followed the run.
