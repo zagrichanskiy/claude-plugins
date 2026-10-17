@@ -42,13 +42,9 @@ Judge against practice the front-end community actually agrees on, not personal 
 
 ## Output
 
-A numbered list, most severe first. Each finding is tagged exactly one of
-`MUST-FIX`, `SHOULD-CONSIDER`, `NITPICK`. `MUST-FIX` is a defect that breaks
-behaviour, security or a contract; `SHOULD-CONSIDER` is a defect with a
-local, bounded cost; both gate `SATISFIED`. `NITPICK` is a cosmetic or
-preference issue with no behavioural cost and never gates. Tag a proposal
-for behaviour nobody asked for `enhancement` instead of a severity — it is
-not a defect.
+A numbered list, most severe first. Tag each finding as the *Report* section of
+`${CLAUDE_PLUGIN_ROOT}/agents/reviewer.md` defines. If `${CLAUDE_PLUGIN_ROOT}` does not resolve,
+run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute path. If the file is missing, say so.
 
 - **Where** — `file:line`, and the selector or element.
 - **What** — the defect in one sentence, with the measured number where there is one.
@@ -56,9 +52,8 @@ not a defect.
 
 Then one closing line, exactly one of:
 
-- `SATISFIED` — no `MUST-FIX` or `SHOULD-CONSIDER` remains. Open `NITPICK` or
-  `enhancement` items do not withhold it.
-- `NOT SATISFIED — N findings above.`
+- `SATISFIED` — no `MUST-FIX` or `SHOULD-CONSIDER` remains.
+- `NOT SATISFIED — N MUST-FIX or SHOULD-CONSIDER findings above.`
 
 Only report what you verified. An unverifiable suspicion is not a finding; say what you could not
 check instead. Never edit the page.

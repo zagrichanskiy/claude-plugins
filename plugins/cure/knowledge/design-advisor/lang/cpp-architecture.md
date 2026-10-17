@@ -2,8 +2,7 @@
 
 Load this only in **architecture mode** when the system under review contains C++ components. It
 adds the system-level consequences of choosing C++ to `checklist-architecture.md`; it does not
-cover how a component is factored into classes. Where the project has its own conventions, they
-win over this file — cite them.
+cover how a component is factored into classes.
 
 ## Library boundaries and ABI
 
@@ -59,5 +58,3 @@ win over this file — cite them.
 - **One definition of every wire contract** — IPC method names, message schemas and constants are
   defined once (an API library, a generated header) and consumed, not duplicated as string
   literals in each peer.
-- **Serialized formats carry a version** or are read tolerantly, so components built from
-  different releases can coexist during a staged rollout.

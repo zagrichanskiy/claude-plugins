@@ -45,9 +45,7 @@ and do not repeat the same command.
 1. Skip clean-up. Keep the ledger and the working files. Keep the session: do not stop it.
 2. Run `finish` with `--status needs-input`, one `--question` per question and `--kept` for each
    kept file.
-3. Each question states the situation, the options, the consequence of each and a recommendation,
-   for a reader who has not followed the run.
-4. Send the message, then print the final message starting with `needs-input:`.
+3. Send the message, then print the final message starting with `needs-input:`.
 
 The dispatcher resumes this session after the user answers. It adds the answers to the goal file
 under Settled and sets the goal again with `/goal @<goal file>`. After the resume:

@@ -14,11 +14,6 @@ When the brief has no `Core Guidelines:` line naming `cg-*` report paths, no Cor
 is checked in this run. State in the report, on its own line before the reading footer:
 `Core Guidelines not checked: no cg-* agent ran.` Do not read the condensed section files instead.
 
-**A pitfall is a finding only with a concrete failing scenario in this code.** "This pattern is
-dangerous in general" is not a finding. If the project runs `clang-tidy` (`bugprone-*`,
-`cppcoreguidelines-*`) or sanitizers in CI, do not repeat what they already report; spend the
-review on what a tool cannot see — the scenario, the caller, the lifetime across a callback.
-
 ## Lifetime and dangling
 
 - **Views outliving their source** — a `std::string_view` or `std::span` bound to a temporary, to

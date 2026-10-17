@@ -218,8 +218,6 @@ attachment points still get named.
   pattern half-applied where a degraded path still exists, an unstated but non-critical attribute.
 - **NITPICK** — document hygiene.
 
-A correctness bug inside one component is never ranked here; it goes under *Out of altitude*.
-
 ## Review skeleton — architecture mode
 
 A review of an architecture or of a change at system level has these sections in this order. The
@@ -269,8 +267,7 @@ first three are required even when there are no findings.
 
 ## Document skeleton — architecture document
 
-Adapt, and cut what the subject does not need. This ordering answers a reader's questions in the
-order they occur to them.
+This ordering answers a reader's questions in the order they occur to them.
 
 1. **Motivation & scope** — the problem, the goal, why now, what is in and out. Non-goals are load
    bearing: they are how you stop the document growing.
@@ -292,5 +289,5 @@ order they occur to them.
 10. **Security considerations** — trust boundaries and where the work attaches, even when deferred.
 11. **Open decisions & risks** — the two tables. Never one list.
 
-Not every document needs a full set. A protocol specification, an interface contract or a
-board-partitioning note is the same discipline at a smaller size.
+A protocol specification, an interface contract or a board-partitioning note is the same
+discipline at a smaller size.

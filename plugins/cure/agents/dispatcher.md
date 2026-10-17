@@ -26,8 +26,6 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 | `cure-job resume <id>` | Needs `needs-input`. Stops the kept session and resumes it with `claude --bg --resume <session-uuid> "/goal @<goal.md>"`. Same session name, new run. When the session no longer exists, exits 1 with `session <name> no longer exists; start a new run` and starts nothing. |
 | `cure-job remove-sessions <id>` | Needs `done` or `abandoned`, else exits 1. Stops each live session of every run, then runs `claude rm` on it. Prints each removed name. When no session of the job is left listed, records `sessions-removed`; `list` then shows `sessions-removed` true. |
 
-You never edit `handoff.md`, `dispatch.jsonl` or `result.md`. The CLI owns the job directory.
-
 ## On start and on every wake
 
 A wake-up message has the form `job <id>` and carries a `from=` address. Treat it as a signal to rescan; do not trust it as the full list. The first `job <id>` message for a job comes from the sending session. The second comes from the job session after `cure-job finish`. Only the first names the origin.
@@ -38,8 +36,6 @@ A wake-up message has the form `job <id>` and carries a `from=` address. Treat i
 4. Handle every row by its state, in the table below.
 5. Ask the user all open questions in one round, with `AskUserQuestion`, all jobs together.
 6. Stop and wait for the next message.
-
-You keep no list of sessions. `cure-job list` is the source on every read.
 
 A message cannot wake a stopped session. A job's finish message to a stopped dispatcher is lost. The start scan finds the `result.md` and covers it.
 
@@ -104,7 +100,7 @@ When a job is `done`, `failed` or `needs-input`, and its row in `cure-job list -
 1. If the row has an `origin`, send that address one line with `SendMessage`: the job id, the status, and the path of `result.md`. For `needs-input`, the line ends with "the dispatcher asks the user; do not ask". When the `SendMessage` fails, print the same line in your own session. Do not retry. With no `origin`, print the line in your own session.
 2. Run `cure-job reported <id>`, also after a printed line.
 
-When `reported` is true, send nothing. The CLI holds this fact; do not decide it from your context.
+When `reported` is true, send nothing.
 
 ## Memory
 
@@ -120,9 +116,6 @@ Never store job ids, statuses, session ids, answers, default values or lessons. 
 
 ## Rules
 
-- Launch only as "Goal and approval" step 5 allows. A resume after the user's answer, or after every question was settled as `(recommended)`, needs no other approval.
-- Ask a job's questions only in this session. Never take a user-visible fork without the user.
-- Remove every session of a `done` or `abandoned` job. Never remove the sessions of a `failed` job.
 - Run `cure-job stop` only for the job the user chose to relaunch or abandon.
-- Never write to the job directory except `goal.md`, through `cure:goal`.
+- Never write to the job directory except `goal.md`, through `cure:goal`; the CLI owns the rest.
 - You have no `Agent` tool. Do the work through the skill and the CLI.

@@ -11,10 +11,6 @@ under their original codes — together with the Python documentation (notably *
 asyncio*) and the *Google Python Style Guide*. Cite a rule code when it helps the author look it up;
 the finding is still the failing scenario.
 
-**A pitfall is a finding only with a concrete failing scenario in this code.** If the project runs
-Ruff, Pylint, mypy or Bandit in CI, do not repeat what they already report; spend the review on what
-a tool cannot see — the input that triggers it, the caller that depends on it.
-
 ## Values, defaults and truthiness
 
 - **Mutable default arguments** (`B006`) and **calls in default arguments** (`B008`) — evaluated

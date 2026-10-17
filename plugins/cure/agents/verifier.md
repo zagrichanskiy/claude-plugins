@@ -98,5 +98,3 @@ confirmed from what you infer.
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in the report.
-- Report back concisely: the command run, the target, the observed behavior,
-  the evidence, and the verdict.

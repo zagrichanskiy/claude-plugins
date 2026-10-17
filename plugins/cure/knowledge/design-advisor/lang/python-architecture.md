@@ -2,8 +2,7 @@
 
 Load this only in **architecture mode** when the system under review contains Python components.
 It adds the system-level consequences of choosing Python to `checklist-architecture.md`; it does
-not cover how a component is factored into classes. Where the project has its own conventions,
-they win over this file — cite them.
+not cover how a component is factored into classes.
 
 ## Process model and the interpreter
 

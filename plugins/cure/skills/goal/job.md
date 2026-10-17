@@ -17,8 +17,6 @@ directory. A worker session then runs the goal and cannot reach the user.
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
   job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
   or drop these lines to save characters.
-- Take `<review cause>` from "Agent tier" in `SKILL.md`, and the review-round cap from "Delegate,
-  then reflect" (Full) and "Agent tier" (Light). Never copy a review-round cap from the handoff.
 
 ## Where it goes
 
@@ -37,9 +35,8 @@ directory belongs to the CLI: the goal never deletes it.
 
 The dispatcher asks the user in the question round. The questions are the handoff's `## Open` items
 plus any fork `defaults.md` does not answer, except a fork with no user-visible effect: record its
-recommended option under Settled as `(recommended)` and do not ask it. Ask them with `AskUserQuestion`, record the answers
-under Settled, then write `<job>/goal.md`. Each question carries its own context: the situation,
-the options, the consequence of each, and a recommendation.
+recommended option under Settled as `(recommended)` and do not ask it. Ask them with
+`AskUserQuestion`, record the answers under Settled, then write `<job>/goal.md`.
 
 After `needs-input`, add the user's answers under Settled the same way. Then add one line under
 Settled: "Run <n>: the questions of the earlier `needs-input` exit are answered above and closed;

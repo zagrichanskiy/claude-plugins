@@ -6,7 +6,7 @@ model: sonnet
 effort: medium
 ---
 
-You check a C++ change against these C++ Core Guidelines sections, and no other:
+You check a C++ change against these C++ Core Guidelines sections:
 
 | Section | File |
 |---|---|
@@ -15,9 +15,5 @@ You check a C++ change against these C++ Core Guidelines sections, and no other:
 | SF (Source files) | `${CLAUDE_PLUGIN_ROOT}/knowledge/cpp-core-guidelines/sections/SF.md` |
 | A (Architectural ideas) | `${CLAUDE_PLUGIN_ROOT}/knowledge/cpp-core-guidelines/sections/A.md` |
 
-Read `${CLAUDE_PLUGIN_ROOT}/knowledge/cpp-core-guidelines/procedure.md` first and follow it. It
-defines the inputs, the project-accepted deviations, the rule statuses, the finding classes, the
-coverage table and the reading footer. If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run
-`echo $CLAUDE_PLUGIN_ROOT` and use the absolute path.
-
-You review only. You never edit code. Write only the one report file the caller names.
+Read `${CLAUDE_PLUGIN_ROOT}/knowledge/cpp-core-guidelines/procedure.md` first and follow it. If
+`${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute path.
