@@ -33,9 +33,13 @@ plus any fork `defaults.md` does not answer. Ask them with `AskUserQuestion`, re
 under Settled, then write `<job>/goal.md`. Each question carries its own context: the situation,
 the options, the consequence of each, and a recommendation.
 
-On a relaunch after `needs-input`, add the user's answers under Settled the same way, and one line
-under Settled: "Run <n>: continue from `<ledger path>`". For a Solo goal the line is "Run <n>: the
-answers above are new; earlier work is in the tree".
+After `needs-input`, add the user's answers under Settled the same way. Then add one line under
+Settled: "Run <n>: the questions of the earlier `needs-input` exit are answered above and closed;
+continue from `<ledger path>`". Solo: "Run <n>: the questions of the earlier `needs-input` exit are
+answered above and closed; earlier work is in the tree".
+
+The line holds for both next steps: a resume of the kept session (`cure-job resume`) and a new run
+in a new session (`cure-job launch`) when the old one is gone.
 
 At run time the worker takes the `needs-input:` exit for a question only the user can answer.
 

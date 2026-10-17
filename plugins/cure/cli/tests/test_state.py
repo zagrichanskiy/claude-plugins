@@ -8,7 +8,7 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Claim, Closed, Launched
+from cure_job.events import Claim, Closed, Launched, StopIssued
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
@@ -74,9 +74,20 @@ def test_row_5_latest_launch_names_the_session_checked():
     assert state_of(record, {A: STOPPED, A + "-r2": BUSY}) is State.RUNNING
 
 
-def test_row_6_stopped_session_is_lost_even_inside_the_grace_period():
+def test_row_6_stopped_session_is_launched_inside_the_grace_period():
+    # Listed without a pid while starting: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
     record = make_record(A, events=(launched(A, age=timedelta(seconds=1)),))
+    assert state_of(record, {A: STOPPED}) is State.LAUNCHED
+
+
+def test_row_6_stopped_session_is_lost_inside_the_grace_period_after_cure_job_stop():
+    record = make_record(A, events=(launched(A, age=timedelta(seconds=1)), StopIssued(1, NOW)))
     assert state_of(record, {A: STOPPED}) is State.LOST
+
+
+def test_row_6_stop_of_an_earlier_run_does_not_end_the_grace_of_the_latest():
+    record = make_record(A, events=(launched(A, 1), StopIssued(1, NOW), launched(A, 2, age=timedelta(seconds=1))))
+    assert state_of(record, {A + "-r2": STOPPED}) is State.LAUNCHED
 
 
 def test_row_7_unlisted_session_inside_the_grace_period_is_launched():

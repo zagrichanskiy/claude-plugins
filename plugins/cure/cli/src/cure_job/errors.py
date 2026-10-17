@@ -33,6 +33,10 @@ class ResourceHeld(CureJobError):
         self.holder = holder
 
 
+class SessionGone(CureJobError):
+    """The session of a job's latest run is no longer listed, so ``resume`` cannot continue it."""
+
+
 class StoreError(CureJobError):
     """The state root cannot be read or written, or ``dispatch.jsonl`` is malformed."""
 

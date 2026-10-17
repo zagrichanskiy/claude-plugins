@@ -48,7 +48,7 @@ INVALID = "invalid"
 def _invalid_json(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "problem": job.problem,
-            "waiting-for": None, "reported": None}
+            "waiting-for": None, "reported": None, "sessions-removed": None}
 
 
 def _as_json(view: JobView, sessions: Mapping[str, Session]) -> dict:
@@ -68,4 +68,5 @@ def _as_json(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "problem": record.result.problem if record.result else None,
         "waiting-for": waiting_for,
         "reported": record.reported,
+        "sessions-removed": record.sessions_removed,
     }

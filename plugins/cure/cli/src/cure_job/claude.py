@@ -29,11 +29,15 @@ class Session:
 
     ``waiting_for`` is the strongest entry's ``waitingFor``. ``ids`` holds the
     listing ``id`` of every live entry under the name, strongest first; a live
-    entry without a string ``id`` contributes ``""``.
+    entry without a string ``id`` contributes ``""``. ``all_ids`` holds the
+    listing ``id`` of every entry, live or stopped, in the same way. ``uuid`` is
+    the strongest entry's ``sessionId``, which ``claude --resume`` takes.
     """
     status: SessionStatus
     waiting_for: str | None = None
     ids: tuple[str, ...] = ()
+    all_ids: tuple[str, ...] = ()
+    uuid: str | None = None
 
 
 #: The key `claude agents --json` puts the status of a live session under, and
@@ -54,6 +58,12 @@ class Claude(Protocol):
 
     def stop(self, session_id: str) -> None:
         """Stop the live session whose listing ``id`` is ``session_id``."""
+
+    def resume(self, name: str, uuid: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
+        """Continue the stopped session ``uuid`` in the background under ``name``. Returns when the binary returned."""
+
+    def remove(self, session_id: str) -> None:
+        """Delete the session whose listing ``id`` is ``session_id``, live or stopped."""
 
 
 class ClaudeCli:
@@ -83,19 +93,31 @@ class ClaudeCli:
             status, strongest = listed[0]
             waiting_for = strongest.get("waitingFor")
             ids = tuple(_id(entry) for entry_status, entry in listed if entry_status is not SessionStatus.STOPPED)
-            found[name] = Session(status, waiting_for if isinstance(waiting_for, str) else None, ids)
+            uuid = strongest.get("sessionId")
+            found[name] = Session(status, waiting_for if isinstance(waiting_for, str) else None, ids,
+                                  tuple(_id(entry) for _, entry in listed), uuid if isinstance(uuid, str) else None)
         return found
 
     def start(self, name: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
-        argv = [self.binary, "--bg", "--name", name, *extra_args, prompt]
+        self._run_in([self.binary, "--bg", "--name", name, *extra_args, prompt], cwd)
+
+    def resume(self, name: str, uuid: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
+        # Resuming a running session starts a copy, so the caller stops it first.
+        # --name keeps the listed name, which every later operation looks up.
+        self._run_in([self.binary, "--bg", "--resume", uuid, "--name", name, *extra_args, prompt], cwd)
+
+    def stop(self, session_id: str) -> None:
+        self._run([self.binary, "stop", session_id])
+
+    def remove(self, session_id: str) -> None:
+        self._run([self.binary, "rm", session_id])
+
+    def _run_in(self, argv: list[str], cwd: str) -> None:
         # Checked here: subprocess reports a missing cwd and a missing binary
         # with the same FileNotFoundError.
         if not os.path.isdir(cwd):
             raise ClaudeError(f"{shlex.join(argv)}: {cwd} is not a directory")
         self._run(argv, cwd=cwd)
-
-    def stop(self, session_id: str) -> None:
-        self._run([self.binary, "stop", session_id])
 
     def _run(self, argv: list[str], cwd: str | None = None) -> str:
         command = shlex.join(argv)

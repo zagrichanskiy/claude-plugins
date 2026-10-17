@@ -45,10 +45,11 @@ class State(enum.Enum):
         return self in (State.AWAITING_APPROVAL, State.LOST, State.NEEDS_INPUT)
 
 
-#: `claude --bg` returns before `claude agents` lists the session. For this
-#: long after a launch, a session that is not listed is not yet lost, and an
-#: idle session is not yet stalled. Measured on Claude Code 2.1.300: listed
-#: within 0.255 seconds.
+#: `claude --bg` returns before `claude agents` lists the session as live. For
+#: this long after a launch or a resume, a session that is not listed, or is
+#: listed stopped and was not stopped by `cure-job stop`, is not yet lost, and
+#: an idle session is not yet stalled. Measured on Claude Code 2.1.300: listed
+#: within 0.255 seconds. On 2.1.301 a fresh launch still read lost at once.
 LAUNCH_GRACE = timedelta(seconds=60)
 
 RETENTION = {
@@ -143,7 +144,11 @@ def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: d
             return State.BLOCKED
         if status is SessionStatus.IDLE:
             return State.RUNNING if within_grace else State.STALLED
-        if status is None and within_grace:
+        # A session can be listed without a pid while it starts or resumes.
+        # After `cure-job stop`, a session listed stopped is down for good and
+        # gets no grace. An unlisted session keeps the grace.
+        starting = status is None or (status is SessionStatus.STOPPED and not record.stop_issued)
+        if starting and within_grace:
             return State.LAUNCHED
         return State.LOST
     if record.has_goal:

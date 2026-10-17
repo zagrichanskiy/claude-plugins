@@ -1,4 +1,4 @@
-"""The ten job operations.
+"""The twelve job operations.
 
 Every operation except ``new``, ``finish`` and ``reported`` reads one snapshot
 of the state root, derives the job states from it and makes its writes.
@@ -6,11 +6,10 @@ of the state root, derives the job states from it and makes its writes.
 so a check and its write are not atomic across processes.
 
 A job whose stored files do not read is invalid. ``list`` shows it, ``prune``
-skips it, and ``launch``, ``claim``, ``close``, ``origin``, ``stop``, ``finish``
-and ``reported`` refuse it by id. Its resources and its launched events are
-unknown, so it may hold any resource whatever its id: ``launch`` and ``claim``
-of every other job refuse while it exists. ``close``, ``origin``, ``stop`` and
-``reported`` name no resource, so they do not.
+skips it, and every other operation refuses it by id. Its resources and its
+launched events are unknown, so it may hold any resource whatever its id:
+``launch``, ``resume`` and ``claim`` of every other job refuse while it exists.
+The other operations name no resource, so they do not.
 """
 from __future__ import annotations
 
@@ -22,12 +21,13 @@ from typing import Callable, Mapping, NamedTuple, Sequence
 from ..claude import Claude, Session, SessionStatus
 from ..clock import Clock
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, HandoffError, JobStateError, PluginError, ResourceHeld,
-                      StoreError, UnknownJob)
-from ..events import Claim, Closed, Launched, Origin, Reported
+                      SessionGone, StoreError, UnknownJob)
+from ..events import Claim, Closed, Launched, Origin, Reported, SessionsRemoved, StopIssued
 from ..goal import PLUGIN_ROOT, RULES, retarget
 from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
+from ..job import JobRecord
 from ..state import HALF_CREATED_AGE, JobView, State, derive, expired, holders, lock_rank, needs_sessions
 from ..store import InvalidJob, JobStore, Snapshot
 
@@ -95,6 +95,49 @@ class JobsProvider:
         if not view.state.is_launchable:
             raise JobStateError(f"job {job_id} is {view.state.value}; launch needs "
                                 + ", ".join(state.value for state in State if state.is_launchable))
+        if view.state is State.NEEDS_INPUT:
+            # The kept session of a needs-input job is not in the listing the state needs.
+            name = record.session
+            if name is not None and _live(self.claude.sessions().get(name)):
+                raise JobStateError(f"job {job_id} is {view.state.value} and its session {name} is live; "
+                                    f"continue it: cure-job resume {job_id}")
+        prompt = self._prepare_run(listing, view, "launch")
+        run = record.run + 1
+        session = session_name(job_id, run)
+        self._record_run(record, run, session,
+                         lambda: self.claude.start(session, record.handoff.launch_dir, prompt, claude_args))
+        return session
+
+    def resume(self, job_id: str, claude_args: Sequence[str] = ()) -> str:
+        """Continue the session of a needs-input job as its next run and return the session name.
+
+        The session keeps its name, so the new run records the same session. A
+        session that is no longer listed raises :class:`SessionGone`: the caller
+        starts a new run with ``launch`` instead.
+        """
+        snapshot = self.store.snapshot()
+        sessions = self.claude.sessions()
+        listing = self._listing(snapshot, sessions)
+        view = self._find(listing, job_id)
+        record = view.record
+        if view.state is not State.NEEDS_INPUT:
+            raise JobStateError(f"job {job_id} is {view.state.value}; resume needs {State.NEEDS_INPUT.value}")
+        name = record.session
+        session = sessions.get(name) if name is not None else None
+        if session is None or session.uuid is None:
+            raise SessionGone(f"job {job_id}: session {name} no longer exists; "
+                              f"start a new run: cure-job launch {job_id}")
+        prompt = self._prepare_run(listing, view, "resume")
+        # Resuming a live session starts a copy, so it is stopped first.
+        self._stop_session(name, session)
+        self._record_run(record, record.run + 1, name,
+                         lambda: self.claude.resume(name, session.uuid, record.handoff.launch_dir, prompt, claude_args))
+        return name
+
+    def _prepare_run(self, listing: Listing, view: JobView, operation: str) -> str:
+        """Check what a new run needs, point the goal file at this plugin and return the prompt."""
+        record = view.record
+        job_id = record.id
         goal = self.store.goal_path(job_id)
         if not record.has_goal:
             raise JobStateError(f"job {job_id} has no goal file: {goal} does not exist")
@@ -102,18 +145,21 @@ class JobsProvider:
             held = _holders(listing.views)
             name = next(name for name in sorted(record.resources) if held[name] != job_id)
             raise ResourceHeld(name, held[name])
-        _refuse_invalid(listing, "launch")
+        _refuse_invalid(listing, operation)
         rules = self.plugin_root / RULES
         if not rules.is_file():
-            raise PluginError(f"launch refused: {rules} does not exist; the goal file names it")
+            raise PluginError(f"{operation} refused: {rules} does not exist; the goal file names it")
         self.store.rewrite_goal(job_id, lambda text: retarget(text, self.plugin_root))
+        return f"/goal @{goal}"
+
+    def _record_run(self, record: JobRecord, run: int, session: str, start: Callable[[], None]) -> None:
+        """Archive ``result.md``, run ``start`` and record run ``run`` of ``session``."""
+        job_id = record.id
         # result-<run>.md takes the number of the run that wrote it.
         archived = self.store.archive_result(job_id, record.run)
-        run = record.run + 1
-        session = session_name(job_id, run)
         unknown = None
         try:
-            self.claude.start(session, record.handoff.launch_dir, f"/goal @{goal}", claude_args)
+            start()
         except ClaudeOutcomeUnknown as e:
             # The session may exist. Recorded, it derives launched, then
             # running or lost, and the lock rule covers it.
@@ -132,7 +178,6 @@ class JobsProvider:
         if unknown is not None:
             raise ClaudeOutcomeUnknown(f"{unknown}; recorded as run {run}, session {session}: "
                                        "list shows it launched, then running or lost") from unknown
-        return session
 
     def claim(self, job_id: str, resource: str) -> None:
         """Add ``resource`` to the resources ``job_id`` names. Returns when the job holds it."""
@@ -185,9 +230,17 @@ class JobsProvider:
         if not record.launches:
             raise JobStateError(f"job {job_id} has no launched run; nothing to stop")
         name = record.session
-        session = sessions.get(name)
+        was_live = self._stop_session(name, sessions.get(name))
+        # Recorded even when the session was already down: a session listed
+        # stopped inside the launch grace is then lost, not launched.
+        if not record.stop_issued:
+            self.store.append_event(job_id, StopIssued(record.run, self.clock()))
+        return Stopped(name, was_live=was_live)
+
+    def _stop_session(self, name: str, session: Session | None) -> bool:
+        """Stop every live entry of ``session`` and wait until none is listed. False when none was live."""
         if not _live(session):
-            return Stopped(name, was_live=False)
+            return False
         if not session.ids or "" in session.ids:
             raise ClaudeError(f"session {name} is listed live without an id; claude stop needs one")
         deadline = self.monotonic() + STOP_TIMEOUT_SECONDS
@@ -199,7 +252,38 @@ class JobsProvider:
             if self.monotonic() >= deadline:
                 raise ClaudeError(f"session {name} still live after claude stop")
             self.sleep(STOP_POLL_SECONDS)
-        return Stopped(name, was_live=True)
+        return True
+
+    def remove_sessions(self, job_id: str) -> list[str]:
+        """Stop and delete the session of every run of a done or abandoned job and return the deleted names.
+
+        A failed job keeps its sessions for the user, and an open job may still use them.
+        Records ``sessions-removed`` once no session of the job is listed.
+        """
+        snapshot = self.store.snapshot()
+        sessions = self.claude.sessions()
+        view = self._find(self._listing(snapshot, sessions), job_id)
+        if view.state not in (State.DONE, State.ABANDONED):
+            raise JobStateError(f"job {job_id} is {view.state.value}; remove-sessions needs "
+                                f"{State.DONE.value} or {State.ABANDONED.value}")
+        # A resumed run records the session of the run before it, so a name can repeat.
+        names = list(dict.fromkeys(launched.session for launched in view.record.launches))
+        listed = {name: sessions[name] for name in names if name in sessions}
+        for name, session in listed.items():
+            if not session.all_ids or "" in session.all_ids:
+                raise ClaudeError(f"session {name} is listed without an id; claude rm needs one")
+        for name, session in listed.items():
+            # `claude rm` documents only sessions that have exited.
+            self._stop_session(name, session)
+            for session_id in session.all_ids:
+                self.claude.remove(session_id)
+        if listed:
+            left = sorted(set(names) & set(self.claude.sessions()))
+            if left:
+                raise ClaudeError(f"job {job_id}: still listed after claude rm: {', '.join(left)}")
+        if not view.record.sessions_removed:
+            self.store.append_event(job_id, SessionsRemoved(self.clock()))
+        return list(listed)
 
     def mark_reported(self, job_id: str) -> None:
         """Record that the origin session was told of the latest run's result.

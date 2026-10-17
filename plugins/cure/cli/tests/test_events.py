@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from cure_job.events import Claim, Closed, Launched, decode, encode
+from cure_job.events import Claim, Closed, Launched, SessionsRemoved, decode, encode
 
 AT = datetime(2026, 10, 13, 17, 42, 5, tzinfo=timezone.utc)
 
@@ -24,7 +24,7 @@ def test_closed_line_shape():
     assert encode(Closed("superseded")) == '{"event":"closed","reason":"superseded"}'
 
 
-@pytest.mark.parametrize("event", [Launched(2, "x-r2", AT), Claim("/work/a"), Closed("")])
+@pytest.mark.parametrize("event", [Launched(2, "x-r2", AT), Claim("/work/a"), Closed(""), SessionsRemoved(AT)])
 def test_decode_inverts_encode(event):
     assert decode(encode(event)) == event
 

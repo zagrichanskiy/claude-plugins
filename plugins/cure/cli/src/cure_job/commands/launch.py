@@ -21,9 +21,14 @@ class LaunchCommand(Command):
                             help="arguments after -- are passed to claude before the prompt")
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
-        claude_args = list(args.claude_args)
-        # argparse keeps the separator in a REMAINDER value.
-        if claude_args[:1] == [_SEPARATOR]:
-            del claude_args[0]
-        self.cli.out(jobs.launch(args.id, claude_args))
+        self.cli.out(jobs.launch(args.id, claude_args(args)))
         return 0
+
+
+def claude_args(args: argparse.Namespace) -> list[str]:
+    """The arguments after ``--``, without the separator."""
+    found = list(args.claude_args)
+    # argparse keeps the separator in a REMAINDER value.
+    if found[:1] == [_SEPARATOR]:
+        del found[0]
+    return found
