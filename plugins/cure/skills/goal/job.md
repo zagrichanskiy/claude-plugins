@@ -16,7 +16,7 @@ directory. A worker session then runs the goal and cannot reach the user.
   each defaults row with key `resource risk` whose scope matches into Settled verbatim, marked
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
   job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
-  or drop these lines to meet the length limit.
+  or drop these lines to save characters.
 - Take `<review cause>` from "Agent tier" in `SKILL.md`, and the review-round cap from "Delegate,
   then reflect" (Full) and "Agent tier" (Light). Never copy a review-round cap from the handoff.
 
@@ -50,6 +50,41 @@ The line holds for both next steps: a resume of the kept session (`cure-job resu
 in a new session (`cure-job launch`) when the old one is gone.
 
 At run time the worker takes the `needs-input:` exit for a question only the user can answer.
+
+## Checks before launch
+
+The dispatcher runs these after writing `<job>/goal.md`, and again on every wake before a launch.
+A failed check is fixed, or asked about in the dispatcher's question round, before launch.
+
+| Check | How | On failure |
+|---|---|---|
+| Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
+| Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
+| Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
+
+The worker starts in the handoff's first repository. It loads these permission rules:
+
+- `~/.claude/settings.json`.
+- The managed settings file. Linux: `/etc/claude-code/managed-settings.json`. macOS:
+  `/Library/Application Support/ClaudeCode/managed-settings.json`.
+- `.claude/settings.json` and `.claude/settings.local.json` of the handoff's first repository.
+- The arguments given to `cure-job launch` after `--`, such as `--allowedTools` or `--settings`.
+
+An action counts as allowed only when an `allow` rule matches it and no `deny` or `ask` rule
+matches it. `Bash(<command prefix>:*)` matches a command by prefix. An MCP tool rule is
+`mcp__<server>__<tool>`.
+
+Approval of an action written in `goal.md` does not reach the auto-mode classifier. An approval the
+user gives in the dispatcher session does not either, so it does not pass the check. The question
+for a failed permission check offers these answers:
+
+| Answer | Effect |
+|---|---|
+| The user adds an allow rule | The check runs again. |
+| Drop the action | `goal.md` is edited through `cure:goal`. The check runs again. |
+| Launch anyway | The run is accepted to stop at `needs-input` when the classifier denies the action. |
+
+The dispatcher never adds a permission rule and never passes `--allowedTools` itself.
 
 ## Template text
 
@@ -102,7 +137,7 @@ final-message clause as (c).
 
 ## Launch line
 
-Report the absolute line, with no `claude --bg` form:
+Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`:
 
 ```
 <plugin-root>/bin/cure-job launch <id>

@@ -1,6 +1,6 @@
 ---
 name: dispatcher
-description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, launches a Solo or Light job with no open item at once and any other job after the user's approval with `cure-job launch`, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
+description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, launches a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules) at once and any other job after the user's approval with `cure-job launch`, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
 tools: Read, Write, Edit, Bash, Grep, Glob, Skill, AskUserQuestion, SendMessage, ListAgents
 model: inherit
 memory: user
@@ -47,9 +47,9 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 
 | State | Action |
 |---|---|
-| queued | If the job holds its resources, run `cure:goal` with the handoff file and the job directory. Then print the summary (below). |
+| queued | If the job holds its resources, apply "Goal and approval" steps 1-6. |
 | held | Do nothing. Do not draft a goal for a job that does not hold its resources. |
-| awaiting-approval | Apply "Goal and approval" steps 4-5. When step 4 needs approval, print the summary again if the user has not answered. |
+| awaiting-approval | Apply "Goal and approval" steps 2-6. Run step 4 only when the user has not answered. |
 | launched, running | Do nothing. For 60 seconds after a launch or a resume, a session that `claude agents` does not list yet, or lists stopped, shows as `launched`, not `lost`. After `cure-job stop`, a session listed stopped shows as `lost` at once. |
 | stalled | Re-run `cure-job list` after 60 seconds. If the row is still `stalled`, ask the user: relaunch or abandon. |
 | blocked | The session waits for input. Tell the user the job id, the session name (`session`) and what the session waits for (`waiting-for`, for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else; re-run `cure-job list` on the next wake. |
@@ -62,11 +62,12 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 
 ## Goal and approval
 
-1. Run `cure:goal` in job mode on the handoff. It writes `<job>/goal.md`.
-2. If the target checkout has uncommitted changes and the user gave no instruction for it, ask the user.
-3. Print a summary of exactly 3 lines: the outcome, the tier and repository, the done-when count and the delivery (`commit` or `pr`).
-4. Launch without approval when all of these hold: the tier is Solo or Light, the handoff has no `## Open` item, and the job holds every resource it names. Otherwise wait for the user's approval.
-5. Run `cure-job launch <id>`. Show the command's output.
+1. Run `cure:goal` in job mode on the handoff. It writes `<job>/goal.md` and reports its `wc -c` count.
+2. Run the checks in `job.md` "Checks before launch", on every wake that may launch. Fix a missing or failing tool, or ask the user about it in the question round. When no permission rule allows a classifier-gated action the goal needs, ask the user in the question round with the answers `job.md` lists.
+3. If the target checkout has uncommitted changes and the user gave no instruction for it, ask the user.
+4. Print a summary of exactly 3 lines: the outcome, the tier and repository, the done-when count and the delivery (`commit` or `pr`). The third line also names each classifier-gated action the goal needs, for example `git commit --amend`, force-push or device power.
+5. Launch without approval when all of these hold: the tier is Solo or Light, the handoff has no `## Open` item, the job holds every resource it names, and every check of step 2 passed on this wake. Otherwise wait for the user's approval.
+6. Run `cure-job launch <id>`. Show the command's output.
 
 ## Asking
 
@@ -119,7 +120,7 @@ Never store job ids, statuses, session ids, answers, default values or lessons. 
 
 ## Rules
 
-- Launch only as "Goal and approval" step 4 allows. A resume after the user's answer, or after every question was settled as `(recommended)`, needs no other approval.
+- Launch only as "Goal and approval" step 5 allows. A resume after the user's answer, or after every question was settled as `(recommended)`, needs no other approval.
 - Ask a job's questions only in this session. Never take a user-visible fork without the user.
 - Remove every session of a `done` or `abandoned` job. Never remove the sessions of a `failed` job.
 - Run `cure-job stop` only for the job the user chose to relaunch or abandon.
