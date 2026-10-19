@@ -238,7 +238,7 @@ Reason: one source of truth per fact. `JobStore` does every read and write under
 | `list --json` | `after` is the resolved predecessor id. `after-state` is its state, `missing` or `invalid`. `continued-by` is the id a closed job names, else null. | The dispatcher's only input. |
 | Predecessor failed, missing, or abandoned without `continued-by` | The CLI derives `held`. The dispatcher closes the successor without asking and sends the origin "closed: predecessor <id> <state>; re-dispatch" (as `skills/goal/job.md:94`). Successors of the closed job follow on the next scan. | A failed job is terminal (`state.py:45`). |
 | Predecessor invalid | The dispatcher does nothing for the successor. The `invalid` row already asks the user to repair the predecessor. | Closing would be wrong while the user repairs the file. |
-| `base` | For each repository R of the job, `cure:goal` job mode sets `base` to the branch of the nearest job on the resolved `after` chain that changes R. It reads that branch from the job's `goal.md`. The walk starts at the row's `after` in `cure-job list --json`, never the handoff's `after:`. Each step moves to the current job's row `after`, which `derive` resolves through `continued-by`. A job changes R when R is in its row's `resources` from its handoff `repos`. A repository added only by `claim` does not count. The walk stops at the first job that changes R. When no job on the chain changes R, `base` comes from the handoff as today. The walk needs a `goal.md` in each job it passes. The dispatcher drafts a successor's goal only after the predecessor's row has `goal` true, so each job on the chain has one. A passed job need not be `done` at draft time. Every passed job is `done` when the successor launches, and the Base check row tests the branch then. | Handoff `branch` may be `current` (`skills/dispatch/defaults.md:12`). A branch exists only in its own repository. The last job of a chain may not change every repository of the successor. Split rule 7 puts an under-limit repository in the part that needs it, which need not be the last part. |
+| `base` | For each repository R of the job, `cure:goal` job mode sets `base` to the branch of the nearest job on the resolved `after` chain that changes R. It reads that branch from the job's `goal.md`. The walk starts at the row's `after` in `cure-job list --json`, never the handoff's `after:`. Each step moves to the current job's row `after`, which `derive` resolves through `continued-by`. A job changes R when R is in its row's `resources` from its handoff `repos`. A repository added only by `claim` does not count. The walk stops at the first job that changes R. When no job on the chain changes R, `base` comes from the handoff as today. A passed job whose row has `after-state` `missing` or `invalid` stops the walk. `cure:goal` asks the user for the base of each repository not yet resolved. The walk needs a `goal.md` in each job it passes. The dispatcher drafts a successor's goal only after the predecessor's row has `goal` true, so each job on the chain has one. A passed job need not be `done` at draft time. Every passed job is `done` when the successor launches, and the Base check row tests the branch then. | Handoff `branch` may be `current` (`skills/dispatch/defaults.md:12`). A branch exists only in its own repository. The last job of a chain may not change every repository of the successor. Split rule 7 puts an under-limit repository in the part that needs it, which need not be the last part. |
 | Base check | For a base taken from a predecessor, work item 1 compares `<base>` with the local branch, not with `origin/<base>`. When `origin/<base>` exists, it checks `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Other bases keep the check of `skills/goal/rules.md:9-11`. | With `delivery: commit`, the default (`skills/dispatch/defaults.md:10`), the predecessor commits locally and nothing pushes. `origin/<base>` lacks its commits, and "base the work on `origin/<base>`" would drop them. |
 | Base commit | Work item 1 records `git -C <repo> rev-parse <base>` for each repository as that repository's base commit: in the ledger, or in the transcript for Solo. The diff cap (`skills/goal/job.md:127-128`) and the retrospective's changed lines are measured per repository against it. | With `branch: current` the successor commits on `<base>` itself. A cap against the branch name would count only uncommitted lines. The repositories of one successor can have different bases. |
 | Cycles | No check at `new`: the predecessor must exist and the new id is fresh. `close ID --continued-by X` exits 1 when X is unknown, invalid, not open, ID itself, or its resolved `after` chain reaches ID. `derive` follows `after` one hop and `continued-by` any number of hops, and stops at a job reached twice. | Re-pointing through `continued-by` can build a cycle; `new` alone cannot. |
@@ -252,11 +252,13 @@ Reason: one source of truth per fact. `JobStore` does every read and write under
 | `held`, goal, not approved | Ask once. Record every answer in `goal.md`, then `approve` as the last write. |
 | `queued` | Steps 1, 2 and 4, as for `held`, no goal. The condition "If the job holds its resources" (`agents/dispatcher.md:46`) is removed. |
 | `held`, approved, every `blocked-by` id lower than its own | Nothing. |
-| `held`, approved, a `blocked-by` id higher than its own | Name the job and the higher ids in the question round. Ask: keep waiting, or close the job. |
+| `held`, approved, a `blocked-by` id higher than its own | Print one line: `<id> waits on later <ids>`. Ask nothing. |
 | `held`, `after-state` `failed`, `abandoned` or `missing` | `close` the successor, tell the origin, run `list` again. |
 | `held`, `after-state` `invalid` | Nothing. |
 | `approved` | Re-run steps 2 and 3, then `launch`. A question from either keeps the job `approved` and holding until the answer. |
 | `needs-input` whose only question is a short-hold timeout | Ask the user, naming the resource and its holder. Never settle it as `(recommended)`. |
+
+The `after-state` rows apply before the `held`, approved rows.
 
 A held job's repository is held by a launched job, which edits that tree, or by an `approved` job
 about to launch. Step 3 at draft time would ask about that job's edits. A dirty tree at launch stops the auto-launch for a question.
@@ -269,7 +271,7 @@ about to launch. Step 3 at draft time would ask about that job's edits. A dirty 
 | Bench jobs lose the launch-time bench lock at the part 1 upgrade. | Two jobs on the bench. | `list` shows two running `device: bench` jobs. | The user who upgrades | Upgrade with no `device: bench` job open. The part 1 PR states this. |
 | A worker forgets `release`. | The bench is held until the run ends. | A waiter's timeout names the holder. | The dispatcher, short-hold timeout row | Run-scoped claims. |
 | A lost session keeps short holds. | Other workers wait. | `list` shows the holder `lost`. | The dispatcher, `lost` row | Deliberate. |
-| A wide multi-repo job starves: jobs on any one of its repositories, later ones included, keep launching. | It waits with no bound. | A `held` approved job whose `blocked-by` names a higher id. | The dispatcher, which names it in the question round | None built. |
+| A wide multi-repo job starves: jobs on any one of its repositories, later ones included, keep launching. | It waits with no bound. | A `held` approved job whose `blocked-by` names a higher id. | The dispatcher, which prints it on each wake | None built. |
 | An `approved` job's launch-time question stays unanswered. | It keeps its repositories. | It stays `approved` across wakes; the question round names the job. | The user | None built. |
 
 ## Split skill
@@ -367,7 +369,7 @@ one file.
 
 | Step | Decision | Reason |
 |---|---|---|
-| Dispatcher, `split proposed` | In step 1 (`agents/dispatcher.md:61`), print the 3 Summary lines from the return and ask in the question round: apply, or run as one job. A split is never auto-launched. `agents/dispatcher.md:120` allows `split.md` and `part-<k>.md` through `cure:split`. After apply, the dispatcher sends the origin the returned line and runs `cure-job list` again. A successor's origin is not told: the successor keeps its id. | The return line is the single interface; later wakes re-print from it. |
+| Dispatcher, `split proposed` | In step 1 (`agents/dispatcher.md:61`), print the 3 Summary lines from the return and ask in the question round: apply, or run as one job. A split is never auto-launched. `agents/dispatcher.md:120` allows `split.md` and `part-<k>.md` through `cure:split`. After apply, the dispatcher sends the origin the returned line and runs `cure-job list` again. When the apply call returns neither `job <original> closed:` nor `failed at part`, run apply once more in the same turn. A successor's origin is not told: the successor keeps its id. | The return line is the single interface; later wakes re-print from it. |
 | Dispatcher, `split applying` | Show the last error and ask: retry apply, or abandon. Abandon closes the original and each part job the return line names. "Run as one" is not offered once a part job exists. | The parts already exist. |
 | Decline | `status: declined`. The dispatcher then runs step 1 again. | The decision persists across wakes. |
 
@@ -442,7 +444,7 @@ window, with one exception:
 |---|---|
 | A ticket is created; `split.md` does not record it. | Step 1.1 searches the tracker by title. The GitHub search index can lag a new issue by seconds. A stop inside that lag can still create a second ticket. |
 | `cure-job new` returns; `split.md` does not record the id. | Step 1.3 searches `jobs/*/handoff.md` for the part's Settled line. `new` renames the job directory with its `handoff.md` in one step (`store.py:83-85`), so the search finds every created job. |
-| `close --continued-by` is written; `split.md` is not `applied`. | The precondition sees `continued-by` equal to the last part id and goes to step 4. |
+| `close --continued-by` is written; `split.md` is not `applied`. | The dispatcher's retry in the same turn: the precondition sees `continued-by` equal to the last part id and goes to step 4. If the dispatcher itself stops, `split.md` stays `applying` and the origin is not told; the successors already resolve to the last part. |
 
 ### 3-line summary
 
@@ -561,7 +563,9 @@ Order: fork probe, then parts 1-6. Reasons:
 
 Parts 1, 3 and 5 carry a cut line. A 2x low estimate puts each above the 800-line trigger. When
 the diff of such a part passes 800 lines during work, the part ends at its cut line and the rest
-becomes the next part.
+becomes the next part. The handoff of such a part names the cut line under Settled and sets the
+line cap to 800. At the cap the worker delivers the first half with that half's Done when items, and
+the second half is queued as the next part.
 
 0. Fork probe, before part 1
    - Issue: #31 (Probe whether a context: fork skill forks from the dispatcher)
@@ -577,7 +581,7 @@ becomes the next part.
    - Scope: `release` command and event; `run` field on claims; `claim` precondition, `--wait`, `JobStore.locked()` and holders from the snapshot; `resource.Kind` and `is_short_hold`; `device: bench` no longer a handoff resource; worker "Short holds" protocol with the single claimant; dispatcher row for a short-hold timeout.
    - Files: `cli/src/cure_job/` `resource.py`, `events.py`, `job.py`, `handoff.py`, `store.py`, `providers/jobs.py`, `commands/claim.py`, new `commands/release.py`, `cli.py`; tests `test_events`, `test_jobs`, `test_state`, `test_cli`, `test_handoff` (about 44 bench references); `skills/goal/worker.md`, `skills/goal/job.md`, `skills/dispatch/SKILL.md:26`, `agents/dispatcher.md`; `plugin.json`.
    - Estimate: 525 changed lines in claude-plugins (195 code, 280 tests, 50 docs).
-   - Cut line: 1a `release`, the `run` field, run-scoped claims, `resource.Kind` and `is_short_hold`. 1b the `claim` precondition, `--wait`, `JobStore.locked()`, `device: bench` no longer a handoff resource, the worker protocol and the dispatcher row.
+   - Cut line: 1a `release`, the `run` field, run-scoped claims, `resource.Kind` and `is_short_hold`. 1b the `claim` precondition, `--wait`, `JobStore.locked()`, `device: bench` no longer a handoff resource, the worker protocol and the dispatcher row. Done when: 1a items 2, 3, 5, 8; 1b items 1, 4, 6, 7, 8.
    - Depends on: none.
    - Done when:
      1. Two launched jobs: B's bench claim exits 1 naming A. After A's `release`, B's `claim --wait` exits 0 (fake clock).
@@ -604,10 +608,10 @@ becomes the next part.
 
 3. Approval while held, auto-launch
    - Issue: #34 (Approve a held job and launch it when its resources free)
-   - Scope: `approved` event bound to the goal digest; `cure-job approve`; state `approved`; `held` with or without a goal; run-1 launch needs approval; `holders` takes launched jobs and ready unlaunched jobs, all or none; `lock_rank` unchanged; `list --json` fields `goal` and `approved`; dispatcher table rows for `queued`, `held` and `approved`, including a `held` approved job blocked by a higher id, with step 3 moved to `approved` and `approve` as the last write; Solo/Light rule as `approve --by auto`.
+   - Scope: `approved` event bound to the goal digest; `cure-job approve`; state `approved`; `held` with or without a goal; run-1 launch needs approval; `holders` takes launched jobs and ready unlaunched jobs, all or none; `lock_rank` unchanged; `list --json` fields `goal` and `approved`; dispatcher table rows for `queued`, `held` and `approved`, including the printed line for a `held` approved job blocked by a higher id, with step 3 moved to `approved` and `approve` as the last write; Solo/Light rule as `approve --by auto`.
    - Files: `events.py`, `job.py`, `store.py`, `goal.py` or a digest helper, `state.py` (the ready predicate; `held[name]` at `:107` becomes `held.get(name)`), `providers/jobs.py` (`held[name]` at `:146` becomes `.get`; `Listing` may carry the holders map `derive` built), new `commands/approve.py`, `cli.py`, `commands/list.py`; tests (an approving builder helper; about 68 `launch` call sites); `agents/dispatcher.md`, the launch line in `skills/goal/job.md`, `README.md:107`; `plugin.json`.
    - Estimate: 615 changed lines in claude-plugins (175 code, 370 tests, 70 docs).
-   - Cut line: 3a the `approved` event, the digest, `cure-job approve` and the `list --json` fields `goal` and `approved`, with no state change. 3b the state `approved`, the run-1 launch refusal, `holders` and the dispatcher rows.
+   - Cut line: 3a the `approved` event, the digest, `cure-job approve` and the `list --json` fields `goal` and `approved`, with no state change. 3b the state `approved`, the run-1 launch refusal, `holders` and the dispatcher rows. Done when: 3a items 11, 12; 3b items 1-11.
    - Depends on: part 2.
    - Done when:
      1. A blocked job with a goal lists `held` with `goal` true.
@@ -619,8 +623,9 @@ becomes the next part.
      7. An approved job on X and Y, with X held by a launched job, holds nothing. A later approved job on Y lists `approved`.
      8. No `blocked-by` names a job in `queued`, `held` or `awaiting-approval`.
      9. A job whose resources become unheld does not raise `KeyError` in `derive` or `launch`.
-     10. `agents/dispatcher.md` runs step 3 only in the `approved` row and names `approve` as the last write of a round. It names a `held` approved job blocked by a higher id in the question round.
+     10. `agents/dispatcher.md` runs step 3 only in the `approved` row and names `approve` as the last write of a round. It prints, and does not ask about, a `held` approved job blocked by a higher id.
      11. `pytest` and `scripts/lint-plugin.py` pass.
+     12. `approve` writes one `approved` event with the goal digest. The same digest again writes nothing. `list --json` shows `goal` and `approved`.
 
 4. `after:` ordering
    - Issue: #35 (Order stacked jobs with after: in the handoff)
@@ -638,13 +643,15 @@ becomes the next part.
      7. An approved successor on Y, whose predecessor names only X and is `needs-input`, holds nothing. A later approved job on Y lists `approved`.
      8. The split case: jobs P1 on A and B, P2 on A after P1, and P3 on A after P2, then S on B after P3. S's stacked B commits are in P1, an earlier part, not the last part. S takes P1's branch as `base` for B.
      9. `pytest` and `scripts/lint-plugin.py` pass.
+     10. A walk that reaches a row with `after-state` `missing` or `invalid` stops there, and `cure:goal` asks for the base of each repository not yet resolved.
+     11. `agents/dispatcher.md` closes an approved successor whose predecessor failed.
 
 5. Split skill with tracker tickets
    - Issue: #36 (Add the cure:split skill with tracker tickets)
    - Scope: `cure:split` with `plan`, `apply` and `decline`; plan state files; plan by status; look-first apply; `close --continued-by` and `after` resolution through it; `continued-by` in `list --json`; part handoffs carry `origin:`; the apply precondition; estimation and trigger; GitHub tracker row; call from `cure:goal` job mode; dispatcher rows for `split proposed` and `split applying`; lint keys.
    - Files: `events.py` (about 8), `state.py` (about 20), `providers/jobs.py` (about 20), `commands/close.py` (about 5), `commands/list.py` (about 2); tests `test_events` (about 15), `test_state` (about 50), `test_jobs` (about 40), `test_cli` (about 15); `skills/split/SKILL.md` (new, about 190), `skills/split/template.md` (new, about 55), `skills/goal/job.md` (about 25), `skills/goal/SKILL.md` (about 8), `agents/dispatcher.md` (about 30), `skills/dispatch/defaults.md` (about 4), `scripts/lint-plugin.py` (about 6), `cli/tests/test_lint_plugin.py` (about 15), `README.md` (about 6), `plugin.json` (2), `cli/tests/test_handoff.py` (about 10).
    - Estimate: 525 changed lines in claude-plugins (60 code, 145 tests, 320 skill and doc).
-   - Cut line: 5a `close --continued-by`, `after` resolution through it, `continued-by` in `list --json` and the lint keys. 5b the skill, the `cure:goal` call and the dispatcher rows.
+   - Cut line: 5a `close --continued-by`, `after` resolution through it, `continued-by` in `list --json` and the lint keys. 5b the skill, the `cure:goal` call and the dispatcher rows. Done when: 5a items 1, 9, 10, 12, 13; 5b items 2-8, 11, 14.
    - Depends on: part 4 (`after:`).
    - Done when:
      1. `scripts/lint-plugin.py` exits 0.
@@ -660,7 +667,7 @@ becomes the next part.
      11. The GitHub ticket path, with the title search, is checked by hand as a PR-checklist item, with no scratch repository.
      12. `close --continued-by X` exits 1 and writes nothing when X is unknown, not open, the job itself, or a job whose `after` chain reaches the job.
      13. `prune` keeps an expired original while an open job's `after` chain passes through it.
-     14. With `split.md` at `applying` and the original `abandoned` with `continued-by` equal to the last part's id, `apply` writes no event and sets `applied`.
+     14. An apply call stops after the close and before `applied`, and returns neither `job <original> closed:` nor `failed at part`. The dispatcher runs apply once more in the same turn. That apply writes no event, sets `applied` and returns `job <original> closed:`.
 
 6. Remove `capture-idea`, extend `cure:note`
    - Issue: #37 (Remove capture-idea and add the design note to cure:note)
