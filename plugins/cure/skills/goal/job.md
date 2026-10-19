@@ -12,6 +12,7 @@ directory. A worker session then runs the goal and cannot reach the user.
   Settled.
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
+- Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts in the first repository, so a path relative to the workspace does not resolve.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
   each defaults row with key `resource risk` whose scope matches into Settled verbatim, marked
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
@@ -57,6 +58,7 @@ A failed check is fixed, or asked about in the dispatcher's question round, befo
 |---|---|---|
 | Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
 | Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
+| Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user which repository the worker starts in. |
 | Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
 
 The worker starts in the handoff's first repository. It loads these permission rules:
