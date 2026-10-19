@@ -1,6 +1,7 @@
 """The handoff: the fields of ``handoff.md`` that the CLI consumes.
 
-``repos`` and ``device`` name the resources a job locks. ``origin``, optional,
+``repos`` names the resources a job locks. ``device`` declares bench use; the
+bench is a short hold the job claims per step. ``origin``, optional,
 names the session the job reports back to. Every other field and section
 belongs to the dispatcher and is not checked here.
 """
@@ -33,10 +34,7 @@ class Handoff:
 
     @property
     def resources(self) -> frozenset[str]:
-        names = set(self.repos)
-        if self.device is Device.BENCH:
-            names.add(resource.DEVICE_BENCH)
-        return frozenset(names)
+        return frozenset(self.repos)
 
 
 def parse_handoff(text: str) -> Handoff:

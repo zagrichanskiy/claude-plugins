@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import errno
+import fcntl
 import os
 import re
 import shutil
@@ -16,7 +17,7 @@ import stat
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterator, NamedTuple
+from typing import Callable, Iterator, NamedTuple, Sequence
 
 from . import job_id as ids
 from .errors import HandoffError, StoreError, UnknownJob
@@ -126,14 +127,34 @@ class JobStore:
                 records.append(record)
         return Snapshot(records, invalid)
 
+    @contextlib.contextmanager
+    def locked(self) -> Iterator[None]:
+        """Hold an exclusive ``flock`` on the ``jobs/`` directory. Creates no lock file."""
+        with _store_errors(self._jobs):
+            os.makedirs(self._jobs, exist_ok=True)
+            descriptor = os.open(self._jobs, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            with _store_errors(self._jobs):
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            # Closing the descriptor releases the lock.
+            os.close(descriptor)
+
     def append_event(self, job_id: str, event: Event) -> None:
+        self.append_events(job_id, [event])
+
+    def append_events(self, job_id: str, events: Sequence[Event]) -> None:
+        """Append ``events`` in one write: a failed write records none of them."""
+        if not events:
+            return
         path = self.job_dir(job_id) / _EVENTS
-        line = (encode(event) + "\n").encode(_ENCODING)
+        line = "".join(encode(event) + "\n" for event in events).encode(_ENCODING)
         with _store_errors(path):
             descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
             try:
                 # One write call on an O_APPEND descriptor: a concurrent
-                # command cannot interleave inside the line.
+                # command cannot interleave inside the lines.
                 os.write(descriptor, line)
             finally:
                 os.close(descriptor)

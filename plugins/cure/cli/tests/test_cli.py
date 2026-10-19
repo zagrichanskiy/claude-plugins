@@ -235,8 +235,15 @@ def test_launch_claude_failure_returns_one(h, tmp_path, capsys):
     assert "cannot start" in capsys.readouterr().err
 
 
+def _launched(h, tmp_path, **kwargs):
+    job_id = h.new(tmp_path, **kwargs)
+    h.approve(job_id)
+    assert h.run("launch", job_id) == 0
+    return job_id
+
+
 def test_claim_prints_nothing_and_resource_is_normalised(h, tmp_path):
-    job_id = h.new(tmp_path)
+    job_id = _launched(h, tmp_path)
     h.lines.clear()
     assert h.run("claim", job_id, "/work/extra/../other/") == 0
     assert h.lines == []
@@ -245,15 +252,16 @@ def test_claim_prints_nothing_and_resource_is_normalised(h, tmp_path):
 
 
 def test_claim_device_bench(h, tmp_path):
-    job_id = h.new(tmp_path)
+    job_id = _launched(h, tmp_path)
     assert h.run("claim", job_id, "device:bench") == 0
     h.run("list", "--json")
     assert "device:bench" in json.loads(h.lines[-1])[0]["resources"]
 
 
 def test_claim_refused_returns_one_with_holder_in_message(h, tmp_path, capsys):
-    first = h.new(tmp_path, repos=("/work/a",), device="bench")
-    second = h.new(tmp_path, repos=("/work/b",))
+    first = _launched(h, tmp_path, repos=("/work/a",), device="bench")
+    second = _launched(h, tmp_path, repos=("/work/b",), device="bench")
+    assert h.run("claim", first, "device:bench") == 0
     assert h.run("claim", second, "device:bench") == 1
     assert f"device:bench is held by {first}" in capsys.readouterr().err
 

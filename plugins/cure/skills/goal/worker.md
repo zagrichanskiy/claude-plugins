@@ -58,6 +58,41 @@ The resume is a new run in this session. Its exit follows "Every exit, in order"
 session is gone, the dispatcher launches a new run in a new session. It also continues from the
 ledger.
 
+## Short holds
+
+A short hold is a `device:*` or `build:*` resource. A job claims it for one step and releases it at
+the end of the step. Repositories are not short holds: the handoff holds them until the job ends,
+and `release` refuses them (exit 1).
+
+| Item | Rule |
+|---|---|
+| Single claimant | One claimant per job: the session that dispatches agents. That is the orchestrator in Light and Full, and the worker in Solo. |
+| Dispatched agents | A dispatched agent never runs `claim` or `release`. Claims are a set, not a count: an agent's `release` would end the claimant's hold. |
+| When to claim | Before each bench step, and before each step that runs a command that takes `bitbake.lock` (`bitbake`, `devtool`, `kas`). The claimant claims before it dispatches an agent for the step. |
+| What to claim | Every short hold the step needs, in one call: `<plugin-root>/bin/cure-job claim <id> --wait 540 device:bench build:<absolute path>`. |
+| Hold | Keep the holds across the consecutive commands of the step. Do not release and claim again between two bitbake commands: a waiter would enter mid-step. |
+| When to release | At the end of the step, on success or failure, after the agent returns: `<plugin-root>/bin/cure-job release <id> <resource>`, once per resource. |
+| Foreground | Run the claim in the foreground with a Bash timeout of 600000 ms (the tool default is 120000 ms, shorter than `--wait 540`). Never run it in the background. If the tool times out anyway, run `release` for every resource named in that claim before anything else, then claim again. |
+| Held by another job | `claim --wait` polls every 10 s, for at most 540 s, and exits 0 when it holds every resource. On timeout it exits 1 with `error: <resource> is held by <holder id>` on stderr. Call it again. |
+| Claim refused | Exit 1 at once, without waiting. Do not retry: report it as `failed:`. The stderr messages are in the table below. `--wait` outside 0..540 exits 2 (`invalid seconds` or `is outside 0..540`) and is also not retried. |
+| Wait budget | Wait for short holds for at most 120 minutes in total over all calls (`short-hold.wait-total-minutes`). Each run starts a new budget: a resume after `needs-input:` is a new run. When the budget is spent, take the `needs-input:` exit with the question "short-hold timeout: <resource> held by <holder id>". |
+| Foreign edits | Before each build claim, run `git -C <repo> status --porcelain` for each repository that another open job names in `cure-job list --json`. Record each dirty one with that job's id: in the ledger in Light and Full, in the final message in Solo (Solo has no ledger). A build failure on another job's edits is then named before fix rounds are spent on it. |
+| Scope | A short-hold claim counts only while its run is the latest run and `result.md` does not exist. A finish, a `needs-input` exit, a resume or a relaunch drops it. A forgotten `release` is bounded by the run. |
+
+`claim` stderr messages (each starts with `error: `):
+
+| Message | Meaning | Action |
+|---|---|---|
+| `<resource> is held by <holder id>` | Another job holds it | Wait again (see "Held by another job") |
+| `job <id> is abandoned; claim needs a launched run` | Refusal | `failed:` |
+| `job <id> has no launched run; claim needs a launched run` | Refusal | `failed:` |
+| `job <id> has a result for run <n>; claim needs a running run` | Refusal | `failed:` |
+| `job <id> is invalid: <problem>` or `claim refused: job <id> is invalid and may hold any resource; ...` | Invalid job: a failure, not a hold | `failed:` |
+| `unknown job <id>: ... holds no handoff.md` | Wrong id | `failed:` |
+
+`release` exits 0 whenever the job does not hold the resource after the call, so a retry is harmless.
+It exits 1 for an unknown or invalid job, and for a repository name.
+
 ## Keep rules
 
 - Keep the goal file, the retrospective and the backlog. List the retrospective with `--retro`.

@@ -76,6 +76,11 @@ def needs_sessions(records: Iterable[JobRecord]) -> bool:
     return any(record.launches and record.result is None and record.closed is None for record in records)
 
 
+def is_open(record: JobRecord) -> bool:
+    """The job is not done, failed or abandoned. Needs no session list."""
+    return _terminal_state(record) is None
+
+
 def lock_rank(record: JobRecord) -> tuple[bool, str]:
     """The lock order. A launched job is already using its resources; after a
     backward clock step it can sort above a newer job (local-time ids)."""

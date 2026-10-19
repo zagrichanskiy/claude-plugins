@@ -8,7 +8,6 @@ import pytest
 from cure_job.errors import CureJobError, HandoffError
 from cure_job.frontmatter import parse
 from cure_job.handoff import Device, parse_handoff, stamp
-from cure_job.resource import DEVICE_BENCH
 
 
 def test_parses_repos_and_device():
@@ -21,9 +20,10 @@ def test_launch_dir_is_the_first_repo():
     assert parse_handoff("---\nrepos: [/work/a, /work/b]\ndevice: none\n---\n").launch_dir == "/work/a"
 
 
-def test_resources_hold_repos_and_bench_when_device_is_bench():
+def test_resources_hold_only_repos_when_device_is_bench():
     handoff = parse_handoff("---\nrepos: [/work/a]\ndevice: bench\n---\n")
-    assert handoff.resources == frozenset({"/work/a", DEVICE_BENCH})
+    assert handoff.device is Device.BENCH
+    assert handoff.resources == frozenset({"/work/a"})
 
 
 def test_resources_have_no_bench_when_device_is_none():

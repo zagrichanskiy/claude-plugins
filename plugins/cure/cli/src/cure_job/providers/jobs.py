@@ -2,8 +2,10 @@
 
 Every operation except ``new``, ``finish``, ``reported`` and ``release`` reads
 one snapshot of the state root, derives the job states from it and makes its
-writes. ``finish``, ``reported`` and ``release`` read only their own job. No
-operation holds a lock, so a check and its write are not atomic across processes.
+writes. ``finish``, ``reported`` and ``release`` read only their own job.
+``claim`` runs its check and its write under :meth:`JobStore.locked` and reads
+no session list. No other operation holds the lock, so their check and write
+are not atomic across processes.
 
 A job whose stored files do not read is invalid. ``list`` shows it, ``prune``
 skips it, and every other operation refuses it by id. Its resources and its
@@ -16,7 +18,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Callable, Mapping, NamedTuple, Sequence
+from typing import Callable, Mapping, NamedTuple, NoReturn, Sequence
 
 from .. import resource as resource_names
 from ..claude import Claude, Session, SessionStatus
@@ -29,7 +31,7 @@ from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
 from ..job import JobRecord
-from ..state import HALF_CREATED_AGE, JobView, State, derive, expired, holders, lock_rank, needs_sessions
+from ..state import HALF_CREATED_AGE, JobView, State, derive, expired, holders, is_open, lock_rank, needs_sessions
 from ..store import InvalidJob, JobStore, Snapshot
 
 
@@ -50,6 +52,11 @@ class Stopped(NamedTuple):
 #: often it reads the listing meanwhile.
 STOP_TIMEOUT_SECONDS = 15.0
 STOP_POLL_SECONDS = 0.5
+
+#: The longest ``claim --wait`` fits one foreground Bash call under its 600 s
+#: cap. A waiting claim polls the store this often.
+CLAIM_WAIT_MAX_SECONDS = 540
+CLAIM_POLL_SECONDS = 10.0
 
 
 class JobsProvider:
@@ -146,7 +153,7 @@ class JobsProvider:
             held = _holders(listing.views)
             name = next(name for name in sorted(record.resources) if held[name] != job_id)
             raise ResourceHeld(name, held[name])
-        _refuse_invalid(listing, operation)
+        _refuse_invalid(listing.invalid, operation)
         rules = self.plugin_root / RULES
         if not rules.is_file():
             raise PluginError(f"{operation} refused: {rules} does not exist; the goal file names it")
@@ -180,34 +187,60 @@ class JobsProvider:
             raise ClaudeOutcomeUnknown(f"{unknown}; recorded as run {run}, session {session}: "
                                        "list shows it launched, then running or lost") from unknown
 
-    def claim(self, job_id: str, resource: str) -> None:
-        """Add ``resource`` to the resources ``job_id`` names. Returns when the job holds it."""
-        listing = self.listing()
-        view = self._find(listing, job_id)
-        if not view.state.is_open:
-            raise JobStateError(f"job {job_id} is {view.state.value}; claim needs an open job")
-        open_records = {other.record.id: other.record for other in listing.views if other.state.is_open}
-        holder = holders(open_records.values()).get(resource)
-        if holder not in (None, job_id):
-            other = open_records[holder]
-            # A launched holder keeps the resource even against a lower id.
-            if other.launches or lock_rank(other) < lock_rank(view.record):
-                raise ResourceHeld(resource, holder)
-        _refuse_invalid(listing, "claim")
-        if resource not in view.record.resources:
-            self.store.append_event(job_id, Claim(resource, view.record.run or None))
+    def claim(self, job_id: str, names: Sequence[str], wait: float = 0) -> None:
+        """Add ``names`` to the resources ``job_id`` names. Returns when the job holds every one.
+
+        A held resource is polled for up to ``wait`` seconds, then raises
+        :class:`ResourceHeld`. Each poll takes and drops the store lock; no sleep runs under it.
+        """
+        if not 0 <= wait <= CLAIM_WAIT_MAX_SECONDS:
+            raise ValueError(f"wait {wait} is outside 0..{CLAIM_WAIT_MAX_SECONDS}")
+        deadline = self.monotonic() + wait
+        while True:
+            with self.store.locked():
+                held = self._claim_once(job_id, names)
+            if held is None:
+                return
+            remaining = deadline - self.monotonic()
+            if remaining <= 0:
+                raise ResourceHeld(*held)
+            self.sleep(min(CLAIM_POLL_SECONDS, remaining))
+
+    def _claim_once(self, job_id: str, names: Sequence[str]) -> tuple[str, str] | None:
+        """Append the claims and return ``None``, or return the first held resource and its holder."""
+        snapshot = self.store.snapshot()
+        record = self._find_record(snapshot, job_id)
+        if record.closed is not None:
+            raise JobStateError(f"job {job_id} is abandoned; claim needs a launched run")
+        if not record.launches:
+            raise JobStateError(f"job {job_id} has no launched run; claim needs a launched run")
+        # A relaunch archives result.md before it records the next run.
+        if record.result is not None or record.run in record.archived_runs:
+            raise JobStateError(f"job {job_id} has a result for run {record.run}; claim needs a running run")
+        _refuse_invalid(snapshot.invalid, "claim")
+        # Holders need only the records: a lost holder keeps its holds.
+        open_records = {other.id: other for other in snapshot.records if is_open(other)}
+        held = holders(open_records.values())
+        for name in names:
+            holder = held.get(name)
+            if holder not in (None, job_id):
+                other = open_records[holder]
+                # A launched holder keeps the resource even against a lower id.
+                if other.launches or lock_rank(other) < lock_rank(record):
+                    return name, holder
+        self.store.append_events(job_id, [Claim(name, record.run) for name in dict.fromkeys(names)
+                                          if name not in record.resources])
+        return None
 
     def release(self, job_id: str, name: str) -> None:
         """End the short hold of ``job_id`` on ``name``. Returns when the job does not hold it.
 
-        Reads only this job. A repository, and the bench a handoff names, are held until the job ends.
+        Reads only this job. A repository is held until the job ends.
         An abandoned job holds nothing and gets no write: its log mtime is its retention start.
         """
         if not resource_names.is_short_hold(name):
             raise CureJobError(f"{name} is a repository; it is held until the job ends")
         record = self.store.load(job_id)
-        if name in record.handoff.resources:
-            raise CureJobError(f"job {job_id}: the handoff names {name}; it is held until the job ends")
         if record.closed is None and name in record.resources:
             self.store.append_event(job_id, Release(name))
 
@@ -352,7 +385,16 @@ class JobsProvider:
         for view in listing.views:
             if view.record.id == job_id:
                 return view
-        for invalid in listing.invalid:
+        self._refuse_missing(listing.invalid, job_id)
+
+    def _find_record(self, snapshot: Snapshot, job_id: str) -> JobRecord:
+        for record in snapshot.records:
+            if record.id == job_id:
+                return record
+        self._refuse_missing(snapshot.invalid, job_id)
+
+    def _refuse_missing(self, invalid_jobs: Sequence[InvalidJob], job_id: str) -> NoReturn:
+        for invalid in invalid_jobs:
             if invalid.id == job_id:
                 raise StoreError(f"job {job_id} is invalid: {invalid.problem}")
         raise UnknownJob(f"unknown job {job_id}: {self.store.job_dir(job_id)} holds no handoff.md")
@@ -366,8 +408,8 @@ def _holders(views: list[JobView]) -> dict[str, str]:
     return holders(view.record for view in views if view.state.is_open)
 
 
-def _refuse_invalid(listing: Listing, operation: str) -> None:
-    if listing.invalid:
-        invalid = listing.invalid[0]
+def _refuse_invalid(invalid_jobs: Sequence[InvalidJob], operation: str) -> None:
+    if invalid_jobs:
+        invalid = invalid_jobs[0]
         raise StoreError(f"{operation} refused: job {invalid.id} is invalid and may hold any resource; "
                          f"fix or remove {invalid.dir}: {invalid.problem}")
