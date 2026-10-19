@@ -27,6 +27,8 @@ add one.
 
 - The main session orchestrates: it dispatches agents, keeps the ledger, checks completeness. It
   reads no source and edits no code.
+- The orchestrator creates the branch and makes every commit, with explicit paths. It never asks
+  `implementer`, `test-author` or `skill-author` to do either.
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round.
 - Record a mechanical choice in the ledger as an assumption.

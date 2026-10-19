@@ -26,6 +26,8 @@ You are a project-agnostic agent, so never guess the command:
 
 - Run the suite. Capture the outcome: total, passed, failed, skipped, and the
   wall-clock time.
+- Report the test count as passed / run / disabled, separately, for ctest and gtest suites. A
+  gtest `DISABLED_` test is counted as disabled, not run. A ctest disabled test is counted likewise.
 - For each failure, report the test name and the salient part of the output —
   the assertion or error and the location. Quote enough to diagnose, not the
   entire log. For noisy output, filter to the failing tests.
