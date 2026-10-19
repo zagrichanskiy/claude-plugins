@@ -1,4 +1,4 @@
-"""Issue 32: ``release``, run-scoped short-hold claims, the ``claim`` precondition and ``claim --wait``."""
+"""Issues 32 and 43: ``release``, run-scoped short-hold claims, the ``claim`` precondition, ``claim --wait`` and the claim lock."""
 from __future__ import annotations
 
 import fcntl
@@ -149,106 +149,9 @@ def test_claim_of_several_free_resources_takes_all(h, pair):
     assert h.resources(first) == frozenset({REPO_A, BENCH, "/work/free"})
 
 
-# --- Done when 2: a claim lives for its run -----------------------------------------------------------------
+# --- Done when 2: device: bench no longer blocks at launch -----------------------------------------------------
 
-def test_done_2_run_one_claim_is_absent_from_resources_after_finish(h, pair):
-    first, _ = pair
-    h.jobs.claim(first, [BENCH])
-    assert BENCH in h.resources(first)
-    h.jobs.finish(first, NEEDS_INPUT)
-    assert BENCH not in h.resources(first)
-    assert REPO_A in h.resources(first)
-
-
-def test_done_2_run_one_claim_is_absent_from_resources_after_run_two_starts(h, pair):
-    first, _ = pair
-    h.jobs.claim(first, [BENCH])
-    h.relaunch_after_needs_input(first)
-    assert h.jobs.store.load(first).run == 2
-    assert BENCH not in h.resources(first)
-
-
-def test_a_repo_claim_survives_finish_and_the_next_run(h, pair):
-    first, _ = pair
-    h.jobs.claim(first, ["/work/extra"])
-    h.relaunch_after_needs_input(first)
-    assert "/work/extra" in h.resources(first)
-
-
-def test_a_run_two_claim_counts_in_run_two(h, pair):
-    first, _ = pair
-    h.jobs.claim(first, [BENCH])
-    h.relaunch_after_needs_input(first)
-    h.jobs.claim(first, [BENCH])
-    assert BENCH in h.resources(first)
-    assert h.jobs.store.load(first).events[-1] == Claim(BENCH, 2)
-
-
-def test_a_finished_run_frees_the_bench_for_another_job(h, pair):
-    first, second = pair
-    h.jobs.claim(first, [BENCH])
-    h.jobs.finish(first, NEEDS_INPUT)
-    h.jobs.claim(second, [BENCH])
-    assert BENCH in h.resources(second)
-
-
-# --- Done when 3: release ----------------------------------------------------------------------------------
-
-def test_done_3_release_of_a_repo_exits_one(h, pair, capsys):
-    first, _ = pair
-    assert h.run("release", first, REPO_A) == 1
-    assert "held until the job ends" in capsys.readouterr().err
-    assert REPO_A in h.resources(first)
-
-
-def test_done_3_second_release_of_a_device_exits_zero(h, pair):
-    first, _ = pair
-    assert h.run("claim", first, BENCH) == 0
-    assert h.run("release", first, BENCH) == 0
-    assert h.run("release", first, BENCH) == 0
-    assert BENCH not in h.resources(first)
-
-
-def test_release_of_a_short_hold_never_claimed_exits_zero_and_writes_nothing(h, pair):
-    first, _ = pair
-    before = h.jobs.store.load(first).events
-    assert h.run("release", first, BENCH) == 0
-    assert h.jobs.store.load(first).events == before
-
-
-def test_release_writes_one_release_event_and_the_job_may_claim_again(h, pair):
-    first, _ = pair
-    h.jobs.claim(first, [BENCH])
-    h.jobs.release(first, BENCH)
-    assert h.jobs.store.load(first).events[-1] == Release(BENCH)
-    h.jobs.claim(first, [BENCH])
-    assert BENCH in h.resources(first)
-
-
-def test_release_of_a_build_directory_is_allowed(h, pair, tmp_path):
-    first, _ = pair
-    name = resource.build(str(tmp_path))
-    h.jobs.claim(first, [name])
-    assert h.run("release", first, name) == 0
-    assert name not in h.resources(first)
-
-
-def test_release_of_an_unknown_job_exits_one(h, capsys):
-    assert h.run("release", "261013-1800-video-core-nothing", BENCH) == 1
-    assert "unknown job" in capsys.readouterr().err
-
-
-def test_release_frees_the_resource_for_another_job_at_once(h, pair):
-    first, second = pair
-    h.jobs.claim(first, [BENCH])
-    h.jobs.release(first, BENCH)
-    h.jobs.claim(second, [BENCH])
-    assert BENCH in h.resources(second)
-
-
-# --- Done when 4: device: bench no longer blocks at launch -----------------------------------------------------
-
-def test_done_4_device_bench_no_longer_blocks_a_second_job_at_launch(h, tmp_path):
+def test_done_2_device_bench_no_longer_blocks_a_second_job_at_launch(h, tmp_path):
     first = h.launched(tmp_path, REPO_A, device="bench")
     second = h.launched(tmp_path, REPO_B, device="bench")
     h.run("list", "--json")
@@ -257,36 +160,9 @@ def test_done_4_device_bench_no_longer_blocks_a_second_job_at_launch(h, tmp_path
     assert h.claude.statuses.keys() == {first, second}
 
 
-# --- Done when 5: a legacy claim without run -------------------------------------------------------------
+# --- Done when 3: no session list, no sleep under the lock ----------------------------------------------------
 
-def test_done_5_legacy_claim_without_run_counts_across_runs_and_after_the_result(h, pair):
-    first, _ = pair
-    h.jobs.store.append_event(first, Claim(BENCH))
-    assert BENCH in h.resources(first)
-    h.relaunch_after_needs_input(first)
-    assert BENCH in h.resources(first)
-    h.jobs.finish(first, NEEDS_INPUT)
-    assert BENCH in h.resources(first)
-
-
-def test_done_5_legacy_claim_holds_the_bench_against_another_job(h, pair):
-    first, second = pair
-    h.jobs.store.append_event(first, Claim(BENCH))
-    with pytest.raises(ResourceHeld) as caught:
-        h.jobs.claim(second, [BENCH])
-    assert caught.value.holder == first
-
-
-def test_a_release_cancels_a_legacy_claim(h, pair):
-    first, _ = pair
-    h.jobs.store.append_event(first, Claim(BENCH))
-    h.jobs.release(first, BENCH)
-    assert BENCH not in h.resources(first)
-
-
-# --- Done when 6: no session list, no sleep under the lock ----------------------------------------------------
-
-def test_done_6_claim_wait_reads_no_session_list(h, pair):
+def test_done_3_claim_wait_reads_no_session_list(h, pair):
     first, second = pair
     h.jobs.claim(first, [BENCH])
     h.claude.fail_sessions = ClaudeError("claude agents is slow")
@@ -296,7 +172,7 @@ def test_done_6_claim_wait_reads_no_session_list(h, pair):
     assert h.claude.sessions_calls == 0
 
 
-def test_done_6_a_claim_holder_that_is_lost_still_holds_without_a_session_list(h, pair):
+def test_done_3_a_claim_holder_that_is_lost_still_holds_without_a_session_list(h, pair):
     first, second = pair
     h.jobs.claim(first, [BENCH])
     h.claude.fail_sessions = ClaudeError("claude agents is down")
@@ -304,7 +180,7 @@ def test_done_6_a_claim_holder_that_is_lost_still_holds_without_a_session_list(h
         h.jobs.claim(second, [BENCH])
 
 
-def test_done_6_no_sleep_runs_while_the_lock_is_held(h, pair):
+def test_done_3_no_sleep_runs_while_the_lock_is_held(h, pair):
     first, second = pair
     h.jobs.claim(first, [BENCH])
     outcomes: list[str] = []
@@ -379,6 +255,140 @@ def test_claim_of_an_unlaunched_job_exits_one_from_the_cli(h, tmp_path, capsys):
     assert "launched run" in capsys.readouterr().err
 
 
+def test_claim_of_a_run_whose_result_is_archived_is_refused_and_writes_nothing(h, pair):
+    first, _ = pair
+    h.jobs.finish(first, NEEDS_INPUT)
+    assert h.jobs.store.archive_result(first, 1)
+    before = h.jobs.store.load(first).events
+    with pytest.raises(JobStateError, match="result"):
+        h.jobs.claim(first, [BENCH])
+    assert h.jobs.store.load(first).events == before
+
+
+# --- run-scoped claims: a claim lives for its run -----------------------------------------------------------------
+
+def test_run_scoped_run_one_claim_is_absent_from_resources_after_finish(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, [BENCH])
+    assert BENCH in h.resources(first)
+    h.jobs.finish(first, NEEDS_INPUT)
+    assert BENCH not in h.resources(first)
+    assert REPO_A in h.resources(first)
+
+
+def test_run_scoped_run_one_claim_is_absent_from_resources_after_run_two_starts(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, [BENCH])
+    h.relaunch_after_needs_input(first)
+    assert h.jobs.store.load(first).run == 2
+    assert BENCH not in h.resources(first)
+
+
+def test_a_repo_claim_survives_finish_and_the_next_run(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, ["/work/extra"])
+    h.relaunch_after_needs_input(first)
+    assert "/work/extra" in h.resources(first)
+
+
+def test_a_run_two_claim_counts_in_run_two(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, [BENCH])
+    h.relaunch_after_needs_input(first)
+    h.jobs.claim(first, [BENCH])
+    assert BENCH in h.resources(first)
+    assert h.jobs.store.load(first).events[-1] == Claim(BENCH, 2)
+
+
+def test_a_finished_run_frees_the_bench_for_another_job(h, pair):
+    first, second = pair
+    h.jobs.claim(first, [BENCH])
+    h.jobs.finish(first, NEEDS_INPUT)
+    h.jobs.claim(second, [BENCH])
+    assert BENCH in h.resources(second)
+
+
+# --- release ----------------------------------------------------------------------------------
+
+def test_release_of_a_repo_exits_one(h, pair, capsys):
+    first, _ = pair
+    assert h.run("release", first, REPO_A) == 1
+    assert "held until the job ends" in capsys.readouterr().err
+    assert REPO_A in h.resources(first)
+
+
+def test_second_release_of_a_device_exits_zero(h, pair):
+    first, _ = pair
+    assert h.run("claim", first, BENCH) == 0
+    assert h.run("release", first, BENCH) == 0
+    assert h.run("release", first, BENCH) == 0
+    assert BENCH not in h.resources(first)
+
+
+def test_release_of_a_short_hold_never_claimed_exits_zero_and_writes_nothing(h, pair):
+    first, _ = pair
+    before = h.jobs.store.load(first).events
+    assert h.run("release", first, BENCH) == 0
+    assert h.jobs.store.load(first).events == before
+
+
+def test_release_writes_one_release_event_and_the_job_may_claim_again(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, [BENCH])
+    h.jobs.release(first, BENCH)
+    assert h.jobs.store.load(first).events[-1] == Release(BENCH)
+    h.jobs.claim(first, [BENCH])
+    assert BENCH in h.resources(first)
+
+
+def test_release_of_a_build_directory_is_allowed(h, pair, tmp_path):
+    first, _ = pair
+    name = resource.build(str(tmp_path))
+    h.jobs.claim(first, [name])
+    assert h.run("release", first, name) == 0
+    assert name not in h.resources(first)
+
+
+def test_release_of_an_unknown_job_exits_one(h, capsys):
+    assert h.run("release", "261013-1800-video-core-nothing", BENCH) == 1
+    assert "unknown job" in capsys.readouterr().err
+
+
+def test_release_frees_the_resource_for_another_job_at_once(h, pair):
+    first, second = pair
+    h.jobs.claim(first, [BENCH])
+    h.jobs.release(first, BENCH)
+    h.jobs.claim(second, [BENCH])
+    assert BENCH in h.resources(second)
+
+
+# --- a legacy claim without run -------------------------------------------------------------
+
+def test_legacy_claim_without_run_counts_across_runs_and_after_the_result(h, pair):
+    first, _ = pair
+    h.jobs.store.append_event(first, Claim(BENCH))
+    assert BENCH in h.resources(first)
+    h.relaunch_after_needs_input(first)
+    assert BENCH in h.resources(first)
+    h.jobs.finish(first, NEEDS_INPUT)
+    assert BENCH in h.resources(first)
+
+
+def test_legacy_claim_holds_the_bench_against_another_job(h, pair):
+    first, second = pair
+    h.jobs.store.append_event(first, Claim(BENCH))
+    with pytest.raises(ResourceHeld) as caught:
+        h.jobs.claim(second, [BENCH])
+    assert caught.value.holder == first
+
+
+def test_a_release_cancels_a_legacy_claim(h, pair):
+    first, _ = pair
+    h.jobs.store.append_event(first, Claim(BENCH))
+    h.jobs.release(first, BENCH)
+    assert BENCH not in h.resources(first)
+
+
 # --- resource.py ------------------------------------------------------------------------------------------
 
 def test_kind_names_repo_device_and_build():
@@ -440,3 +450,94 @@ def test_release_line_shape_and_round_trip():
 def test_decode_rejects_malformed_release_and_claim_run(line):
     with pytest.raises(ValueError):
         decode(line)
+
+
+# --- an archived result ends the run's short holds before the next Launched is written ------------------------------
+
+def _archive_run_one(h, job_id):
+    h.jobs.finish(job_id, NEEDS_INPUT)
+    assert h.jobs.store.archive_result(job_id, 1)
+
+
+def test_archived_result_ends_a_short_hold_and_frees_the_bench_for_another_job(h, pair):
+    first, second = pair
+    h.jobs.claim(first, [BENCH])
+    _archive_run_one(h, first)
+    assert BENCH not in h.resources(first)
+    assert h.run("claim", second, BENCH) == 0
+
+
+def test_failed_relaunch_leaves_the_bench_unheld(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, [BENCH])
+    h.jobs.finish(first, NEEDS_INPUT)
+    del h.claude.statuses[first]
+    h.claude.fail_start = ClaudeError("cannot start")
+    with pytest.raises(ClaudeError):
+        h.jobs.launch(first)
+    assert (h.jobs.store.job_dir(first) / "result.md").is_file()
+    assert BENCH not in h.resources(first)
+
+
+def test_archived_result_keeps_a_repo_claim(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, ["/work/extra"])
+    _archive_run_one(h, first)
+    assert "/work/extra" in h.resources(first)
+
+
+def test_archived_result_keeps_a_legacy_bench_claim(h, pair):
+    first, _ = pair
+    h.jobs.store.append_event(first, Claim(BENCH))
+    _archive_run_one(h, first)
+    assert BENCH in h.resources(first)
+
+
+def test_archived_runs_are_the_positive_integer_result_files_only(h, pair):
+    first, _ = pair
+    directory = h.jobs.store.job_dir(first)
+    for name in ("result-1.md", "result-2.md", "result-0.md", "result-01.md", "result-x.md"):
+        (directory / name).write_text("---\nstatus: done\n---\n", encoding="utf-8")
+    assert h.jobs.store.load(first).archived_runs == {1, 2}
+
+
+# --- release on a job that no longer runs -------------------------------------------------------------------------
+
+def _closed_with_bench(h, job_id):
+    h.jobs.claim(job_id, [BENCH])
+    h.jobs.stop(job_id)
+    h.jobs.close(job_id)
+    log = h.jobs.store.job_dir(job_id) / "dispatch.jsonl"
+    os.utime(log, (1_000_000_000, 1_000_000_000))
+    return log
+
+
+def test_release_on_a_closed_job_exits_zero_and_leaves_the_log_untouched(h, pair):
+    first, _ = pair
+    log = _closed_with_bench(h, first)
+    before = (log.read_bytes(), log.stat().st_mtime_ns)
+    assert h.run("release", first, BENCH) == 0
+    assert (log.read_bytes(), log.stat().st_mtime_ns) == before
+
+
+def test_release_of_a_repo_on_a_closed_job_still_exits_one(h, pair):
+    first, _ = pair
+    _closed_with_bench(h, first)
+    assert h.run("release", first, "/work/extra") == 1
+
+
+def test_release_on_a_done_job_exits_zero_and_writes_nothing(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, [BENCH])
+    h.jobs.finish(first, Report(ResultStatus.DONE))
+    log = h.jobs.store.job_dir(first) / "dispatch.jsonl"
+    before = log.read_bytes()
+    assert h.run("release", first, BENCH) == 0
+    assert log.read_bytes() == before
+
+
+def test_release_on_an_invalid_job_exits_one(h, pair, capsys):
+    first, _ = pair
+    (h.jobs.store.job_dir(first) / "dispatch.jsonl").write_text("{not json\n", encoding="utf-8")
+    assert h.run("release", first, BENCH) == 1
+    assert "invalid" in capsys.readouterr().err
