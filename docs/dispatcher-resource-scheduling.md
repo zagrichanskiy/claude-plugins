@@ -554,6 +554,7 @@ Order: fork probe, then parts 1-6. Reasons:
 
 0. Fork probe, before part 1
    - Issue: #31 (Probe whether a context: fork skill forks from the dispatcher)
+   - Estimate: 0 changed lines in claude-plugins (a manual session with a throwaway skill that is not committed).
    - No PR. One manual session.
    - Method: a throwaway skill of about 20 lines with `context: fork` and `allowed-tools: Read`,
      invoked from a session started with `--agent cure:dispatcher`.
