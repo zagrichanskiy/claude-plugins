@@ -56,8 +56,15 @@ at `root@192.168.240.1`.
 | Tracker only from `defaults.md`. | Every repository would need a row before its first split. |
 | `kind:` frontmatter key for design notes. | Nothing reads it. |
 | Short holds acquired in a fixed order (`build:` before `device:`), enforced by the worker prompt only. | The CLI cannot check it. A worker that breaks it deadlocks two jobs for the full wait budget. |
-| A `wait` event and a `claim-wait` field in `list --json`. | With hold-and-wait refused, no deadlock remains to show. The timeout exit names the resource and its holder. |
+| A `wait` event and a `claim-wait` field in `list --json`. | No claim waits while its run holds a short hold, and only short holds are waited for, so no wait cycle remains to show. The timeout exit names the resource and its holder. |
 | Allow `after:` only with `delivery: pr`. | Stacking would not work with the default delivery. |
+| Lock rank (not launched, not after-satisfied, not approved, id). | A ready job blocked on X still holds Y. Each new launch condition needs a new term. |
+| Ready filter for lock holders without all or none. | A partial hold remains. |
+| A reservation for every open job. | One unanswered question stops a repository's queue. |
+| Lock order by approval time. | Re-approval reorders the queue. Approval stamps are local time. |
+| Split apply re-queues each successor as a new job. | It drops origin and lock order, closes grandchildren and misses late successors. |
+| A `cure-job after ID PRED` re-point event. | One write per successor; it misses late successors. |
+| A generic `cure-job replace`, or a CLI `split`. | It needs a carry rule per event kind. Only `origin` carries for an unlaunched original, and the `origin:` key carries it atomically. A CLI split still cannot create n jobs atomically. |
 
 ## State model
 
@@ -74,17 +81,17 @@ at `root@192.168.240.1`.
 
 | State | Condition | Launchable |
 |---|---|---|
-| `queued` | Unlaunched, not blocked, no goal. | no |
-| `held` | Unlaunched, `blocked_by` non-empty or `after` not satisfied, with or without a goal. | no |
-| `awaiting-approval` | Unlaunched, not blocked, goal, no valid approval. | no |
-| `approved` | Unlaunched, not blocked, goal, valid approval. New. | yes |
+| `queued` | Unlaunched, not blocked, no goal. Holds nothing. | no |
+| `held` | Unlaunched, `blocked_by` non-empty or `after` not satisfied, with or without a goal. Holds nothing. | no |
+| `awaiting-approval` | Unlaunched, not blocked, goal, no valid approval. Holds nothing. | no |
+| `approved` | Unlaunched, not blocked, goal, valid approval, `after` satisfied. Holds every resource it names. New. | yes |
 | `launched`, `running`, `stalled`, `blocked` | Session states. Unchanged. | no |
 | `lost` | Unchanged. | yes |
 | `needs-input` | Unchanged. | yes |
 | `done`, `failed`, `abandoned` | Unchanged. | no |
 
 `is_launchable` returns true for `approved`, `lost` and `needs-input`. `awaiting-approval` is no
-longer launchable. `list --json` gains the fields `goal`, `approved`, `after` and `after-state`.
+longer launchable. `list --json` gains the fields `goal`, `approved`, `after`, `after-state` and `continued-by`.
 
 ### Events
 
@@ -96,6 +103,7 @@ Existing events: `launched`, `claim`, `closed`, `origin`, `reported`, `stopped`,
 | `approved` | `{"event":"approved","goal":"sha256:<hex>","by":"user"\|"auto","at":...}` | `cure-job approve` |
 | `release` | `{"event":"release","resource":...}` | `cure-job release` |
 | `claim` | Gains a `run` field. | `cure-job claim` |
+| `closed` | Gains an optional `continued-by: <job id>`. Older versions read only `reason` (`events.py:101-102`). | `cure-job close --continued-by` |
 
 ### Approval
 
@@ -107,7 +115,7 @@ Existing events: `launched`, `claim`, `closed`, `origin`, `reported`, `stopped`,
 | Order in a question round | `approve` is the last write of the round. Every answer goes into `goal.md` through `cure:goal` first. `approve --by auto` runs after the step 2 checks and after any `goal.md` edit they cause. | An edit after `approve` changes the digest and revokes the approval just given. |
 | `launch` | Run 1 needs a valid approval, else exit 1 "approve first". Later runs need none: relaunch of `lost` or `stalled`, launch of `needs-input`. | The user's answer is the approval for a later run (`agents/dispatcher.md:84`). |
 | Solo/Light rule (`agents/dispatcher.md:65`) | Becomes `approve --by auto`. Its condition "holds every resource" moves to launch time. | One approval path. |
-| Repository order between unlaunched jobs | `lock_rank` (`state.py:79-82`) becomes (not launched, not approved, id). An approved unlaunched job holds a repository ahead of an unapproved one. | One unanswered question must not stop the queue for a repository. Re-drafting a goal moves the job back. |
+| Lock holders | 1. A launched job holds every resource it names that no job ranked before it holds. This covers `launched` through `needs-input`, including `lost`. 2. An unlaunched job takes part only when ready: goal, valid approval, `after` satisfied. This is the run-1 launch test, one predicate in `state.py` for both uses. 3. A ready unlaunched job takes all its resources if none is taken, otherwise none. 4. Every other job holds nothing. 5. `lock_rank` stays (not launched, id) (`state.py:79-82`). | A job that cannot launch holds nothing. The ready test is the launch test, so a new launch condition leaves no holder behind. All or none, so a job blocked on one repository does not keep another idle. An invalid job may have a live session. |
 
 ### Derivation order
 
@@ -117,10 +125,30 @@ First match wins:
 2. result failed -> `failed`; result done with no unproven item -> `done`
 3. any other result -> `needs-input`
 4. a launched event exists -> session states, unchanged
-5. `blocked_by` non-empty (repo held by another job), or `after` not satisfied -> `held`
+5. `blocked_by` non-empty (a repository held by a launched job or an `approved` job), or `after` not satisfied -> `held`
 6. no goal -> `queued`
 7. valid approval -> `approved`
 8. otherwise -> `awaiting-approval`
+
+`derive` runs one pass in this order: terminal states (`state.py:100`); `satisfied`, true when the
+predecessor's terminal state is `DONE`; holders, by the ready test and all or none; `blocked_by`,
+the holders of the job's resources minus the job itself; open states; views. `After.state` comes
+from the terminal and open states. A job in `invalid_ids` gives `invalid`; an absent one gives
+`missing`. No step needs a later one, so no cycle exists.
+
+### Locks of unlaunched jobs
+
+| Reason an unlaunched job cannot launch | State | Holds locks |
+|---|---|---|
+| No goal, including a split original at `proposed` or `applying` | `queued` or `held` | No |
+| Goal, no valid approval | `awaiting-approval` or `held` | No |
+| `after` not satisfied: predecessor open, `failed`, `abandoned`, `missing` or `invalid` | `held` | No |
+| Ready, but a resource is held by a launched job or a lower-id ready job | `held`, approved true | No (all or none) |
+| Job invalid: the files do not read | `invalid` in `list` | Yes, every resource, through `_refuse_invalid` (`providers/jobs.py:8-12,354-358`). It may have a live session. |
+| `approved`, the launch-time check raises a question | `approved` | Yes, gated by the dispatcher |
+
+Every id in any `blocked_by` is a job in `launched`, `running`, `stalled`, `blocked`, `lost`,
+`needs-input` or `approved`. `approved` means the job holds every resource it names.
 
 ### Transitions
 
@@ -133,9 +161,10 @@ First match wins:
 | `held`, goal, not approved | `approve` | `held`, approved true |
 | `approved` / `held`, approved | `goal.md` bytes change | `awaiting-approval` / `held`, approved false |
 | `queued`, `awaiting-approval`, `approved` | a launched job claims one of its repos | `held` |
-| `queued`, `awaiting-approval` | an unlaunched job on one of its repos is approved | `held` |
-| `held` | every blocker reaches `done`, `failed` or `abandoned`, and the predecessor is `done` | `queued`, `awaiting-approval` or `approved` by flags |
-| `held`, after | predecessor `failed`, `abandoned` or missing | stays `held`; the dispatcher closes it |
+| `queued`, `awaiting-approval`, `approved` | another unlaunched job naming one of its repos becomes `approved`; for `approved`, only a job with a lower id | `held` |
+| `held` | no launched or `approved` job holds any of its repos, and the predecessor is `done`: the last blocker ends, or leaves `approved` without a launch (goal changed, or closed) | `queued`, `awaiting-approval` or `approved` by flags |
+| `held`, after | predecessor `failed`, `missing`, or `abandoned` without `continued-by` | stays `held`; the dispatcher closes it |
+| `held`, after | predecessor closed with `continued-by` | stays `held`; waits on the continuing job |
 | `approved` | `launch` (dispatcher, no question) | `launched` |
 | `awaiting-approval` | `launch` | refused, exit 1 |
 | `launched` to `lost` | unchanged | unchanged |
@@ -149,7 +178,7 @@ First match wins:
 | Releasable | Only short holds: `device:*` and `build:*`. Releasing a repo path exits 1 "held until the job ends". | A repo tree holds uncommitted work. Unlaunched jobs are then blocked only by repos. |
 | Caller | The job's single claimant (row Single claimant below), for its own job only. Never the dispatcher. | The CLI cannot authenticate callers; this is a stated contract. |
 | Idempotence | Exit 0 whenever the job does not hold the resource after the call. Exit 1 only for an unknown or invalid job, or a repo name. | Retries are harmless. |
-| Dispatcher rescans | No dispatcher wake on release. After its own `close`, the dispatcher runs `list` again in the same turn. Today it runs `list` once per wake (`agents/dispatcher.md:33-38`). | Unlaunched jobs name only repos. Repos free at `done` or `failed`, followed by the worker's message, or at `abandoned`, the dispatcher's own close. Short-hold waiters use `claim --wait`. |
+| Dispatcher rescans | No dispatcher wake on release. After its own `close`, and after a `goal.md` write that revokes an approval, the dispatcher runs `list` again in the same turn. Today it runs `list` once per wake (`agents/dispatcher.md:33-38`). | Unlaunched jobs name only repos. Repos free at `done` or `failed`, followed by the worker's message, or at `abandoned`, the dispatcher's own close. An `approved` job that loses its approval frees its repositories. Short-hold waiters use `claim --wait`. |
 
 ### Run-scoped claims
 
@@ -179,7 +208,7 @@ Reason: one source of truth per fact. `JobStore` does every read and write under
 |---|---|---|
 | Precondition | `claim` needs a launched run with no result and no close, checked on the record. | A claim outside a run never takes effect. |
 | Several resources | `claim ID R1 [R2 ...]` grants every named resource or none. It appends one `claim` event per resource under one lock. | A step that needs a build and the bench takes both at once. |
-| No hold and wait | A short-hold claim exits 1 "release <held> first" when the run holds a short hold and the request names a short hold the run does not hold. | Removes hold-and-wait, so two jobs cannot deadlock on two short holds. The CLI enforces it; the worker prompt does not need to. |
+| No hold and wait | A claim of any kind exits 1 "release <held> first" when the run holds a short hold and the request names a resource the run does not hold. `--wait` accepts only short holds; a repo claim with `--wait` exits 1. | A run that holds a short hold never waits, and only short holds are waited for, so no wait cycle can form. Covering only short-hold requests would let a bench holder `claim --wait` a repository whose holder waits for the bench. The CLI enforces it; the worker prompt does not need to. |
 | `--wait SECONDS` | At most 540. Polls every 10 s until every named resource is free, then claims them and exits 0. On timeout exits 1 `ResourceHeld`, naming the resource and its holder. | Fits one foreground Bash call under the 600 s cap. The session stays busy, not `stalled` (`state.py:145-146`). |
 | Atomicity | Check and append run inside `JobStore.locked()`. `claim` derives holders from the store snapshot and reads no session list. Each poll takes and drops the lock; no sleep runs under it. The docstring at `providers/jobs.py:5-6` changes. | The id tie-break in `holders()` (`state.py:85-92`) lets a lower-id claimant overtake a running build; the second bitbake fails on `bitbake.lock`. A directory flock creates no lock file. A session list starts `claude agents` (`providers/jobs.py:83`, `claude.py:70-76`) for up to 60 s; holders need only the records, and a `lost` holder keeps its holds anyway. |
 | Wait order | Waiters are not ordered. The first poll after a release wins. | Holds per step make releases rare. A queue would need stored waiter state. |
@@ -202,17 +231,18 @@ Reason: one source of truth per fact. `JobStore` does every read and write under
 | Item | Decision | Reason |
 |---|---|---|
 | Storage | Handoff frontmatter scalar `after: <job id>`, one predecessor. `Handoff.after`, checked with `job_id.is_valid`. `new` refuses an id with no job. | A stack is a chain. |
-| View | `JobView` gains `after: After \| None`. `After` holds the predecessor id and its state: a `State`, or `PredecessorGone.MISSING` (no job directory) or `PredecessorGone.INVALID` (the files do not read). `After.satisfied` is true only for `State.DONE`. `blocked_by` keeps resource holders only. `derive` gains `invalid_ids`; its callers are `providers/jobs.py:88` and tests. | `blocked_by` has one meaning. `list` prints `blocked-by=` as holders (`commands/list.py:36-37,67`). An invalid predecessor is not in `records`, so without `invalid_ids` it would read as missing. |
+| View | `JobView` gains `after: After \| None`. `After` holds the predecessor id and its state: a `State`, or `PredecessorGone.MISSING` (no job directory) or `PredecessorGone.INVALID` (the files do not read). `After.satisfied` is true only for `State.DONE`. `blocked_by` keeps resource holders only. `derive` gains `invalid_ids`; its callers are `providers/jobs.py:88` and tests. When the predecessor is `abandoned` with `continued-by`, `After` follows `continued-by` until it reaches a job that is not, and holds that job's id and state. A job reached twice gives `PredecessorGone.INVALID`. | `blocked_by` has one meaning. `list` prints `blocked-by=` as holders (`commands/list.py:36-37,67`). An invalid predecessor is not in `records`, so without `invalid_ids` it would read as missing. Successors of a split job keep every piece of their state. |
 | Leaves `held` | When the predecessor derives `done`. `needs-input`, including done with an unproven item, keeps it held. | The successor's branch base exists only after `done`; a successor never runs after a failure. |
-| `launch` while after-blocked | `_prepare_run` checks `view.after` before `blocked_by`. Exit 1 `after <pred> is <state>`. | `providers/jobs.py:144-147` names a held resource with `next()`; it stays correct when `blocked_by` holds only holders. |
-| `list --json` | `after` is the predecessor id. `after-state` is its state, `missing` or `invalid`. | The dispatcher's only input. |
-| Predecessor failed, abandoned or missing | The CLI derives `held`. The dispatcher closes the successor without asking and sends the origin "closed: predecessor <id> <state>; re-dispatch" (as `skills/goal/job.md:94`). Successors of the closed job follow on the next scan. | A failed job is terminal (`state.py:45`). |
+| Locks | A job whose `after` is not satisfied holds nothing, whatever its approval. `satisfied` is computed from the terminal states before `holders`. | A predecessor at `needs-input` waits for the user; a successor on another repository must not stop that repository's queue. |
+| `launch` while after-blocked | The `is_launchable` refusal (`providers/jobs.py:95-97`) runs before `_prepare_run`. For a `held` job with an unsatisfied `after` it exits 1 `after <pred> is <state>`. | A `held` job never reaches `_prepare_run`. `providers/jobs.py:144-147` names a held resource with `next()`; it stays correct when `blocked_by` holds only holders. |
+| `list --json` | `after` is the resolved predecessor id. `after-state` is its state, `missing` or `invalid`. `continued-by` is the id a closed job names, else null. | The dispatcher's only input. |
+| Predecessor failed, missing, or abandoned without `continued-by` | The CLI derives `held`. The dispatcher closes the successor without asking and sends the origin "closed: predecessor <id> <state>; re-dispatch" (as `skills/goal/job.md:94`). Successors of the closed job follow on the next scan. | A failed job is terminal (`state.py:45`). |
 | Predecessor invalid | The dispatcher does nothing for the successor. The `invalid` row already asks the user to repair the predecessor. | Closing would be wrong while the user repairs the file. |
-| `base` | `cure:goal` job mode sets `base` to the predecessor's branch, read from the predecessor's `goal.md`, only for a repository the predecessor also changes. For any other repository `base` comes from the handoff as today. The dispatcher drafts a successor's goal only after the predecessor's row has `goal` true. | Handoff `branch` may be `current` (`skills/dispatch/defaults.md:12`). A branch exists only in its own repository. |
+| `base` | `cure:goal` job mode sets `base` to the predecessor's branch, read from the predecessor's `goal.md`, only for a repository the predecessor also changes. The predecessor is the row's `after` in `cure-job list --json`, never the handoff's `after:`. For any other repository `base` comes from the handoff as today. The dispatcher drafts a successor's goal only after the predecessor's row has `goal` true. | Handoff `branch` may be `current` (`skills/dispatch/defaults.md:12`). A branch exists only in its own repository. |
 | Base check | For a base taken from a predecessor, work item 1 compares `<base>` with the local branch, not with `origin/<base>`. When `origin/<base>` exists, it checks `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Other bases keep the check of `skills/goal/rules.md:9-11`. | With `delivery: commit`, the default (`skills/dispatch/defaults.md:10`), the predecessor commits locally and nothing pushes. `origin/<base>` lacks its commits, and "base the work on `origin/<base>`" would drop them. |
 | Base commit | Work item 1 records `git rev-parse <base>` as the base commit: in the ledger, or in the transcript for Solo. The diff cap (`skills/goal/job.md:127-128`) and the retrospective's changed lines measure against it. | With `branch: current` the successor commits on `<base>` itself. A cap against the branch name would count only uncommitted lines. |
-| Cycles | No check. The predecessor must exist at `new`; the new id is fresh. `derive` looks one hop. | A cycle cannot be built. |
-| Prune | `prune` keeps an expired job named by an open job's `after` (`providers/jobs.py:326-334`, `state.py:55-59`). | Otherwise a pruned predecessor closes its successor. |
+| Cycles | No check at `new`: the predecessor must exist and the new id is fresh. `close ID --continued-by X` exits 1 when X is unknown, invalid, not open, ID itself, or its resolved `after` chain reaches ID. `derive` follows `after` one hop and `continued-by` any number of hops, and stops at a job reached twice. | Re-pointing through `continued-by` can build a cycle; `new` alone cannot. |
+| Prune | `prune` keeps an expired job named by an open job's `after`, and every job on the `continued-by` chain from it (`providers/jobs.py:326-334`, `state.py:55-59`). | Otherwise a pruned predecessor closes its successor. |
 
 ### Dispatcher table changes
 
@@ -220,14 +250,15 @@ Reason: one source of truth per fact. `JobStore` does every read and write under
 |---|---|
 | `held`, no goal | Steps 1, 2 and 4: draft, checks, summary. Ask for approval in the question round. Step 3, the uncommitted-changes question (`agents/dispatcher.md:63`), waits for the `approved` row. |
 | `held`, goal, not approved | Ask once. Record every answer in `goal.md`, then `approve` as the last write. |
+| `queued` | Steps 1, 2 and 4, as for `held`, no goal. The condition "If the job holds its resources" (`agents/dispatcher.md:46`) is removed. |
 | `held`, approved | Nothing. |
 | `held`, `after-state` `failed`, `abandoned` or `missing` | `close` the successor, tell the origin, run `list` again. |
 | `held`, `after-state` `invalid` | Nothing. |
-| `approved` | Re-run steps 2 and 3, then `launch`. |
+| `approved` | Re-run steps 2 and 3, then `launch`. A question from either keeps the job `approved` and holding until the answer. |
 | `needs-input` whose only question is a short-hold timeout | Ask the user, naming the resource and its holder. Never settle it as `(recommended)`. |
 
-A held job's repository is held by another job that edits that tree, so step 3 at draft time would
-ask about that job's edits. A dirty tree at launch stops the auto-launch for a question.
+A held job's repository is held by a launched job, which edits that tree, or by an `approved` job
+about to launch. Step 3 at draft time would ask about that job's edits. A dirty tree at launch stops the auto-launch for a question.
 
 ### Risks
 
@@ -237,6 +268,8 @@ ask about that job's edits. A dirty tree at launch stops the auto-launch for a q
 | Bench jobs lose the launch-time bench lock at the part 1 upgrade. | Two jobs on the bench. | `list` shows two running `device: bench` jobs. | Upgrade with no `device: bench` job open. The part 1 PR states this. |
 | A worker forgets `release`. | The bench is held until the run ends. | A waiter's timeout names the holder. | Run-scoped claims. |
 | A lost session keeps short holds. | Other workers wait. | `list` shows the holder `lost`. | Deliberate. |
+| A wide multi-repo job starves: jobs on any one of its repositories, later ones included, keep launching. | It waits with no bound. | A `held` approved job whose `blocked-by` names a higher id. | None built. |
+| An `approved` job's launch-time question stays unanswered. | It keeps its repositories. | It stays `approved` across wakes; the question round names the job. | None built. |
 
 ## Split skill
 
@@ -259,7 +292,7 @@ approves the split.
 | Mode | Caller | Action |
 |---|---|---|
 | `plan` (default) | `cure:goal` job mode | Return by `split.md` status; see [Plan by status](#plan-by-status). |
-| `apply` | dispatcher, after the user chooses apply | Create tickets and jobs, re-queue successors, close the original. |
+| `apply` | dispatcher, after the user chooses apply | Create tickets and jobs, close the original with `continued-by`. |
 | `decline` | dispatcher, after the user chooses run as one | Set `status: declined`. |
 
 `$ARGUMENTS` is `<job dir> [plan|apply|decline]`. The skill reads `<job>/handoff.md`. The job id
@@ -270,7 +303,7 @@ is the directory name (`skills/goal/job.md:8`). The skill reads
 
 | File | Content |
 |---|---|
-| `<job>/split.md` | Frontmatter: `status: proposed \| declined \| applying \| applied`, `original`, `limit`, `tracker`, `error`. Body: `## Estimate` (table), `## Parts` (table: k, slug, repos, outcome, estimate, after, ticket, job), `## Successors` (table: old id, new id), `## Summary` (3 lines). |
+| `<job>/split.md` | Frontmatter: `status: proposed \| declined \| applying \| applied`, `original`, `limit`, `tracker`, `error`. Body: `## Estimate` (table), `## Parts` (table: k, slug, repos, outcome, estimate, after, ticket, job), `## Summary` (3 lines). |
 | `<job>/part-<k>.md` | One handoff per part. |
 
 `cure:split` is the only reader and writer of these files. The dispatcher reads only the skill's
@@ -310,7 +343,7 @@ return line, and prints the Summary lines from it. The store ignores files it do
 | Settled | Applicable lines copied, plus "Split: part k of n of <original id>; estimate ~N lines". |
 | `Resource risk:` lines, `## Tools` | Copied verbatim. |
 | `## Open` | Each item goes into the first part it affects. |
-| `ticket:`, `after:` | Empty until apply. |
+| `ticket:`, `after:`, `origin:` | Empty until apply. Apply fills them in step 1.2. |
 | `branch` | With `delivery: pr`: `<original branch>-part<k>`. With `delivery: commit`: the original branch; the parts stack as commits on it. |
 | Slug | `<original slug>-part<k>`. It passes `_slug_arg` (`commands/new.py:42-47`). |
 
@@ -333,38 +366,76 @@ one file.
 
 | Step | Decision | Reason |
 |---|---|---|
-| Dispatcher, `split proposed` | In step 1 (`agents/dispatcher.md:61`), print the 3 Summary lines from the return and ask in the question round: apply, or run as one job. A split is never auto-launched. `agents/dispatcher.md:120` allows `split.md` and `part-<k>.md` through `cure:split`. After apply, the dispatcher sends the origin the returned line and runs `cure-job list` again. | The return line is the single interface; later wakes re-print from it. |
+| Dispatcher, `split proposed` | In step 1 (`agents/dispatcher.md:61`), print the 3 Summary lines from the return and ask in the question round: apply, or run as one job. A split is never auto-launched. `agents/dispatcher.md:120` allows `split.md` and `part-<k>.md` through `cure:split`. After apply, the dispatcher sends the origin the returned line and runs `cure-job list` again. A successor's origin is not told: the successor keeps its id. | The return line is the single interface; later wakes re-print from it. |
 | Dispatcher, `split applying` | Show the last error and ask: retry apply, or abandon. Abandon closes the original and each part job the return line names. "Run as one" is not offered once a part job exists. | The parts already exist. |
 | Decline | `status: declined`. The dispatcher then runs step 1 again. | The decision persists across wakes. |
 
-Apply sets `status: applying`, then runs these steps. Each step records its result in `split.md`
-before the next. Each create looks for an earlier result first.
+#### Continuation through `continued-by`
+
+The brief's "closed with pointers to the parts" is refined here. The `closed` event of the original
+carries `continued-by: <last part id>`. `derive` resolves each successor's `after` through it.
+
+| # | Decision | Reason |
+|---|---|---|
+| 1 | `cure-job close ID --continued-by X` writes `continued-by: X` in the `closed` event. | One append, and apply runs it last. No window between re-point and close. |
+| 2 | The effective predecessor is the declared `after`, followed through every `abandoned` job with `continued-by`. | Successors keep id, origin, goal, approval and lock order. Grandchildren are untouched. Late successors resolve. |
+| 3 | `close --continued-by X` exits 1 and writes nothing when X is unknown, invalid, not open, the job itself, or a job whose resolved `after` chain reaches the job. `derive` gives `PredecessorGone.INVALID` at a job reached twice. | Re-pointing makes a cycle possible. |
+| 4 | Parts carry the original's origin in the handoff key `origin:`, filled from the original's `list --json` row. | `handoff.py:57-62` parses it and `job.py:60` falls back to it. It is written in the same rename as the handoff (`store.py:83-85`), so no crash window exists. |
+| 5 | The skill reads every CLI-derived value of the original (`origin`, `after`, `state`, `goal`) from `cure-job list --json`, never from `handoff.md`. | A handoff does not hold derived values. |
+| 6 | Apply proceeds only when the original's row is `queued` or `held` with `goal` false, or `abandoned` with `continued-by` equal to the recorded last part. | Then no goal, approval, run, claim or result exists. |
+| 7 | No generic `cure-job replace` and no CLI `split`. | See [Rejected](#rejected). |
+
+| Item at apply | Parts | Successors |
+|---|---|---|
+| Job id, lock order | Fresh id per part | Kept |
+| `repos`, `device`, `outcome`, Work, Done when | Per part | Kept |
+| `ticket` | New per part; with tracker none, the original's | Kept |
+| `branch` | Per part | Kept |
+| `base`, `delivery` | Copied; part k > 1 bases on part k-1 | Kept; `base` from the resolved predecessor |
+| Settled, Resource risk, Tools | Copied | Kept |
+| Open | First part it affects | Kept |
+| `after` | Part 1: the original's row `after`; k > 1: part k-1's id | Kept; resolves to the last part |
+| `origin` | `origin:` key from the original's row; omitted when null | Kept |
+| `split-from` | Original id | n/a |
+| `goal.md`, `approved`, `launched`, results | None exist (decision 6) | Kept |
+| `claim`, `release` | None; the close frees the original's | Kept |
+| `closed` | Written once on the original with `continued-by: <last part>` | Not written |
+| `split.md`, `part-<k>.md` | Stay with the original, pruned with it | n/a |
+
+The original's origin gets the apply return line. A successor's origin is told nothing.
+
+#### Apply procedure
+
+Apply first reads the original's row in `cure-job list --json`. It returns
+`failed: <original> is <state>` unless the row is `queued` or `held` with `goal` false, or
+`abandoned` with `continued-by` equal to the last part id in `split.md`. In that last case it goes
+to step 4. Otherwise it sets `status: applying` and runs these steps. Each step records its result
+in `split.md` before the next. Each create looks for an earlier result first.
 
 1. Per part k in order:
    1. If a tracker is active and the row has no ticket: search the tracker for the title
       `<original id> part k/n` (GitHub: `gh issue list --search "<original id> part k/n in:title"
       --state all`). Record a match. Otherwise create the ticket with that title and record it.
-   2. Fill `ticket:` and `after:` in `part-<k>.md`. Part 1 takes the original's `after:`. Part
-      k > 1 takes part k-1's job id.
+   2. Fill `ticket:`, `after:` and `origin:` in `part-<k>.md`. Part 1 takes the original's row
+      `after`. Part k > 1 takes part k-1's job id. Every part takes the original's row `origin`;
+      omit the key when it is null.
    3. If the row has no job: search `${CURE_JOB_ROOT:-~/.claude/cure}/jobs/*/handoff.md` for the
       Settled line "Split: part k of n of <original id>". Record a match. Otherwise run
       `cure-job new --slug <slug> <job>/part-<k>.md` and record the id.
-   4. If the original has an `origin`, run `cure-job origin <id> <origin>` (`providers/jobs.py:209-217`).
-2. Re-queue successors. Run `cure-job list --json`. For each open job whose `after` is the original:
-   if `## Successors` has no new id for it, search `jobs/*/handoff.md` for the Settled line
-   "Re-queued from <old id>". Record a match. Otherwise copy its `handoff.md` with
-   `after: <last part id>` and that Settled line, run `cure-job new`, and record the id. Then run
-   `cure-job close <old id> --reason "re-queued as <new id>"` unless it is already `abandoned`.
-3. Comment the part tickets on the original ticket if it is in the same tracker.
-4. Run `cure-job close <original> --reason "split into <id1>, <id2>, ..."` (`commands/close.py:18`).
-5. Set `status: applied`. Return `job <original> closed: split into <ids>`.
+2. Comment the part tickets on the original ticket if it is in the same tracker.
+3. Run `cure-job close <original> --continued-by <last part id> --reason "split into <id1>, <id2>, ..."`
+   (`commands/close.py:18`).
+4. Set `status: applied`. Run `cure-job list --json`. Return
+   `job <original> closed: split into <ids>[; <ids> wait on <last part id>]`, naming each open row
+   whose `after` is the last part id.
 
 On a failure, apply stops before that part's `cure-job new`, writes `error:` and returns
-`failed at part k: <error>`. The original is closed last, so its successors are re-queued before the
-after rule could close them. The fork has no `SendMessage`.
+`failed at part k: <error>`. The original is closed last. Until then its successors wait on it. From
+then on `derive` resolves them to the last part. No successor is re-created. The fork has no
+`SendMessage`.
 
-A re-queued successor gets a new id and needs a new goal and approval. The GitHub search index can
-lag a just-created issue by seconds; a crash inside that lag can still create a second ticket.
+The GitHub search index can lag a just-created issue by seconds. A crash inside that lag can still
+create a second ticket.
 
 ### 3-line summary
 
@@ -372,7 +443,7 @@ lag a just-created issue by seconds; a crash inside that lag can still create a 
 |---|---|
 | 1 | `<id>: <outcome> -> split into <n> parts in <repo>; estimate ~<total>, limit <L>` |
 | 2 | `1 <slug> ~<lines>; 2 <slug> ~<lines> after 1; ...` |
-| 3 | `tickets: <n> new in <tracker> \| none: <reason>; original closed on apply[; re-queued after part <n>: <ids>]` |
+| 3 | `tickets: <n> new in <tracker> \| none: <reason>; original closed on apply[; <ids> wait on part <n>]` |
 
 For an unsplit job, line 2 of the normal summary (`agents/dispatcher.md:64`) gains `~N lines`.
 
@@ -380,7 +451,7 @@ For an unsplit job, line 2 of the normal summary (`agents/dispatcher.md:64`) gai
 
 | Risk | Mitigation |
 |---|---|
-| Unverified: a `context: fork` skill forks when the caller has no `Agent` tool and honours `allowed-tools`. | The fork probe runs before part 1 and its result is recorded here. Fallback when it fails: `cure:split plan` runs as a headless `claude -p` call from Bash with the skill's tools; only its return line enters the dispatcher context. The fallback needs no CLI change. Part 5 done-when 2 re-tests the chosen path. |
+| Unverified: a `context: fork` skill forks when the caller has no `Agent` tool and honours `allowed-tools`. | The fork probe runs before part 1 and its result is recorded here. Fallback when it fails: `cure:split plan` runs as `timeout 540 claude -p "/cure:split <job dir> plan"` in one foreground Bash call, under the 600 s cap. It passes no `--allowedTools` (`skills/goal/job.md:97`); the skill's `allowed-tools` grant its tools. On a timeout the dispatcher asks: retry, or run as one job. Only the return line enters the dispatcher context. The fallback needs no CLI change. Part 5 done-when 2 re-tests the chosen path. |
 | The estimate may read a tree another job edits. | Accepted within the 2x margin. |
 | The close reason is not in `cure-job list --json` (`commands/list.py:59-72`). | Pointers live in `dispatch.jsonl`, the origin message and the ticket. |
 
@@ -477,7 +548,7 @@ Order: fork probe, then parts 1-6. Reasons:
   wait on it.
 - Part 1 ships one short-hold kind, so no two short holds can nest. Part 2 adds the second kind
   together with the all-or-none claim that prevents the deadlock. Together the two come to about
-  780 lines, near the 800-line trigger.
+  790 lines, near the 800-line trigger.
 - Parts 3-5 stack: approval, then `after:`, then the split, which uses `after:`.
 - Part 6 is independent.
 
@@ -508,20 +579,20 @@ Order: fork probe, then parts 1-6. Reasons:
    - Issue: TBD
    - Scope: `build:<dir>` kind and `resource.build`; `claim ID R1 [R2 ...]`, all or none; the hold-and-wait refusal; worker protocol for build steps, holds across a step and the foreign-edits check.
    - Files: `resource.py`, `providers/jobs.py`, `commands/claim.py`; tests `test_jobs`, `test_cli`; `skills/goal/worker.md`; `plugin.json`.
-   - Estimate: 255 changed lines in claude-plugins (100 code, 120 tests, 35 docs).
+   - Estimate: 265 changed lines in claude-plugins (105 code, 125 tests, 35 docs).
    - Depends on: part 1.
    - Done when:
      1. `claim ID build:<symlinked or ../ path>` stores the realpath.
      2. `claim ID build:/w device:bench` with the bench held writes no event.
-     3. A run holding `device:bench` gets exit 1 for `claim --wait ID build:/w`.
+     3. A run holding `device:bench` gets exit 1 for `claim --wait ID build:/w` and for `claim ID <repo>`. `claim --wait ID <repo>` exits 1.
      4. `skills/goal/worker.md` states one call per step and the foreign-edits check.
      5. `pytest` and `scripts/lint-plugin.py` pass.
 
 3. Approval while held, auto-launch
    - Issue: TBD
-   - Scope: `approved` event bound to the goal digest; `cure-job approve`; state `approved`; `held` with or without a goal; run-1 launch needs approval; `lock_rank` ranks approved jobs first; `list --json` fields `goal` and `approved`; dispatcher table rows for `held` and `approved`, with step 3 moved to `approved` and `approve` as the last write; Solo/Light rule as `approve --by auto`.
-   - Files: `events.py`, `job.py`, `store.py`, `goal.py` or a digest helper, `state.py`, `providers/jobs.py`, new `commands/approve.py`, `cli.py`, `commands/list.py`; tests (an approving builder helper; about 68 `launch` call sites); `agents/dispatcher.md`, the launch line in `skills/goal/job.md`, `README.md:107`; `plugin.json`.
-   - Estimate: 565 changed lines in claude-plugins (160 code, 340 tests, 65 docs).
+   - Scope: `approved` event bound to the goal digest; `cure-job approve`; state `approved`; `held` with or without a goal; run-1 launch needs approval; `holders` takes launched jobs and ready unlaunched jobs, all or none; `lock_rank` unchanged; `list --json` fields `goal` and `approved`; dispatcher table rows for `queued`, `held` and `approved`, with step 3 moved to `approved` and `approve` as the last write; Solo/Light rule as `approve --by auto`.
+   - Files: `events.py`, `job.py`, `store.py`, `goal.py` or a digest helper, `state.py` (the ready predicate; `held[name]` at `:107` becomes `held.get(name)`), `providers/jobs.py` (`held[name]` at `:146` becomes `.get`; `Listing` may carry the holders map `derive` built), new `commands/approve.py`, `cli.py`, `commands/list.py`; tests (an approving builder helper; about 68 `launch` call sites); `agents/dispatcher.md`, the launch line in `skills/goal/job.md`, `README.md:107`; `plugin.json`.
+   - Estimate: 615 changed lines in claude-plugins (175 code, 370 tests, 70 docs).
    - Depends on: part 2.
    - Done when:
      1. A blocked job with a goal lists `held` with `goal` true.
@@ -529,43 +600,50 @@ Order: fork probe, then parts 1-6. Reasons:
      3. Editing `goal.md` after `approve` returns `approved` to `awaiting-approval`, and `list` shows approved false.
      4. After the blocker is `done`, the held approved job lists `approved` with no new event.
      5. A `needs-input` launch or resume needs no approval.
-     6. Of two unlaunched jobs on one repo, the approved higher id holds it.
-     7. `agents/dispatcher.md` runs step 3 only in the `approved` row and names `approve` as the last write of a round.
-     8. `pytest` and `scripts/lint-plugin.py` pass.
+     6. Of two unlaunched jobs on one repo, the approved higher id holds it. The unapproved lower id lists `held`, `blocked-by` naming it.
+     7. An approved job on X and Y, with X held by a launched job, holds nothing. A later approved job on Y lists `approved`.
+     8. No `blocked-by` names a job in `queued`, `held` or `awaiting-approval`.
+     9. A job whose resources become unheld does not raise `KeyError` in `derive` or `launch`.
+     10. `agents/dispatcher.md` runs step 3 only in the `approved` row and names `approve` as the last write of a round.
+     11. `pytest` and `scripts/lint-plugin.py` pass.
 
 4. `after:` ordering
    - Issue: TBD
-   - Scope: handoff key `after:`; `JobView.after` and `PredecessorGone`; `derive` gains `invalid_ids`; `after` and `after-state` in `list`; launch refusal; prune guard; `base` from a same-repository predecessor, with the local base check and the base commit; dispatcher rows for the successor of a failed, abandoned, missing or invalid predecessor.
+   - Scope: handoff key `after:`; `JobView.after` and `PredecessorGone`; `derive` gains `invalid_ids`; `after` and `after-state` in `list`; launch refusal; the ready test excludes a job whose `after` is not satisfied; prune guard; `base` from a same-repository predecessor, which `cure:goal` reads from the row's `after`, with the local base check and the base commit; dispatcher rows for the successor of a failed, abandoned, missing or invalid predecessor.
    - Files: `handoff.py`, `state.py`, `providers/jobs.py`, `commands/list.py`; tests; `skills/dispatch/SKILL.md`, `skills/dispatch/template.md`, `skills/goal/job.md`, `skills/goal/SKILL.md`, `skills/goal/rules.md`, `agents/dispatcher.md`; `plugin.json`.
-   - Estimate: 365 changed lines in claude-plugins (110 code, 200 tests, 55 docs).
+   - Estimate: 390 changed lines in claude-plugins (115 code, 220 tests, 55 docs).
    - Depends on: part 3.
    - Done when:
      1. `new` with an unknown `after` exits 1.
      2. The successor is `held` with an empty `blocked-by` and `after-state` set until the predecessor is `done`. `needs-input` keeps it held.
-     3. `launch` of an after-held job exits 1 `after <id> is <state>`, with no traceback.
+     3. `launch` of an after-held job exits 1 `after <id> is <state>` from the `is_launchable` refusal (`providers/jobs.py:95-97`), with no traceback.
      4. A failed predecessor gives `after-state: failed`. An invalid predecessor gives `invalid`; a removed one gives `missing`.
      5. `prune` keeps an expired predecessor of an open job.
      6. `skills/goal/rules.md` states the local base check and the base commit for a predecessor's base.
-     7. `pytest` and `scripts/lint-plugin.py` pass.
+     7. An approved successor on Y, whose predecessor names only X and is `needs-input`, holds nothing. A later approved job on Y lists `approved`.
+     8. `pytest` and `scripts/lint-plugin.py` pass.
 
 5. Split skill with tracker tickets
    - Issue: TBD
-   - Scope: `cure:split` with `plan`, `apply` and `decline`; plan state files; plan by status; look-first apply; successor re-queue; estimation and trigger; GitHub tracker row; call from `cure:goal` job mode; dispatcher rows for `split proposed` and `split applying`; lint keys.
-   - Files: `skills/split/SKILL.md` (new, about 200), `skills/split/template.md` (new, about 55), `skills/goal/job.md` (about 25), `skills/goal/SKILL.md` (about 8), `agents/dispatcher.md` (about 30), `skills/dispatch/defaults.md` (about 4), `scripts/lint-plugin.py` (about 6), `cli/tests/test_lint_plugin.py` (about 15), `README.md` (about 6), `plugin.json` (2), `cli/tests/test_handoff.py` (about 10).
-   - Estimate: 361 changed lines in claude-plugins.
+   - Scope: `cure:split` with `plan`, `apply` and `decline`; plan state files; plan by status; look-first apply; `close --continued-by` and `after` resolution through it; `continued-by` in `list --json`; part handoffs carry `origin:`; the apply precondition; estimation and trigger; GitHub tracker row; call from `cure:goal` job mode; dispatcher rows for `split proposed` and `split applying`; lint keys.
+   - Files: `events.py` (about 8), `state.py` (about 20), `providers/jobs.py` (about 20), `commands/close.py` (about 5), `commands/list.py` (about 2); tests `test_events` (about 15), `test_state` (about 50), `test_jobs` (about 40), `test_cli` (about 15); `skills/split/SKILL.md` (new, about 190), `skills/split/template.md` (new, about 55), `skills/goal/job.md` (about 25), `skills/goal/SKILL.md` (about 8), `agents/dispatcher.md` (about 30), `skills/dispatch/defaults.md` (about 4), `scripts/lint-plugin.py` (about 6), `cli/tests/test_lint_plugin.py` (about 15), `README.md` (about 6), `plugin.json` (2), `cli/tests/test_handoff.py` (about 10).
+   - Estimate: 525 changed lines in claude-plugins (60 code, 145 tests, 320 skill and doc).
    - Depends on: part 4 (`after:`).
    - Done when:
      1. `scripts/lint-plugin.py` exits 0.
      2. From a session without `Agent`, `cure:split` runs on the path the fork probe chose. The main transcript has no Read of repository source.
      3. With a temporary `CURE_JOB_ROOT`, an over-limit fixture and tracker none: `split.md` is `proposed`, has n >= 2 parts each at or below the limit, and a 3-line Summary.
-     4. `apply` creates n jobs in `cure-job list --json`. Part k > 1 has `after:` equal to part k-1's id. The original is `abandoned` with the reason in `dispatch.jsonl`.
+     4. `apply` creates n jobs in `cure-job list --json`. Part k > 1 has `after:` equal to part k-1's id. Each part's row has the original's `origin`. The original is `abandoned`, its row has `continued-by` equal to the last part's id, and the reason is in `dispatch.jsonl`.
      5. A second `apply` leaves the job count unchanged.
      6. With `split.md` at `applying` and part 1's job present but not recorded, `apply` creates no second job for part 1.
-     7. A job queued with `after: <original>` is re-queued with `after: <last part id>`, and the old one is closed with "re-queued as <new id>".
+     7. Jobs S (`after: <original>`) and T (`after: S`), queued before apply, keep their ids, origins and states. S lists `after` equal to the last part's id. T is open after the next dispatcher scan. A job queued with `after: <original>` after apply also lists the last part.
      8. `plan` on `proposed` and on `applying` writes no file.
      9. CLI tests pass.
      10. The version is bumped.
      11. The GitHub ticket path, with the title search, is checked by hand as a PR-checklist item, with no scratch repository.
+     12. `close --continued-by X` exits 1 and writes nothing when X is unknown, not open, the job itself, or a job whose `after` chain reaches the job.
+     13. `prune` keeps an expired original while an open job's `after` chain passes through it.
+     14. With `split.md` at `applying` and the original `abandoned` with `continued-by` equal to the last part's id, `apply` writes no event and sets `applied`.
 
 6. Remove `capture-idea`, extend `cure:note`
    - Issue: TBD
