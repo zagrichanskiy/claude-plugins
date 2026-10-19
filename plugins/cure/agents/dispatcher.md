@@ -17,9 +17,9 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 | Command | Use |
 |---|---|
 | `cure-job prune` | Remove expired jobs and half-created directories. |
-| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported`, `sessions-removed` and, for a `blocked` job, `waiting-for`. |
+| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported`, `sessions-removed`, `prs` (the job's PR URLs) and, for a `blocked` job, `waiting-for`. |
 | `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. Refused after the job was launched. |
-| `cure-job reported <id>` | Record that the finish line for the job's latest run was sent or printed. |
+| `cure-job reported <id>` | Record that the finish message for the job's latest run was sent or printed. |
 | `cure-job stop <id>` | Stop the session of the job's latest run and wait until it is down. Takes the job id. Prints the session name, or `<session> not live` when it was already down; both exit 0. Exit 1 means the session may still be alive. |
 | `cure-job launch <id>` | Start the job session. Refuses a job that does not hold every resource it names, and a job whose session is alive. Refuses a `needs-input` job whose session is listed live, with `job <id> is needs-input and its session <name> is live; continue it: cure-job resume <id>`. A `needs-input` job whose session is gone or listed stopped launches. |
 | `cure-job close <id>` | Abandon a job. Refuses while its session is alive. |
@@ -50,9 +50,9 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | stalled | Re-run `cure-job list` after 60 seconds. If the row is still `stalled`, ask the user: relaunch or abandon. |
 | blocked | The session waits for input. Tell the user the job id, the session name (`session`) and what the session waits for (`waiting-for`, for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else; re-run `cure-job list` on the next wake. |
 | lost | Ask the user: relaunch or abandon. |
-| needs-input | Read `result.md`. If `reported` is false, send the finish line (below). Settle each `question` item as in "Asking". Ask the user the rest and any `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
+| needs-input | Read `result.md`. If `reported` is false, send the finish message (below). Settle each `question` item as in "Asking". Ask the user the rest and any `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
 | done | If `reported` is false, send the finish message (below). Then, if `sessions-removed` is false, run `cure-job remove-sessions <id>`. If it exits non-zero, show its error and continue. The next wake retries. |
-| failed | If `reported` is false, send the finish line (below). Keep the sessions: the user inspects them. |
+| failed | If `reported` is false, send the finish message (below). Keep the sessions: the user inspects them. |
 | abandoned | If `sessions-removed` is false, run `cure-job remove-sessions <id>`. If it exits non-zero, show its error and continue. The next wake retries. |
 | invalid | Print the job id and the file `list` names. Ask the user to repair the file or delete the job directory. Launch nothing until no job is `invalid`: the CLI refuses every `launch` and `claim` meanwhile. |
 
@@ -97,8 +97,8 @@ After the user chooses relaunch or abandon for a `lost` or `stalled` job, or aba
 
 When a job is `done`, `failed` or `needs-input`, and its row in `cure-job list --json` has `reported` false:
 
-1. If the row has an `origin`, send that address the finish message with `SendMessage`. Its first line holds the job id, the status, and the path of `result.md`. For `needs-input`, the first line ends with "the dispatcher asks the user; do not ask". Each PR URL under `pr` in `result.md` follows on its own line, as the plain full URL: no bullet, no markdown, no link syntax. The origin session prints the PR URLs unchanged. When the `SendMessage` fails, print the same message in your own session. Do not retry. With no `origin`, print the message in your own session.
-2. Run `cure-job reported <id>`, also after a printed line.
+1. If the row has an `origin`, send that address the finish message with `SendMessage`. Its first line holds the job id, the status, and the path of `result.md`. For `needs-input`, the first line ends with "the dispatcher asks the user; do not ask". When the row's `prs` is not empty, the first line ends with "print the URLs below unchanged", and each URL in `prs` follows on its own line, as the plain full URL: no bullet, no markdown, no link syntax. When the `SendMessage` fails, print the same message in your own session. Do not retry. With no `origin`, print the message in your own session.
+2. Run `cure-job reported <id>`, also after a printed message.
 
 When `reported` is true, send nothing.
 
