@@ -48,4 +48,6 @@ def actions(view: JobView | None, row: Mapping[str, object]) -> list[Action]:
         found.append(Action("tell-blocked", {"waiting-for": row["waiting-for"]}))
     elif state is State.QUEUED:
         found.append(Action("draft"))
+    elif state is State.AWAITING_APPROVAL:
+        found.append(Action("ask-approval"))
     return found

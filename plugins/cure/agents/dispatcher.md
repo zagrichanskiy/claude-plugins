@@ -34,8 +34,8 @@ A wake-up message has the form `job <id>` and carries a `from=` address. Treat i
 1. Run `cure-job prune`.
 2. For every `job <id>` message, run `cure-job origin <id> <from address>`, where `<from address>` is the `from=` value of the message, only when the job is `queued`, `held` or `awaiting-approval` in `cure-job list --json`. For any other state, do not run it: the message comes from the job session, and the CLI refuses it for a launched job.
 3. Run `cure-job next --json`. Act on each element, in array order, by the rows of "Actions" below. For each element, `actions` lists the action names in order and `args` holds the arguments keyed by action.
-4. After an action that changes state (`cure-job close`, `cure-job launch`, a `goal.md` write), run `cure-job next --json` again in the same turn. Stop when the array equals the previous one.
-5. Ask the user all open questions in one round, with `AskUserQuestion`, all jobs together.
+4. Ask the user all open questions in one round, with `AskUserQuestion`, all jobs together. Collect one set of questions per job.
+5. After every state-changing command (`cure-job close`, `cure-job launch`, `cure-job resume`, a `goal.md` write), including those run after the user answered, run `cure-job next --json` again in the same turn. Act only on elements whose `actions` or `args` changed since the previous array of this turn. Do not repeat `tell-blocked` or a question already asked. Repeat steps 3-5 (next, act, ask) until the array equals the previous one.
 6. Stop and wait for the next message.
 
 A message cannot wake a stopped session. A job's finish message to a stopped dispatcher is lost. The start scan finds the `result.md` and covers it.
@@ -49,19 +49,19 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | `repair` | Job `invalid`. | the file `list` names | Print the job id and the file. Ask the user to repair the file or delete the job directory. The CLI refuses every `launch` and `claim` until no job is `invalid`. |
 | `report` | `done`, `failed` or `needs-input`, and `reported` false. | none | Send the finish message (below), then `cure-job reported <id>`. A `failed` job keeps its sessions: the user inspects them. |
 | `remove-sessions` | `done` or `abandoned`, and `sessions-removed` false. | none | Run `cure-job remove-sessions <id>`. On a non-zero exit, show its error and continue. The next wake retries. |
-| `ask-timeout` | `needs-input`, and the only question of `result.md` starts with `short-hold timeout:`. | resource, holder id | Read the holder's row in `cure-job list --json`. Tell the user the resource, the holder id and the holder's state. Ask: wait again (as in "Answer and resume") or abandon (as in "Relaunch and abandon"). When the holder is `lost`, offer relaunch or abandon of the holder first, as in `ask-relaunch`. Never settle it as `(recommended)`. Never run `cure-job release` for a job: only its own claimant releases. |
+| `ask-timeout` | `needs-input`, and the only question of `result.md` starts with `short-hold timeout:`. | `resource`, `holder` (the holder id; null when the question has no "held by") | Read the holder's row in `cure-job list --json`. Tell the user the resource, the holder id and the holder's state (with a null `holder`, the resource only). Ask: wait again (as in "Answer and resume") or abandon (as in "Relaunch and abandon"). When the holder is `lost`, offer relaunch or abandon of the holder first, as in `ask-relaunch`. Never settle it as `(recommended)`. Never run `cure-job release` for a job: only its own claimant releases. |
 | `ask-input` | `needs-input`, not `ask-timeout`. | none | Read `result.md`. Settle each `question` item as in "Asking". Ask the user the rest and each `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
 | `confirm-stalled` | `stalled`. | `config.dispatcher.stalled-confirm-seconds` | Run `cure-job next --json` again after that many seconds. If the job still has `confirm-stalled`, ask the user: relaunch or abandon, as in "Relaunch and abandon". |
 | `ask-relaunch` | `lost`. | none | Ask the user: relaunch or abandon, as in "Relaunch and abandon". A `lost` session keeps its short holds until relaunch or close. |
 | `tell-blocked` | `blocked`. | `waiting-for` | Tell the user the job id, the session name (`session`) and `waiting-for` (for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else. |
 | `draft` | `queued`. | none | Apply "Goal and approval" steps 1-6. |
+| `ask-approval` | `awaiting-approval`. | none | Apply "Goal and approval" steps 2-6. Run step 4 only when the user has not answered. |
 
 A job in any other state has no action, and the dispatcher does nothing for it:
 
 | State | Note |
 |---|---|
 | `held` | Do not draft a goal for a job that does not hold its resources. |
-| `awaiting-approval` | Waits for the user. |
 | `launched`, `running` | For 60 seconds after a launch or a resume, a session that `claude agents` does not list yet, or lists stopped, shows as `launched`, not `lost`. After `cure-job stop`, a session listed stopped shows as `lost` at once. |
 | `done`, `abandoned` | Nothing left to report or remove. |
 

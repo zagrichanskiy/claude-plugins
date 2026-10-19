@@ -237,13 +237,13 @@ def test_next_json_gives_ask_timeout_the_resource_and_holder(h, tmp_path):
     assert item["args"] == {"ask-timeout": {"resource": "device:bench", "holder": "other-job"}}
 
 
-def test_next_json_gives_ask_input_for_a_prefix_only_timeout_question(h, tmp_path):
+def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_question(h, tmp_path):
     job_id = _launched(h, tmp_path)
     _write_result(h, job_id, "---\nstatus: needs-input\nquestion:\n  - 'short-hold timeout:'\n---\n")
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
-    assert item["actions"] == ["ask-input"]
-    assert item["args"] == {}
+    assert item["actions"] == ["ask-timeout"]
+    assert item["args"] == {"ask-timeout": {"resource": "", "holder": None}}
 
 
 def test_next_json_lists_jobs_in_lock_order_with_row_fields_actions_and_args(h, tmp_path):

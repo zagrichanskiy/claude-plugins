@@ -78,12 +78,23 @@ def test_blocked_job_gets_tell_blocked_with_waiting_for():
 @pytest.mark.parametrize("record, sessions", [
     (make_record(A, events=(launched(A, age=timedelta(seconds=1)),)), {}),
     (make_record(A, events=(launched(A),)), {A: SessionStatus.BUSY}),
-    (make_record(A, goal=True), {}),
     (finished(ResultStatus.DONE, Reported(1, NOW), SessionsRemoved(NOW)), {}),
+    (finished(ResultStatus.FAILED, Reported(1, NOW)), {}),
     (make_record(A, events=(Closed("x"), SessionsRemoved(NOW))), {}),
 ])
 def test_states_with_nothing_to_do_get_no_action(record, sessions):
     assert names(record, sessions) == []
+
+
+def test_held_job_gets_no_action():
+    records = [make_record(A), make_record(B)]
+    view = {v.record.id: v for v in derive(records, {}, NOW)}[B]
+    assert view.state is State.HELD
+    assert actions(view, {}) == []
+
+
+def test_awaiting_approval_job_gets_ask_approval():
+    assert names(make_record(A, goal=True)) == ["ask-approval"]
 
 
 def test_timeout_as_only_question_gets_ask_timeout_with_resource_and_holder():
@@ -93,12 +104,25 @@ def test_timeout_as_only_question_gets_ask_timeout_with_resource_and_holder():
     assert actions(view, {}) == [Action("ask-timeout", {"resource": "device:bench", "holder": B})]
 
 
+def _timeout_actions(questions):
+    record = make_record(A, events=(launched(A), Reported(1, NOW)),
+                         result=Result(ResultStatus.NEEDS_INPUT, (), None, (), questions))
+    return actions(derive([record], {}, NOW)[0], {})
+
+
+@pytest.mark.parametrize("question, resource, holder", [
+    ("short-hold timeout:", "", None),
+    ("short-hold timeout: device:bench", "device:bench", None),
+    ("short-hold timeout: device:bench repo:x held by " + A + " " + B, "device:bench repo:x", A + " " + B),
+])
+def test_timeout_question_without_a_single_holder_still_gets_ask_timeout(question, resource, holder):
+    assert _timeout_actions((question,)) == [Action("ask-timeout", {"resource": resource, "holder": holder})]
+
+
 @pytest.mark.parametrize("questions", [
-    ("short-hold timeout:",),
-    ("short-hold timeout: device:bench",),
     (TIMEOUT, "another question"),
 ])
-def test_malformed_or_shared_timeout_question_gets_ask_input(questions):
+def test_shared_timeout_question_gets_ask_input(questions):
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), questions))
     assert names(record) == ["ask-input"]

@@ -18,7 +18,7 @@ _DONE_WHEN_NUMBER = re.compile(r"[1-9][0-9]*")
 
 #: The question a worker reports when its short-hold wait budget is spent.
 SHORT_HOLD_TIMEOUT = "short-hold timeout:"
-_SHORT_HOLD_TIMEOUT = re.compile(re.escape(SHORT_HOLD_TIMEOUT) + r" (\S.*) held by (\S+)")
+_HELD_BY = " held by "
 
 
 class ResultStatus(enum.Enum):
@@ -39,15 +39,22 @@ class Result:
 @dataclass(frozen=True)
 class ShortHoldTimeout:
     resource: str
-    holder: str
+    holder: str | None
 
 
 def short_hold_timeout(result: Result) -> ShortHoldTimeout | None:
-    """The timeout when it is the only question: ``short-hold timeout: <resource> held by <holder id>``."""
-    if len(result.questions) != 1:
+    """The timeout when the only question starts with ``short-hold timeout:``.
+
+    The expected form is ``short-hold timeout: <resource> held by <holder id>``; without
+    ``held by`` the holder is ``None``.
+    """
+    if len(result.questions) != 1 or not result.questions[0].startswith(SHORT_HOLD_TIMEOUT):
         return None
-    match = _SHORT_HOLD_TIMEOUT.fullmatch(result.questions[0])
-    return ShortHoldTimeout(match.group(1), match.group(2)) if match else None
+    rest = result.questions[0][len(SHORT_HOLD_TIMEOUT):]
+    resource, held_by, holder = rest.rpartition(_HELD_BY)
+    if not held_by:
+        return ShortHoldTimeout(rest.strip(), None)
+    return ShortHoldTimeout(resource.strip(), holder.strip())
 
 
 @dataclass(frozen=True)
