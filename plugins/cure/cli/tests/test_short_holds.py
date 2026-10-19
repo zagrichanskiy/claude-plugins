@@ -541,3 +541,92 @@ def test_release_on_an_invalid_job_exits_one(h, pair, capsys):
     (h.jobs.store.job_dir(first) / "dispatch.jsonl").write_text("{not json\n", encoding="utf-8")
     assert h.run("release", first, BENCH) == 1
     assert "invalid" in capsys.readouterr().err
+
+
+# --- Review round 1: R1-2, R1-4, R1-5 -------------------------------------------------------------------
+
+def _jobs_lock_is_held(root) -> bool:
+    descriptor = os.open(root / "jobs", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(descriptor)
+    return False
+
+
+def test_claim_holds_the_store_lock_during_the_snapshot_and_the_append(h, pair, monkeypatch):
+    _, second = pair
+    store = h.jobs.store
+    observed: dict[str, bool] = {}
+    snapshot, append_events = store.snapshot, store.append_events
+
+    def probing_snapshot():
+        observed["snapshot"] = _jobs_lock_is_held(h.root)
+        return snapshot()
+
+    def probing_append(job_id, events):
+        observed["append"] = _jobs_lock_is_held(h.root)
+        append_events(job_id, events)
+
+    monkeypatch.setattr(store, "snapshot", probing_snapshot)
+    monkeypatch.setattr(store, "append_events", probing_append)
+    h.jobs.claim(second, [BENCH])
+    assert observed == {"snapshot": True, "append": True}
+
+
+def test_claim_wait_on_a_held_bench_refuses_an_invalid_job_on_the_first_poll(h, pair, tmp_path, capsys):
+    first, second = pair
+    invalid = h.launched(tmp_path, "/work/c")
+    h.jobs.claim(first, [BENCH])
+    (h.jobs.store.job_dir(invalid) / "dispatch.jsonl").write_text("{not json\n", encoding="utf-8")
+    assert h.run("claim", second, BENCH, "--wait", "540") == 1
+    err = capsys.readouterr().err
+    assert f"claim refused: job {invalid} is invalid" in err
+    assert "is held by" not in err
+    assert h.time.sleeps == []
+    assert BENCH not in h.resources(second)
+
+
+def test_claim_of_several_resources_is_one_write(h, pair, monkeypatch):
+    _, second = pair
+    writes: list[bytes] = []
+    real_write = os.write
+
+    def counting_write(descriptor, data):
+        writes.append(bytes(data))
+        return real_write(descriptor, data)
+
+    monkeypatch.setattr(os, "write", counting_write)
+    h.jobs.claim(second, [BENCH, "device:other"])
+    assert len(writes) == 1
+    claims = [decode(line) for line in writes[0].decode().splitlines()]
+    assert [c.resource for c in claims] == [BENCH, "device:other"]
+    assert h.resources(second) >= {BENCH, "device:other"}
+
+
+def test_claim_of_several_resources_records_none_when_the_write_fails(h, pair, monkeypatch):
+    _, second = pair
+    before = h.resources(second)
+
+    def failing_write(descriptor, data):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "write", failing_write)
+    with pytest.raises(Exception):
+        h.jobs.claim(second, [BENCH, "device:other"])
+    monkeypatch.undo()
+    assert h.resources(second) == before
+
+
+def test_append_events_with_no_events_writes_nothing_and_creates_no_file(h, tmp_path):
+    store = h.jobs.store
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text((REPO_A,), "none"), encoding="utf-8")
+    assert h.run("new", "--slug", "x", str(source)) == 0
+    job_id = h.lines[0]
+    log = store.job_dir(job_id) / "dispatch.jsonl"
+    log.unlink(missing_ok=True)
+    store.append_events(job_id, [])
+    assert not log.exists()

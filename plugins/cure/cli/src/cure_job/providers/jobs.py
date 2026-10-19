@@ -217,6 +217,7 @@ class JobsProvider:
         # A relaunch archives result.md before it records the next run.
         if record.result is not None or record.run in record.archived_runs:
             raise JobStateError(f"job {job_id} has a result for run {record.run}; claim needs a running run")
+        _refuse_invalid(snapshot.invalid, "claim")
         # Holders need only the records: a lost holder keeps its holds.
         open_records = {other.id: other for other in snapshot.records if is_open(other)}
         held = holders(open_records.values())
@@ -227,10 +228,8 @@ class JobsProvider:
                 # A launched holder keeps the resource even against a lower id.
                 if other.launches or lock_rank(other) < lock_rank(record):
                     return name, holder
-        _refuse_invalid(snapshot.invalid, "claim")
-        for name in dict.fromkeys(names):
-            if name not in record.resources:
-                self.store.append_event(job_id, Claim(name, record.run))
+        self.store.append_events(job_id, [Claim(name, record.run) for name in dict.fromkeys(names)
+                                          if name not in record.resources])
         return None
 
     def release(self, job_id: str, name: str) -> None:
