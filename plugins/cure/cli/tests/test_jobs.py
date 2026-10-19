@@ -321,79 +321,94 @@ def test_launch_runs_sessions_at_most_once(jobs, claude, clock):
 
 # --- claim ------------------------------------------------------------------------------------------
 
+def launched_job(jobs, clock, **kwargs):
+    return jobs.launch(new_job(jobs, clock, approved=True, **kwargs))
+
+
 def test_claim_a_new_resource_appends_a_claim_event(jobs, store, clock):
-    job_id = new_job(jobs, clock)
-    jobs.claim(job_id, DEVICE_BENCH)
-    assert store.load(job_id).events == (Claim(DEVICE_BENCH),)
+    job_id = launched_job(jobs, clock)
+    jobs.claim(job_id, [DEVICE_BENCH])
+    assert store.load(job_id).events[-1] == Claim(DEVICE_BENCH, 1)
     assert DEVICE_BENCH in store.load(job_id).resources
 
 
 def test_claim_of_a_resource_the_job_already_names_writes_nothing(jobs, store, clock):
-    job_id = new_job(jobs, clock)
-    jobs.claim(job_id, REPO)
-    assert store.load(job_id).events == ()
+    job_id = launched_job(jobs, clock)
+    before = store.load(job_id).events
+    jobs.claim(job_id, [REPO])
+    assert store.load(job_id).events == before
 
 
 def test_claim_twice_writes_one_event(jobs, store, clock):
-    job_id = new_job(jobs, clock)
-    jobs.claim(job_id, DEVICE_BENCH)
-    jobs.claim(job_id, DEVICE_BENCH)
-    assert store.load(job_id).events == (Claim(DEVICE_BENCH),)
+    job_id = launched_job(jobs, clock)
+    jobs.claim(job_id, [DEVICE_BENCH])
+    jobs.claim(job_id, [DEVICE_BENCH])
+    claims = [event for event in store.load(job_id).events if isinstance(event, Claim)]
+    assert claims == [Claim(DEVICE_BENCH, 1)]
 
 
 def test_claim_makes_a_higher_job_that_names_the_resource_held(jobs, clock):
-    first = new_job(jobs, clock, repos=("/work/a",))
-    second = new_job(jobs, clock, repos=("/work/b",), device="bench")
-    jobs.claim(first, DEVICE_BENCH)
-    assert state_map(jobs) == {first: State.QUEUED, second: State.HELD}
+    first = launched_job(jobs, clock, repos=("/work/a",))
+    second = new_job(jobs, clock, repos=("/work/b", "/work/c"))
+    jobs.claim(first, ["/work/c"])
+    assert state_map(jobs) == {first: State.RUNNING, second: State.HELD}
 
 
 def test_claim_unknown_job(jobs):
     with pytest.raises(UnknownJob):
-        jobs.claim("261013-1800-video-core-nothing", DEVICE_BENCH)
+        jobs.claim("261013-1800-video-core-nothing", [DEVICE_BENCH])
+
+
+def test_claim_refuses_a_job_that_is_not_launched(jobs, clock):
+    job_id = new_job(jobs, clock, approved=True)
+    with pytest.raises(JobStateError, match="no launched run"):
+        jobs.claim(job_id, [DEVICE_BENCH])
 
 
 @pytest.mark.parametrize("finish", ["close", "done", "failed"])
 def test_claim_refuses_a_job_that_is_not_open(jobs, store, clock, finish):
-    job_id = new_job(jobs, clock)
+    job_id = launched_job(jobs, clock)
     if finish == "close":
+        jobs.stop(job_id)
         jobs.close(job_id)
     else:
         (store.job_dir(job_id) / "result.md").write_text(f"---\nstatus: {finish}\n---\n", encoding="utf-8")
     with pytest.raises(JobStateError):
-        jobs.claim(job_id, DEVICE_BENCH)
+        jobs.claim(job_id, [DEVICE_BENCH])
 
 
 def test_claim_refused_when_a_lower_open_job_names_the_resource(jobs, store, clock):
-    low = new_job(jobs, clock, repos=("/work/a",), device="bench")
-    high = new_job(jobs, clock, repos=("/work/b",))
+    low = launched_job(jobs, clock, repos=("/work/a", "/work/c"))
+    high = launched_job(jobs, clock, repos=("/work/b",))
+    before = store.load(high).events
     with pytest.raises(ResourceHeld) as caught:
-        jobs.claim(high, DEVICE_BENCH)
-    assert (caught.value.resource, caught.value.holder) == (DEVICE_BENCH, low)
-    assert store.load(high).events == ()
+        jobs.claim(high, ["/work/c"])
+    assert (caught.value.resource, caught.value.holder) == ("/work/c", low)
+    assert store.load(high).events == before
 
 
 def test_claim_refused_when_a_higher_job_that_names_it_has_been_launched(jobs, clock):
-    low = new_job(jobs, clock, repos=("/work/a",))
-    high = new_job(jobs, clock, repos=("/work/b",), device="bench", approved=True)
-    jobs.launch(high)
+    low = launched_job(jobs, clock, repos=("/work/a",))
+    high = launched_job(jobs, clock, repos=("/work/b",))
+    jobs.claim(high, [DEVICE_BENCH])
     with pytest.raises(ResourceHeld) as caught:
-        jobs.claim(low, DEVICE_BENCH)
+        jobs.claim(low, [DEVICE_BENCH])
     assert (caught.value.resource, caught.value.holder) == (DEVICE_BENCH, high)
 
 
 def test_claim_allowed_when_the_lower_job_naming_it_is_closed(jobs, clock):
-    low = new_job(jobs, clock, repos=("/work/a",), device="bench")
-    high = new_job(jobs, clock, repos=("/work/b",))
+    low = new_job(jobs, clock, repos=("/work/a", "/work/c"))
+    high = launched_job(jobs, clock, repos=("/work/b",))
     jobs.close(low)
-    jobs.claim(high, DEVICE_BENCH)
-    assert state_map(jobs)[high] is State.QUEUED
+    jobs.claim(high, ["/work/c"])
+    assert "/work/c" in jobs.store.load(high).resources
 
 
 def test_claim_allowed_over_a_higher_job_that_was_not_launched(jobs, clock):
-    low = new_job(jobs, clock, repos=("/work/a",))
-    new_job(jobs, clock, repos=("/work/b",), device="bench", approved=True)
-    jobs.claim(low, DEVICE_BENCH)
+    low = launched_job(jobs, clock, repos=("/work/a",))
+    new_job(jobs, clock, repos=("/work/b", "/work/c"), approved=True)
+    jobs.claim(low, ["/work/c"])
+    assert "/work/c" in jobs.store.load(low).resources
 
 
 # --- close ------------------------------------------------------------------------------------------

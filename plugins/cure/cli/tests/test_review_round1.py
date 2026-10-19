@@ -104,10 +104,9 @@ def test_launched_job_with_a_higher_id_holds_the_resource_against_a_lower_unlaun
 
 def test_launched_job_may_claim_a_resource_named_by_a_lower_unlaunched_job(h, tmp_path):
     low = h.new(tmp_path, repo=OTHER)
-    (h.root / "jobs" / low / "handoff.md").write_text(handoff_text((OTHER,), device="bench"), encoding="utf-8")
     high = h.new(tmp_path)
     assert h.run("launch", high) == 0
-    assert h.run("claim", high, "device:bench") == 0
+    assert h.run("claim", high, OTHER) == 0
     listed = h.listed()
     assert listed[low]["blocked-by"] == [high]
     assert listed[high]["blocked-by"] == []

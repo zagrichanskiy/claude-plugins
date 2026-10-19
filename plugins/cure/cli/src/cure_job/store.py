@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import errno
+import fcntl
 import os
 import shutil
 import stat
@@ -123,6 +124,20 @@ class JobStore:
             if record is not None:
                 records.append(record)
         return Snapshot(records, invalid)
+
+    @contextlib.contextmanager
+    def locked(self) -> Iterator[None]:
+        """Hold an exclusive ``flock`` on the ``jobs/`` directory. Creates no lock file."""
+        with _store_errors(self._jobs):
+            os.makedirs(self._jobs, exist_ok=True)
+            descriptor = os.open(self._jobs, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            with _store_errors(self._jobs):
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            # Closing the descriptor releases the lock.
+            os.close(descriptor)
 
     def append_event(self, job_id: str, event: Event) -> None:
         path = self.job_dir(job_id) / _EVENTS

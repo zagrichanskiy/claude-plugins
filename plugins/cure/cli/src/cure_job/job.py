@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .events import Claim, Closed, Event, Launched, Origin, Reported, SessionsRemoved, StopIssued
+from . import resource
+from .events import Claim, Closed, Event, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
 from .handoff import Handoff
 from .result import Result
 
@@ -61,5 +62,18 @@ class JobRecord:
 
     @property
     def resources(self) -> frozenset[str]:
-        claimed = {event.resource for event in self.events if isinstance(event, Claim)}
-        return self.handoff.resources | claimed
+        """The handoff's repositories, every repository claim, and each short hold claimed and
+        not released in the latest run while it has no result. A claim without a run counts for
+        the whole job."""
+        names = set(self.handoff.resources)
+        for event in self.events:
+            if isinstance(event, Claim) and self._claim_counts(event):
+                names.add(event.resource)
+            elif isinstance(event, Release) and resource.is_short_hold(event.resource):
+                names.discard(event.resource)
+        return frozenset(names)
+
+    def _claim_counts(self, claim: Claim) -> bool:
+        if claim.run is None or not resource.is_short_hold(claim.resource):
+            return True
+        return claim.run == self.run and self.result is None

@@ -17,11 +17,27 @@ directory. A worker session then runs the goal and cannot reach the user.
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
   job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
   or drop these lines to save characters.
+- A handoff with `device: bench` declares bench use. The bench is not held from launch, so the goal
+  must carry the short-hold claim and release (below).
 
 ## Writing the goal
 
 - Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts
   in the first repository, so a path relative to the origin session's directory does not resolve.
+
+## Short holds in the goal
+
+`device: bench` no longer adds `device:bench` to the job's resources. The resource-risk scope of
+`device: bench` is unchanged. The goal tells the claimant the following:
+
+- Claim `device:bench` before each step that uses the bench, and `build:<absolute path>` before each
+  step that runs `bitbake`, `devtool` or `kas`. Release at the end of the step.
+- The rules are in `<plugin-root>/skills/goal/worker.md` "Short holds". The goal repeats none of
+  them and names the build directory of each build step.
+- Verify steps that use the bench carry their own claim and release in the work items.
+
+Upgrade: a `device: bench` job that is open when the plugin is upgraded loses its launch-time bench
+hold. Upgrade with no `device: bench` job open.
 
 ## Where it goes
 

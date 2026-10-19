@@ -246,10 +246,10 @@ def test_claim_event_adds_a_resource_to_the_job():
     assert states([claimed, other])[B] is State.HELD
 
 
-def test_device_bench_is_a_resource_like_a_repo():
+def test_device_bench_in_the_handoff_does_not_hold_the_bench():
     result = states([make_record(A, repos=("/work/x",), device=Device.BENCH),
                      make_record(B, repos=("/work/y",), device=Device.BENCH)])
-    assert result == {A: State.QUEUED, B: State.HELD}
+    assert result == {A: State.QUEUED, B: State.QUEUED}
 
 
 def test_ids_compare_as_plain_strings():
