@@ -35,8 +35,8 @@ ask which subnet to use has wasted the time it was meant to save.
 
 Before asking, settle everything you can yourself — read the code, the recipe, the ticket. What
 survives is a real fork: two readings that produce different work. For each, give the options you
-would actually recommend between. A question that asks the user to choose
-names each answer and its effect, and each answer is one the CLI allows. Each question carries its own context: the situation, the
+would actually recommend between, each an action the session or the tools it runs can take (in job
+mode, `cure-job` is one such tool). Each question carries its own context: the situation, the
 options, the consequence of each, and a recommendation, for a reader who has not followed the run.
 
 A question is a choice that changes behaviour the user would see, or a place where the source
@@ -172,7 +172,7 @@ unattended and pays for the orchestrator's context on every turn.
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
 | Retrospective | The second-last work item and the done-when item before the clean-up item. |
-| Implementer brief | Bump a plugin version once per branch, not per commit. A commit brief states that commits carry no trailer (no `Co-Authored-By`, no session line), because the user's `CLAUDE.md` overrides a session attribution reminder. |
+| Implementer brief | When the repository ships a versioned plugin or package, the brief states: bump the version once per branch, not per commit, and points to the repository's version rule where its `CLAUDE.md` has one. A commit brief omits attribution trailers (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids them, because that file overrides a session attribution reminder. Trailers the repository requires, such as `Signed-off-by:`, stay. |
 
 ## Agent tier
 

@@ -18,8 +18,9 @@ add one.
 - Each question states the situation, the options, the consequence of each and a recommendation,
   for a reader who has not followed the run.
 - A mechanical choice that the code or conventions determine: decide it. Scope with `grep` first.
-- Read and edit issues and pull requests with `gh ... --json` or `gh api`. `gh issue view` and
-  `gh pr edit` fail on the Projects (classic) deprecation.
+- Read with `gh issue view --json <fields>` or `gh pr view --json <fields>`. Edit with `gh api`, for
+  example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -f body=...`. `gh issue view` and
+  `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 
 ## Light and Full
