@@ -56,7 +56,7 @@ def test_relative_build_path_is_a_usage_error(h, pair, capsys):
     with pytest.raises(SystemExit) as caught:
         h.cli.run(["claim", first, "build:relative/dir"])
     assert caught.value.code == 2
-    assert capsys.readouterr().err
+    assert "is not an absolute path" in capsys.readouterr().err
 
 
 def test_claim_of_several_resources_with_one_held_writes_no_event(h, pair, capsys):
@@ -71,8 +71,18 @@ def test_claim_of_several_resources_with_one_held_writes_no_event(h, pair, capsy
 
 def test_claim_of_several_free_resources_appends_one_event_each(h, pair):
     first, _ = pair
+    before = len(claims(h, first))
     assert h.run("claim", first, "build:/w", BENCH) == 0
-    assert {event.resource for event in claims(h, first)} >= {"build:/w", BENCH}
+    appended = claims(h, first)[before:]
+    assert [event.resource for event in appended] == ["build:/w", BENCH]
+
+
+def test_claim_naming_one_resource_twice_appends_one_event_for_it(h, pair):
+    first, _ = pair
+    before = len(claims(h, first))
+    assert h.run("claim", first, "build:/w", "build:/w", BENCH) == 0
+    appended = claims(h, first)[before:]
+    assert [event.resource for event in appended] == ["build:/w", BENCH]
 
 
 def test_wait_claim_of_a_build_is_refused_while_the_run_holds_the_bench(h, pair, capsys):
