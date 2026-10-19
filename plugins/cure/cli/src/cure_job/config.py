@@ -183,10 +183,30 @@ def _from_defaults_md(path: Path) -> dict[str, object]:
         raise ConfigError(f"cannot read {path}: {e}") from e
     found: dict[str, object] = {}
     risks: list[dict[str, str]] = []
+    in_table = False
     for number, line in enumerate(lines, 1):
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
-        if len(cells) != 3 or cells[0] == "key" or set(cells[0]) <= set("-: "):
+        text = line.strip()
+        cells = [cell.strip() for cell in text.strip("|").split("|")]
+        if not text:
+            in_table = False
             continue
+        if text.startswith("|") and cells[0] == "key":
+            in_table = True
+            continue
+        if not in_table or ("-" in text and set(text) <= set("|-: ")):
+            continue
+        if "\\|" in text:
+            problem = "escaped '|' is not supported"
+        elif not text.startswith("|"):
+            problem = "row does not start with '|'"
+        elif len(cells) != 3:
+            problem = f"row has {len(cells)} cells, expected 3"
+        elif not cells[0]:
+            problem = "row has an empty key"
+        else:
+            problem = ""
+        if problem:
+            raise ConfigError(f"{path}:{number}: {problem}")
         key, value, scope = cells
         if key == "resource risk":
             risks.append({"scope": scope, "text": value})

@@ -45,7 +45,7 @@ Never read the file. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json`
 |---|---|
 | `handoff.delivery` | `delivery`, when the user did not state it. |
 | `handoff.base` | `base`, when the user did not state it. |
-| `handoff.branch` | Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies `handoff.branch` when the handoff omits `branch`; `current` is the branch checked out in the launch repository. |
+| `handoff.branch` | Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
 
 Omit `id` and `created`. `cure-job new` sets them.
 

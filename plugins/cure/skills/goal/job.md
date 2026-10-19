@@ -9,14 +9,14 @@ directory. A worker session then runs the goal and cannot reach the user.
 - Read the handoff file as the conversation.
 - Read `handoff.delivery`, `handoff.base`, `handoff.branch` and `handoff.resource-risk` with
   `<plugin-root>/bin/cure-job config get <key>` before the question round. Each prints JSON; the
-  built-in default applies when `config.json` has no value. Do not ask a fork a value answers; mark
+  built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch`; `current` is the branch checked out in the first repository of `repos`, the launch repository. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `config.json` itself.
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
   each `handoff.resource-risk` entry whose scope matches into Settled as its `text`, marked
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
-  job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
+  job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. A scope `repo: <path>` matches a handoff whose `repos` lists `<path>`. Never shorten
   or drop these lines to save characters.
 - A handoff with `device: bench` declares bench use. The goal must carry the short-hold claim and
   release (below).

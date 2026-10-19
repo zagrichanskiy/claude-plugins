@@ -30,6 +30,10 @@ def configure(h, data):
     """Write ``config.json`` and rebuild the CLI over the same fakes, as a new process would."""
     h.root.mkdir(parents=True, exist_ok=True)
     (h.root / "config.json").write_text(json.dumps(data), encoding="utf-8")
+    reload(h)
+
+
+def reload(h):
     h.cli = Cli(root=h.root, claude=h.claude, clock=h.clock, out=h.lines.append)
 
 
@@ -137,6 +141,128 @@ def test_done_when_4_prune_done_days_one_prunes_a_done_job_only_after_one_day(h,
     assert h.run("finish", job_id, "--status", "done") == 0
     configure(h, {"prune.done-days": 1})
     set_age(h.root / "jobs" / job_id / "result.md", h.clock(), age)
+    assert run_silently(h, "prune") == 0
+    assert (h.lines == [job_id]) is pruned
+    assert (h.root / "jobs" / job_id).exists() is not pruned
+
+
+# --- review finding 9: rejecting branches -------------------------------------------------------------
+
+RISK = {"scope": "all", "text": "r"}
+REJECTED = {
+    "delivery-unknown": {"handoff.delivery": "push"},
+    "base-with-whitespace": {"handoff.base": "my branch"},
+    "base-empty": {"handoff.base": ""},
+    "branch-not-a-string": {"handoff.branch": 3},
+    "tier-unknown": {"dispatcher.auto-approve-tiers": ["Solo", "Heavy"]},
+    "tier-duplicate": {"dispatcher.auto-approve-tiers": ["Solo", "Solo"]},
+    "tiers-not-a-list": {"dispatcher.auto-approve-tiers": "Solo"},
+    "risk-bad-scope": {"handoff.resource-risk": [{**RISK, "scope": "device:"}]},
+    "risk-empty-text": {"handoff.resource-risk": [{**RISK, "text": "  "}]},
+    "risk-extra-key": {"handoff.resource-risk": [{**RISK, "note": "n"}]},
+    "risk-not-a-list": {"handoff.resource-risk": RISK},
+}
+
+
+@pytest.mark.parametrize("data", REJECTED.values(), ids=REJECTED)
+def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewhere(h, capsys, data):
+    (key,) = data
+    configure(h, data)
+    assert h.run("config", "check") == 1
+    assert f"config.json: {key}: " in capsys.readouterr().err
+    assert run_silently(h, "config", "get", key) == 0
+    assert json.loads(h.lines[0]) == DEFAULTS[key]
+    assert f"using default {json.dumps(DEFAULTS[key])}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("data", [{"handoff.delivery": "pr"}, {"handoff.branch": "feature/x"},
+                                  {"dispatcher.auto-approve-tiers": []}, {"handoff.resource-risk": [
+                                      RISK, {"scope": "repo: /work/a", "text": "t"}]}])
+def test_an_accepted_value_passes_check(h, data):
+    configure(h, data)
+    assert h.run("config", "check") == 0
+
+
+WHOLE_FILE = {
+    "invalid-json": ("{not json", "invalid JSON"),
+    "not-an-object": ("[1]", "not a JSON object"),
+}
+
+
+@pytest.mark.parametrize("text, problem", WHOLE_FILE.values(), ids=WHOLE_FILE)
+def test_a_whole_file_error_stops_check_and_falls_back_to_every_default_elsewhere(h, capsys, text, problem):
+    h.root.mkdir(parents=True)
+    (h.root / "config.json").write_text(text, encoding="utf-8")
+    reload(h)
+    assert h.run("config", "check") == 1
+    assert f"config.json: {problem}" in capsys.readouterr().err
+    assert h.run("list") == 0
+    err = capsys.readouterr().err
+    assert f"config.json: {problem}" in err
+    assert err.rstrip().endswith("; using every default")
+
+
+def test_an_unreadable_config_file_is_a_whole_file_error(h, capsys):
+    (h.root / "config.json").mkdir(parents=True)
+    reload(h)
+    assert h.run("config", "check") == 1
+    assert "config.json: cannot read" in capsys.readouterr().err
+    assert h.run("list") == 0
+    assert "; using every default" in capsys.readouterr().err
+
+
+def test_an_unknown_key_is_reported_as_ignored_by_a_lenient_command(h, capsys):
+    configure(h, {"bogus.key": 1})
+    assert h.run("list") == 0
+    assert "config.json: bogus.key: unknown key; ignored" in capsys.readouterr().err
+
+
+def init_refused(h, capsys, defaults_md):
+    h.root.mkdir(parents=True)
+    (h.root / "defaults.md").write_text(defaults_md, encoding="utf-8")
+    assert h.run("config", "init") == 1
+    assert "error:" in capsys.readouterr().err
+    assert not (h.root / "config.json").exists()
+    assert (h.root / "defaults.md").read_text(encoding="utf-8") == defaults_md
+    assert not (h.root / "defaults.md.bak").exists()
+
+
+def table(*rows):
+    return "| key | value | scope |\n|---|---|---|\n" + "".join(row + "\n" for row in rows)
+
+
+INIT_REFUSED = {
+    "delivery-scoped": "| delivery | pr | device: bench |",
+    "base-scoped": "| base | develop | repo: /work/a |",
+    "branch-scoped": "| branch | feature | device: bench |",
+    "invalid-value": "| delivery | push | all |",
+    "escaped-pipe": "| resource risk | a \\| b | all |",
+    "no-leading-pipe": "delivery | pr | all |",
+    "two-cells": "| delivery | pr |",
+    "four-cells": "| delivery | pr | all | extra |",
+    "empty-key": "|  | pr | all |",
+}
+
+
+@pytest.mark.parametrize("row", INIT_REFUSED.values(), ids=INIT_REFUSED)
+def test_config_init_refuses_a_defaults_md_it_cannot_convert_and_writes_nothing(h, capsys, row):
+    init_refused(h, capsys, table(row))
+
+
+# --- prune retention by state --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("age, pruned", [(timedelta(days=1), False), (timedelta(days=1, seconds=1), True)])
+@pytest.mark.parametrize("key, state", [("prune.failed-days", "failed"), ("prune.abandoned-days", "abandoned")])
+def test_prune_failed_and_abandoned_days_set_the_retention_of_that_state(h, tmp_path, key, state, age, pruned):
+    job_id = launched_job(h, tmp_path) if state == "failed" else h.new(tmp_path)
+    if state == "failed":
+        assert h.run("finish", job_id, "--status", "failed") == 0
+        marker = h.root / "jobs" / job_id / "result.md"
+    else:
+        assert h.run("close", job_id) == 0
+        marker = h.root / "jobs" / job_id / "dispatch.jsonl"
+    configure(h, {key: 1})
+    set_age(marker, h.clock(), age)
     assert run_silently(h, "prune") == 0
     assert (h.lines == [job_id]) is pruned
     assert (h.root / "jobs" / job_id).exists() is not pruned
