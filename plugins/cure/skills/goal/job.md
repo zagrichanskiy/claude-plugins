@@ -51,14 +51,14 @@ At run time the worker takes the `needs-input:` exit for a question only the use
 
 ## Checks before launch
 
-The dispatcher runs these after writing `<job>/goal.md`, and again on every wake before a launch.
+The dispatcher runs the Repository check before writing `<job>/goal.md`, because the ledger path and the Permissions check depend on the first repository. It runs the other checks after writing it. All run again on every wake before a launch.
 A failed check is fixed, or asked about in the dispatcher's question round, before launch.
 
 | Check | How | On failure |
 |---|---|---|
 | Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
 | Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
-| Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user which repository the worker starts in. |
+| Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user. See the answers below. |
 | Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
 
 The worker starts in the handoff's first repository. It loads these permission rules:
@@ -82,6 +82,13 @@ for a failed permission check offers these answers:
 | The user adds an allow rule | The check runs again. |
 | Drop the action | `goal.md` is edited through `cure:goal`. The check runs again. |
 | Launch anyway | The run is accepted to stop at `needs-input` when the classifier denies the action. |
+
+The question for a failed Repository check offers these answers:
+
+| Answer | Effect |
+|---|---|
+| Re-dispatch | The dispatcher runs `cure-job close <id>`. The origin session queues a new handoff with the repository the change is made in first. |
+| Start in the first repository anyway | The decision is recorded under Settled in `goal.md`. The check passes on later wakes. |
 
 The dispatcher never adds a permission rule and never passes `--allowedTools` itself.
 
