@@ -26,7 +26,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | `device` | `bench` when the work needs the hardware bench, else `none`. It declares the use. The job claims the bench for each step at run time; the handoff does not hold it from launch. |
 | `outcome` | One sentence. |
 | `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. A new ticket or branch only when the user asked for one. |
-| `base`, `delivery` | Only when the user stated them. Otherwise omit the key; the defaults file supplies it. `delivery` is `commit` or `pr`. |
+| `base`, `delivery` | Only when the user stated them. Otherwise omit the key; the configuration supplies it. `delivery` is `commit` or `pr`. |
 | `after` | Only when this job continues the work of an open job of the same stack (any state other than `done`, `failed` or `abandoned`): that job's id, one only. Otherwise omit the key. `cure-job new` refuses an id with no job. The successor stays `held` until the predecessor is `done`. |
 | `## Settled` | Decisions taken in the session, each with its reason. |
 | Resource risk | One Settled line per resource the user rated in the session, in the user's words, for example "Resource risk: bench is a test stand; any action on it is approved". Omit when the user said nothing. |
@@ -37,8 +37,15 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 
 A small change does not affect customers: a fix, a small refactoring, a doc edit.
 
-The defaults file is `${CURE_JOB_ROOT:-~/.claude/cure}/defaults.md`. A missing file means no
-defaults. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/defaults.md` is an example of it.
+The configuration file is `${CURE_JOB_ROOT:-~/.claude/cure}/config.json`. A missing file means the
+built-in defaults. Read a value with `<plugin-root>/bin/cure-job config get <key>`; it prints JSON.
+Never read the file. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json` is an example of it.
+
+| Key | Used for |
+|---|---|
+| `handoff.delivery` | `delivery`, when the user did not state it. |
+| `handoff.base` | `base`, when the user did not state it. |
+| `handoff.branch` | Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies `handoff.branch` when the handoff omits `branch`; `current` is the branch checked out in the launch repository. |
 
 Omit `id` and `created`. `cure-job new` sets them.
 

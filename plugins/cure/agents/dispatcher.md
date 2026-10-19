@@ -52,7 +52,7 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | `remove-sessions` | `done` or `abandoned`, and `sessions-removed` false. | none | Run `cure-job remove-sessions <id>`. On a non-zero exit, show its error and continue. The next wake retries. |
 | `ask-timeout` | `needs-input`, and the only question of `result.md` starts with `short-hold timeout:`. | `resource`, `holder` (the holder id; null when the question has no "held by") | Read the holder's row in `cure-job list --json`. Tell the user the resource, the holder id and the holder's state (with a null `holder`, the resource only). Ask: wait again (as in "Answer and resume") or abandon (as in "Relaunch and abandon"). When the holder is `lost`, offer relaunch or abandon of the holder first, as in `ask-relaunch`. Never settle it as `(recommended)`. Never run `cure-job release` for a job: only its own claimant releases. |
 | `ask-input` | `needs-input`, not `ask-timeout`. | none | Read `result.md`. Settle each `question` item as in "Asking". Ask the user the rest and each `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
-| `confirm-stalled` | `stalled`. | `config.dispatcher.stalled-confirm-seconds` | Run `cure-job next --json` again after that many seconds. If the job still has `confirm-stalled`, ask the user: relaunch or abandon, as in "Relaunch and abandon". |
+| `confirm-stalled` | `stalled`. | `config.dispatcher.stalled-confirm-seconds` (from `cure-job next`; the value of `dispatcher.stalled-confirm-seconds`) | Run `cure-job next --json` again after that many seconds. If the job still has `confirm-stalled`, ask the user: relaunch or abandon, as in "Relaunch and abandon". |
 | `ask-relaunch` | `lost`. | none | Ask the user: relaunch or abandon, as in "Relaunch and abandon". A `lost` session keeps its short holds until relaunch or close. |
 | `tell-blocked` | `blocked`. | `waiting-for` | Tell the user the job id, the session name (`session`) and `waiting-for` (for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else. |
 | `close-successor` | `after-state` is `failed`, `abandoned` or `missing` (the CLI derives the job `held`). | `after`, `after-state` | Run `cure-job close <id>` without asking. Send the row's `origin` one line with `SendMessage`: the job id and "closed: predecessor <after> <after-state>; re-dispatch". When the `SendMessage` fails or the row has no `origin`, print the line in your own session. Successors of the closed job follow on the next scan. |
@@ -75,7 +75,7 @@ A job in any other state has no action, and the dispatcher does nothing for it:
 1. Write the goal: run `cure:goal` in job mode on the handoff. It writes `<job>/goal.md` and reports its `wc -c` count. A `held` job gets its goal too.
 2. Run the checks: the checks in `job.md` "Checks before launch", on every wake that may approve or launch. Fix a missing or failing tool, or ask the user about it in the question round. When no permission rule allows a classifier-gated action the goal needs, ask the user in the question round with the answers `job.md` lists. When the first repository holds none of the Work's edits, do the same.
 3. Print the summary: exactly 3 lines: the outcome, the tier and repository, the done-when count and the delivery (`commit` or `pr`). The third line also names each classifier-gated action the goal needs, for example `git commit --amend`, force-push or device power.
-4. Approve: for a Solo or Light job (`dispatcher.auto-approve-tiers` of `config.json` replaces this fixed rule once `config.json` exists), when the handoff has no `## Open` item and every check passed on this wake, run `cure-job approve <id> --by auto`. Run it after the checks and after any `goal.md` edit they cause. Otherwise wait for the user's answer, then run `cure-job approve <id>` (`--by user`).
+4. Approve: for a Solo or Light job (a tier in the JSON list printed by `cure-job config get dispatcher.auto-approve-tiers`; default `["Solo", "Light"]`), when the handoff has no `## Open` item and every check passed on this wake, run `cure-job approve <id> --by auto`. Run it after the checks and after any `goal.md` edit they cause. Otherwise wait for the user's answer, then run `cure-job approve <id>` (`--by user`).
 5. `approve` is the last write of a question round. Write every answer into `goal.md` through `cure:goal` first: a later edit changes the digest and revokes the approval.
 6. Launch: run `cure-job launch <id>` for an `approved` job (action `launch`). Show the command's output. Launch of an `awaiting-approval` job is refused.
 
@@ -130,7 +130,7 @@ When `reported` is true, send nothing.
 
 ## Memory
 
-Your `memory: user` directory holds only facts that stay true after `jobs/` is emptied and that neither `cure-job list` nor `defaults.md` can answer:
+Your `memory: user` directory holds only facts that stay true after `jobs/` is emptied and that neither `cure-job list` nor `cure-job config get` can answer:
 
 | File | Content |
 |---|---|

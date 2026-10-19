@@ -20,6 +20,7 @@ class NextCommand(Command):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--json", action="store_true", required=True, help="print JSON; the only format")
+        parser.set_defaults(config_mode="strict")
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
@@ -29,7 +30,7 @@ class NextCommand(Command):
                         key=lambda entry: entry[0])
         elements = []
         for _, view, row in ranked:
-            found = actions(view, row)
+            found = actions(view, row, jobs.config)
             if found:
                 elements.append({**row, "actions": [action.name for action in found],
                                  "args": {action.name: dict(action.args) for action in found if action.args}})

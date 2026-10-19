@@ -8,11 +8,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping
 
+from .config import DEFAULTS, Config
 from .result import short_hold_timeout
 from .state import JobView, PredecessorGone, State
 
-#: Replaced by ``dispatcher.stalled-confirm-seconds`` of ``config.json`` once it exists.
-STALLED_CONFIRM_SECONDS = 60
+STALLED_CONFIRM_SECONDS = DEFAULTS["dispatcher.stalled-confirm-seconds"]
 
 #: The ``after`` predecessor states that close a held successor. An invalid
 #: predecessor is left to its own ``repair``.
@@ -25,7 +25,7 @@ class Action:
     args: Mapping[str, object] = field(default_factory=dict)
 
 
-def actions(view: JobView | None, row: Mapping[str, object]) -> list[Action]:
+def actions(view: JobView | None, row: Mapping[str, object], config: Config = Config()) -> list[Action]:
     """The actions of one job, in the order the dispatcher takes them.
 
     ``row`` is the job's ``list --json`` row. ``view`` is ``None`` for an invalid job.
@@ -45,7 +45,7 @@ def actions(view: JobView | None, row: Mapping[str, object]) -> list[Action]:
         else:
             found.append(Action("ask-input"))
     elif state is State.STALLED:
-        found.append(Action("confirm-stalled", {"stalled-confirm-seconds": STALLED_CONFIRM_SECONDS}))
+        found.append(Action("confirm-stalled", {"stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]}))
     elif state is State.LOST:
         found.append(Action("ask-relaunch"))
     elif state is State.BLOCKED:
