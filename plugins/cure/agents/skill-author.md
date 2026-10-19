@@ -67,3 +67,4 @@ only what it added.
   personally identifiable information in a skill.
 - Report back concisely: the skill path, the commands or sections documented,
   and what changed since the previous version.
+- Do not commit, branch, or push.
