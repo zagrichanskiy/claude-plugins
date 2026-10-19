@@ -553,6 +553,7 @@ Order: fork probe, then parts 1-6. Reasons:
 - Part 6 is independent.
 
 0. Fork probe, before part 1
+   - Issue: #31 (Probe whether a context: fork skill forks from the dispatcher)
    - No PR. One manual session.
    - Method: a throwaway skill of about 20 lines with `context: fork` and `allowed-tools: Read`,
      invoked from a session started with `--agent cure:dispatcher`.
@@ -560,7 +561,7 @@ Order: fork probe, then parts 1-6. Reasons:
      held. It names the path part 5 takes.
 
 1. Short holds: `release`, run-scoped claims, `claim --wait` for the bench
-   - Issue: TBD
+   - Issue: #32 (Add cure-job release and run-scoped short holds for the bench)
    - Scope: `release` command and event; `run` field on claims; `claim` precondition, `--wait`, `JobStore.locked()` and holders from the snapshot; `resource.Kind` and `is_short_hold`; `device: bench` no longer a handoff resource; worker "Short holds" protocol with the single claimant; dispatcher row for a short-hold timeout.
    - Files: `cli/src/cure_job/` `resource.py`, `events.py`, `job.py`, `handoff.py`, `store.py`, `providers/jobs.py`, `commands/claim.py`, new `commands/release.py`, `cli.py`; tests `test_events`, `test_jobs`, `test_state`, `test_cli`, `test_handoff` (about 44 bench references); `skills/goal/worker.md`, `skills/goal/job.md`, `skills/dispatch/SKILL.md:26`, `agents/dispatcher.md`; `plugin.json`.
    - Estimate: 525 changed lines in claude-plugins (195 code, 280 tests, 50 docs).
@@ -576,7 +577,7 @@ Order: fork probe, then parts 1-6. Reasons:
      8. `pytest` and `scripts/lint-plugin.py` pass.
 
 2. `build:<dir>` and the all-or-none claim
-   - Issue: TBD
+   - Issue: #33 (Add the build:<dir> resource and the all-or-none claim)
    - Scope: `build:<dir>` kind and `resource.build`; `claim ID R1 [R2 ...]`, all or none; the hold-and-wait refusal; worker protocol for build steps, holds across a step and the foreign-edits check.
    - Files: `resource.py`, `providers/jobs.py`, `commands/claim.py`; tests `test_jobs`, `test_cli`; `skills/goal/worker.md`; `plugin.json`.
    - Estimate: 265 changed lines in claude-plugins (105 code, 125 tests, 35 docs).
@@ -589,7 +590,7 @@ Order: fork probe, then parts 1-6. Reasons:
      5. `pytest` and `scripts/lint-plugin.py` pass.
 
 3. Approval while held, auto-launch
-   - Issue: TBD
+   - Issue: #34 (Approve a held job and launch it when its resources free)
    - Scope: `approved` event bound to the goal digest; `cure-job approve`; state `approved`; `held` with or without a goal; run-1 launch needs approval; `holders` takes launched jobs and ready unlaunched jobs, all or none; `lock_rank` unchanged; `list --json` fields `goal` and `approved`; dispatcher table rows for `queued`, `held` and `approved`, with step 3 moved to `approved` and `approve` as the last write; Solo/Light rule as `approve --by auto`.
    - Files: `events.py`, `job.py`, `store.py`, `goal.py` or a digest helper, `state.py` (the ready predicate; `held[name]` at `:107` becomes `held.get(name)`), `providers/jobs.py` (`held[name]` at `:146` becomes `.get`; `Listing` may carry the holders map `derive` built), new `commands/approve.py`, `cli.py`, `commands/list.py`; tests (an approving builder helper; about 68 `launch` call sites); `agents/dispatcher.md`, the launch line in `skills/goal/job.md`, `README.md:107`; `plugin.json`.
    - Estimate: 615 changed lines in claude-plugins (175 code, 370 tests, 70 docs).
@@ -608,7 +609,7 @@ Order: fork probe, then parts 1-6. Reasons:
      11. `pytest` and `scripts/lint-plugin.py` pass.
 
 4. `after:` ordering
-   - Issue: TBD
+   - Issue: #35 (Order stacked jobs with after: in the handoff)
    - Scope: handoff key `after:`; `JobView.after` and `PredecessorGone`; `derive` gains `invalid_ids`; `after` and `after-state` in `list`; launch refusal; the ready test excludes a job whose `after` is not satisfied; prune guard; `base` per repository from the nearest job on the resolved `after` chain that changes the repository, which `cure:goal` walks from the row's `after`, with the local base check and the base commit; dispatcher rows for the successor of a failed, abandoned, missing or invalid predecessor.
    - Files: `handoff.py`, `state.py`, `providers/jobs.py`, `commands/list.py`; tests; `skills/dispatch/SKILL.md`, `skills/dispatch/template.md`, `skills/goal/job.md`, `skills/goal/SKILL.md`, `skills/goal/rules.md`, `agents/dispatcher.md`; `plugin.json`.
    - Estimate: 400 changed lines in claude-plugins (115 code, 220 tests, 65 docs).
@@ -625,7 +626,7 @@ Order: fork probe, then parts 1-6. Reasons:
      9. `pytest` and `scripts/lint-plugin.py` pass.
 
 5. Split skill with tracker tickets
-   - Issue: TBD
+   - Issue: #36 (Add the cure:split skill with tracker tickets)
    - Scope: `cure:split` with `plan`, `apply` and `decline`; plan state files; plan by status; look-first apply; `close --continued-by` and `after` resolution through it; `continued-by` in `list --json`; part handoffs carry `origin:`; the apply precondition; estimation and trigger; GitHub tracker row; call from `cure:goal` job mode; dispatcher rows for `split proposed` and `split applying`; lint keys.
    - Files: `events.py` (about 8), `state.py` (about 20), `providers/jobs.py` (about 20), `commands/close.py` (about 5), `commands/list.py` (about 2); tests `test_events` (about 15), `test_state` (about 50), `test_jobs` (about 40), `test_cli` (about 15); `skills/split/SKILL.md` (new, about 190), `skills/split/template.md` (new, about 55), `skills/goal/job.md` (about 25), `skills/goal/SKILL.md` (about 8), `agents/dispatcher.md` (about 30), `skills/dispatch/defaults.md` (about 4), `scripts/lint-plugin.py` (about 6), `cli/tests/test_lint_plugin.py` (about 15), `README.md` (about 6), `plugin.json` (2), `cli/tests/test_handoff.py` (about 10).
    - Estimate: 525 changed lines in claude-plugins (60 code, 145 tests, 320 skill and doc).
@@ -647,7 +648,7 @@ Order: fork probe, then parts 1-6. Reasons:
      14. With `split.md` at `applying` and the original `abandoned` with `continued-by` equal to the last part's id, `apply` writes no event and sets `applied`.
 
 6. Remove `capture-idea`, extend `cure:note`
-   - Issue: TBD
+   - Issue: #37 (Remove capture-idea and add the design note to cure:note)
    - Scope: the file list in [`capture-idea` removal](#capture-idea-removal) and the [design-note anatomy](#curenote-design-note-anatomy).
    - Files: `skills/capture-idea/SKILL.md` (deleted, 71), `skills/note/SKILL.md` (about 45), `README.md` (about 3), `plugin.json` (2).
    - Estimate: 121 changed lines in claude-plugins.
