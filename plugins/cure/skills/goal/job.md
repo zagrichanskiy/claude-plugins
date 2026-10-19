@@ -12,12 +12,16 @@ directory. A worker session then runs the goal and cannot reach the user.
   Settled.
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
-- Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts in the first repository, so a path relative to the workspace does not resolve.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
   each defaults row with key `resource risk` whose scope matches into Settled verbatim, marked
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
   job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
   or drop these lines to save characters.
+
+## Writing the goal
+
+- Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts
+  in the first repository, so a path relative to the origin session's directory does not resolve.
 
 ## Where it goes
 
