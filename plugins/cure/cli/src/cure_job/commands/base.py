@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING
 
-from .. import job_id
+from .. import job_id, resource
 from ..help import HelpFormatter, style
 from ..providers.jobs import JobsProvider
 
@@ -45,3 +45,14 @@ def job_id_arg(text: str) -> str:
     if not job_id.is_valid(text):
         raise argparse.ArgumentTypeError(f"invalid job id: {text!r}")
     return text
+
+
+#: The resource names ``claim`` and ``release`` accept, for help and errors.
+RESOURCE_CHOICES = f"{resource.DEVICE_BENCH}, build:<absolute path> or an absolute repository path"
+
+
+def resource_arg(text: str) -> str:
+    try:
+        return resource.parse(text)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"{e}; expected {RESOURCE_CHOICES}") from e
