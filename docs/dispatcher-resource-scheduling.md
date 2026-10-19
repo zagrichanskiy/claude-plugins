@@ -1,6 +1,6 @@
 # Dispatcher resource scheduling
 
-Status: agreed design. Each part's implementation spec is in its issue; see [Parts](#parts).
+Status: agreed design.
 
 ## Problem
 
@@ -124,18 +124,3 @@ cut.
 | A split skill with `context: fork` run by the dispatcher. | Needs plan state files, apply and decline modes and job continuation. The dispatcher cannot ask the user mid-estimate. |
 | A separate long-lived scheduler session. | Scheduling is deterministic and lives in the CLI. A second session adds a context and a message protocol. |
 | Keep `defaults.md` beside a second settings file. | A markdown table has no validator, and the CLI cannot read it. |
-
-## Parts
-
-Each part is one job and one PR in claude-plugins, and bumps the plugin version.
-
-| Part | Issue | Depends on | Estimate (lines) |
-|---|---|---|---|
-| 1 | #32 (Add cure-job release and run-scoped short holds for the bench) | none | 525 |
-| 2 | #33 (Add the build:<dir> resource and the all-or-none claim) | 1 | 265 |
-| 3 | #40 (Add cure-job next for the dispatcher's actions) | 2 | 430 |
-| 4 | #34 (Approve a held job and launch it when its resources free) | 3 | 600 |
-| 5 | #35 (Order stacked jobs with after: in the handoff) | 4 | 380 |
-| 6 | #41 (Replace defaults.md with a validated config.json) | 5 | 380 |
-| 7 | #36 (Split large jobs into chained jobs in cure:dispatch) | 6 | 130 |
-| 8 | #37 (Remove capture-idea and add the design note to cure:note) | none | 121 |
