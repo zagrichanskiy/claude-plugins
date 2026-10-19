@@ -8,11 +8,11 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Claim, Closed, Launched, StopIssued
+from cure_job.events import Approved, Claim, Closed, Launched, StopIssued
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
-from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, needs_sessions
+from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, is_ready, needs_sessions
 from tests.builders import NOW, make_record, result_of
 
 BUSY, IDLE, STOPPED = SessionStatus.BUSY, SessionStatus.IDLE, SessionStatus.STOPPED
@@ -172,6 +172,18 @@ def test_state_values_are_the_documented_words():
 
 
 # --- lock rule ----------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("blocked", [False, True])
+@pytest.mark.parametrize("result", [None, ResultStatus.NEEDS_INPUT])
+@pytest.mark.parametrize("goal", ["none", "unapproved", "stale", "approved"])
+def test_is_ready_is_true_exactly_when_an_unlaunched_job_derives_approved_or_held_approved(goal, result, blocked):
+    events = (Approved("sha256:other", "user", NOW),) if goal == "stale" else ()
+    record = make_record(B, goal=goal != "none", approved=goal == "approved", events=events,
+                         result=None if result is None else result_of(result))
+    others = [make_record(A, approved=True)] if blocked else []
+    state = states(others + [record])[B]
+    assert is_ready(record) is (state is State.APPROVED or (state is State.HELD and record.approved))
+
 
 def test_lowest_open_id_holds_and_the_others_are_held():
     result = states([make_record(C, approved=True), make_record(A, approved=True), make_record(B, approved=True)])

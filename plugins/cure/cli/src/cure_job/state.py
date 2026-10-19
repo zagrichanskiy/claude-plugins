@@ -172,7 +172,7 @@ def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: d
         return State.HELD
     if not record.has_goal:
         return State.QUEUED
-    return State.APPROVED if record.approved else State.AWAITING_APPROVAL
+    return State.APPROVED if is_ready(record) else State.AWAITING_APPROVAL
 
 
 def _ended_at(record: JobRecord, state: State) -> datetime | None:

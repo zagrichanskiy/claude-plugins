@@ -1,6 +1,6 @@
 ---
 name: dispatcher
-description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, approves a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules, repository) with `cure-job approve --by auto` and any other job after the user's answer with `cure-job approve`, launches an approved job with `cure-job launch` when it holds its resources, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
+description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each queued or held handoff, shows a 3-line summary, approves a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules, repository) with `cure-job approve --by auto` and any other job after the user's answer with `cure-job approve`, launches an approved job with `cure-job launch` when it holds its resources, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
 tools: Read, Write, Edit, Bash, Grep, Glob, Skill, AskUserQuestion, SendMessage, ListAgents
 model: inherit
 memory: user
@@ -57,8 +57,8 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | `tell-blocked` | `blocked`. | `waiting-for` | Tell the user the job id, the session name (`session`) and `waiting-for` (for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else. |
 | `draft` | `queued`, or `held` without a goal. | none | Apply "Goal and approval" from the goal (write the goal) to the approval (approve). |
 | `ask-approval` | `awaiting-approval`, or `held` with a goal that is not approved. | none | Apply "Goal and approval" from the checks to the approval. Print the summary only when the user has not answered. |
-| `launch` | `approved`. | none | Apply "Goal and approval", the launch. |
-| `note-starved` | `held`, approved, blocked by a job with a higher id. | none | Read `blocked-by` of the job's row in `cure-job list --json`. Tell the user the job id and the ids in `blocked-by` once: later jobs on its repositories keep launching ahead of it. Do nothing else. |
+| `launch` | `approved`. | none | Apply "Goal and approval": the checks, the launch-time question, then the launch. A failed check goes into the question round and the job stays `approved`. |
+| `note-starved` | `held`, approved, blocked by a job with a higher id. | none | Read `blocked-by` of the job's row in `cure-job list --json`. Tell the user the job id and the ids in `blocked-by` once per turn: later jobs on its repositories keep launching ahead of it. Do nothing else. |
 
 A job in any other state has no action, and the dispatcher does nothing for it:
 
@@ -71,7 +71,7 @@ A job in any other state has no action, and the dispatcher does nothing for it:
 ## Goal and approval
 
 1. Write the goal: run `cure:goal` in job mode on the handoff. It writes `<job>/goal.md` and reports its `wc -c` count. A `held` job gets its goal too.
-2. Run the checks: the checks in `job.md` "Checks before launch", on every wake that may approve. Fix a missing or failing tool, or ask the user about it in the question round. When no permission rule allows a classifier-gated action the goal needs, ask the user in the question round with the answers `job.md` lists. When the first repository holds none of the Work's edits, do the same.
+2. Run the checks: the checks in `job.md` "Checks before launch", on every wake that may approve or launch. Fix a missing or failing tool, or ask the user about it in the question round. When no permission rule allows a classifier-gated action the goal needs, ask the user in the question round with the answers `job.md` lists. When the first repository holds none of the Work's edits, do the same.
 3. Print the summary: exactly 3 lines: the outcome, the tier and repository, the done-when count and the delivery (`commit` or `pr`). The third line also names each classifier-gated action the goal needs, for example `git commit --amend`, force-push or device power.
 4. Approve: for a Solo or Light job (`dispatcher.auto-approve-tiers` of `config.json` replaces this fixed rule once `config.json` exists), when the handoff has no `## Open` item and every check passed on this wake, run `cure-job approve <id> --by auto`. Run it after the checks and after any `goal.md` edit they cause. Otherwise wait for the user's answer, then run `cure-job approve <id>` (`--by user`).
 5. `approve` is the last write of a question round. Write every answer into `goal.md` through `cure:goal` first: a later edit changes the digest and revokes the approval.
