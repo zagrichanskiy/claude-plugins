@@ -35,6 +35,8 @@ class ListCommand(Command):
             line = f"{row['id']:<{width}}  {row['state']}"
             if row["blocked-by"]:
                 line += "  blocked-by=" + ",".join(row["blocked-by"])
+            if row["prs"]:
+                line += "  prs=" + ",".join(row["prs"])
             if row["state"] == INVALID:
                 line += "  " + row["problem"]
             self.cli.out(line)
@@ -48,7 +50,7 @@ INVALID = "invalid"
 def _invalid_json(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "problem": job.problem,
-            "waiting-for": None, "reported": None, "sessions-removed": None}
+            "waiting-for": None, "reported": None, "sessions-removed": None, "prs": []}
 
 
 def _as_json(view: JobView, sessions: Mapping[str, Session]) -> dict:
@@ -69,4 +71,5 @@ def _as_json(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "waiting-for": waiting_for,
         "reported": record.reported,
         "sessions-removed": record.sessions_removed,
+        "prs": list(record.result.prs) if record.result else [],
     }

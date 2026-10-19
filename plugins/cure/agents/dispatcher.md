@@ -97,7 +97,7 @@ After the user chooses relaunch or abandon for a `lost` or `stalled` job, or aba
 
 When a job is `done`, `failed` or `needs-input`, and its row in `cure-job list --json` has `reported` false:
 
-1. If the row has an `origin`, send that address one line with `SendMessage`: the job id, the status, and the path of `result.md`. For `needs-input`, the line ends with "the dispatcher asks the user; do not ask". When the `SendMessage` fails, print the same line in your own session. Do not retry. With no `origin`, print the line in your own session.
+1. If the row has an `origin`, send that address the finish message with `SendMessage`. Its first line holds the job id, the status, and the path of `result.md`. For `needs-input`, the first line ends with "the dispatcher asks the user; do not ask". Each PR URL under `pr` in `result.md` follows on its own line, as the plain full URL: no bullet, no markdown, no link syntax. The origin session prints the PR URLs unchanged. When the `SendMessage` fails, print the same message in your own session. Do not retry. With no `origin`, print the message in your own session.
 2. Run `cure-job reported <id>`, also after a printed line.
 
 When `reported` is true, send nothing.

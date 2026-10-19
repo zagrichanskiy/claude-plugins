@@ -12,7 +12,7 @@ from .base import Command, job_id_arg
 class FinishCommand(Command):
     name = "finish"
     usage = ("cure-job finish ID --status STATUS [--unproven N[,N...]] [--question TEXT ...] "
-             "[--retro PATH] [--pr URL] [--kept PATH ...]")
+             "[--retro PATH] [--pr URL ...] [--kept PATH ...]")
     help = "record the result of a job run"
     description = "Write result.md for a launched job and print its path"
 
@@ -26,7 +26,8 @@ class FinishCommand(Command):
         parser.add_argument("--question", metavar="TEXT", action="append", type=str.strip, default=[],
                             help="a question for the user; repeatable; needed by --status needs-input")
         parser.add_argument("--retro", metavar="PATH", type=_path, help="retrospective file")
-        parser.add_argument("--pr", metavar="URL", type=str.strip, help="pull request")
+        parser.add_argument("--pr", metavar="URL", action="append", type=str.strip, default=[],
+                            help="a pull request on the job's branch, as a full URL; repeatable")
         parser.add_argument("--kept", metavar="PATH", action="append", type=_path, default=[],
                             help="a file kept for the user; repeatable")
         # Kept for run(): a refusal of Report is a usage error.
@@ -35,7 +36,7 @@ class FinishCommand(Command):
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         try:
             report = Report(status=ResultStatus(args.status), unproven=args.unproven,
-                            questions=tuple(args.question), retro=args.retro, pr=args.pr,
+                            questions=tuple(args.question), retro=args.retro, prs=tuple(args.pr),
                             kept=tuple(args.kept))
         except ValueError as e:
             self._parser.error(str(e))

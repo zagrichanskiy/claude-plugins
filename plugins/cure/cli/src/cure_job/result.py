@@ -28,6 +28,7 @@ class Result:
     status: ResultStatus
     unproven: tuple[str, ...]
     problem: str | None
+    prs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,7 @@ class Report:
     #: Written under the key ``question``.
     questions: tuple[str, ...] = ()
     retro: str | None = None
-    pr: str | None = None
+    prs: tuple[str, ...] = ()
     kept: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -49,18 +50,18 @@ class Report:
         for item in self.unproven:
             if not _DONE_WHEN_NUMBER.fullmatch(item):
                 raise ValueError(f"unproven: {item} is not a done-when number")
-        texts = (("questions", self.questions), ("retro", (self.retro,)), ("pr", (self.pr,)), ("kept", self.kept))
+        texts = (("questions", self.questions), ("retro", (self.retro,)), ("prs", self.prs), ("kept", self.kept))
         for field, values in texts:
             if not all(is_writable(value) for value in values if value is not None):
                 raise ValueError(f"{field}: empty or more than one line")
 
 
 def render_result(report: Report) -> str:
-    """The text of ``result.md``. ``parse_result`` reads it back as ``report``'s status and unproven."""
+    """The text of ``result.md``. ``parse_result`` reads it back as ``report``'s status, unproven and prs."""
     entries: dict[str, Value] = {STATUS: report.status.value}
     optional: dict[str, Value | None] = {
         UNPROVEN: list(report.unproven), QUESTION: list(report.questions),
-        RETRO: report.retro, PR: report.pr, KEPT: list(report.kept)}
+        RETRO: report.retro, PR: list(report.prs), KEPT: list(report.kept)}
     entries.update((key, value) for key, value in optional.items() if value)
     return render(entries)
 
@@ -75,7 +76,8 @@ def parse_result(text: str) -> Result:
     if status is None:
         return _malformed("status is missing")
     try:
-        return Result(ResultStatus(status), tuple(as_list(entries.get(UNPROVEN))), None)
+        return Result(ResultStatus(status), tuple(as_list(entries.get(UNPROVEN))), None,
+                      tuple(as_list(entries.get(PR))))
     except ValueError:
         choices = ", ".join(member.value for member in ResultStatus)
         return _malformed(f"status is {status!r}; expected one of {choices}")
