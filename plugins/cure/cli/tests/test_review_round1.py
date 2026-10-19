@@ -39,6 +39,7 @@ class Harness:
         job_id = self.lines[0]
         if goal:
             self.goal(job_id).write_text("goal", encoding="utf-8")
+            assert self.run("approve", job_id) == 0
         return job_id
 
     def goal(self, job_id):
@@ -136,7 +137,7 @@ def test_list_shows_the_invalid_job_and_still_lists_the_others(broken):
     listed = h.listed()
     assert listed[bad]["state"] == "invalid"
     assert listed[first]["state"] == "queued"
-    assert listed[later]["state"] == "awaiting-approval"
+    assert listed[later]["state"] == "approved"
 
 
 def test_prune_skips_an_invalid_job(broken):
@@ -153,6 +154,7 @@ def test_launch_and_claim_are_refused_while_any_job_is_invalid(broken, which):
     # The invalid job's resources are unknown, so it may hold any resource, whatever its id.
     target = {"first": first, "later": later}[which]
     h.goal(target).write_text("goal", encoding="utf-8")
+    assert h.run("approve", target) == 0
     assert h.run("launch", target) == 1
     assert h.run("claim", target, "device:bench") == 1
     assert h.claude.started == []
@@ -201,6 +203,7 @@ def test_launch_rewrites_a_versioned_cure_job_path_to_the_current_plugin_root(ro
     job_id = h.new(tmp_path)
     h.goal(job_id).write_text(f"run {OLD_ROOT}/bin/cure-job finish\nand {OLD_ROOT}/bin/cure-job claim\n",
                               encoding="utf-8")
+    assert h.run("approve", job_id) == 0
     assert h.run("launch", job_id) == 0
     assert h.goal(job_id).read_text(encoding="utf-8") == (
         f"run {current}/bin/cure-job finish\nand {current}/bin/cure-job claim\n")
@@ -211,5 +214,6 @@ def test_launch_leaves_a_goal_without_a_plugin_path_unchanged(root, tmp_path):
     job_id = h.new(tmp_path)
     text = "do the work\nsee /home/u/other/bin/cure-job-notes\n"
     h.goal(job_id).write_text(text, encoding="utf-8")
+    assert h.run("approve", job_id) == 0
     assert h.run("launch", job_id) == 0
     assert h.goal(job_id).read_text(encoding="utf-8") == text

@@ -104,7 +104,7 @@ the project's conventions, test command and run command from the repo.
 
 | Agent | Description |
 |---|---|
-| `dispatcher` | Scans the job queue (`cure-job prune`, then `cure-job next --json`: one element per job with its ordered actions) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, then runs `cure-job launch`: at once for a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules), otherwise after approval. It alone asks a job's questions. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
+| `dispatcher` | Scans the job queue (`cure-job prune`, then `cure-job next --json`: one element per job with its ordered actions) on start and on every wake-up message, runs `cure:goal` for each handoff that holds its resources, prints a 3-line summary, then runs `cure-job approve` (`--by auto` for a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules); otherwise after the user's answer) and `cure-job launch` for an `approved` job. `launch` refuses a run-1 job that is not `approved`. It alone asks a job's questions. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
 
 Start it once per machine:
 

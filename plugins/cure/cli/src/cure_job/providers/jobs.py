@@ -1,8 +1,8 @@
-"""The thirteen job operations.
+"""The fourteen job operations.
 
-Every operation except ``new``, ``finish``, ``reported`` and ``release`` reads
-one snapshot of the state root, derives the job states from it and makes its
-writes. ``finish``, ``reported`` and ``release`` read only their own job.
+Every operation except ``new``, ``approve``, ``finish``, ``reported`` and ``release``
+reads one snapshot of the state root, derives the job states from it and makes its
+writes. ``approve``, ``finish``, ``reported`` and ``release`` read only their own job.
 ``claim`` runs its check and its write under :meth:`JobStore.locked` and reads
 no session list. No other operation holds the lock, so their check and write
 are not atomic across processes.
@@ -25,13 +25,14 @@ from ..claude import Claude, Session, SessionStatus
 from ..clock import Clock
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
-from ..events import Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
+from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
 from ..goal import PLUGIN_ROOT, RULES, retarget
 from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
 from ..job import JobRecord
-from ..state import HALF_CREATED_AGE, JobView, State, derive, expired, holders, is_open, lock_rank, needs_sessions
+from ..state import (HALF_CREATED_AGE, JobView, State, derive, expired, holders, is_open, is_ready, lock_rank,
+                     needs_sessions)
 from ..store import InvalidJob, JobStore, Snapshot
 
 
@@ -100,6 +101,11 @@ class JobsProvider:
         listing = self.listing()
         view = self._find(listing, job_id)
         record = view.record
+        if view.state is State.AWAITING_APPROVAL:
+            raise JobStateError(f"job {job_id} is {view.state.value}; approve its goal first: "
+                                f"cure-job approve {job_id}")
+        if view.state is State.HELD and view.blocked_by and is_ready(record):
+            raise _resource_held(listing, record)
         if not view.state.is_launchable:
             raise JobStateError(f"job {job_id} is {view.state.value}; launch needs "
                                 + ", ".join(state.value for state in State if state.is_launchable))
@@ -150,9 +156,7 @@ class JobsProvider:
         if not record.has_goal:
             raise JobStateError(f"job {job_id} has no goal file: {goal} does not exist")
         if view.blocked_by:
-            held = _holders(listing.views)
-            name = next(name for name in sorted(record.resources) if held[name] != job_id)
-            raise ResourceHeld(name, held[name])
+            raise _resource_held(listing, record)
         _refuse_invalid(listing.invalid, operation)
         rules = self.plugin_root / RULES
         if not rules.is_file():
@@ -186,6 +190,24 @@ class JobsProvider:
         if unknown is not None:
             raise ClaudeOutcomeUnknown(f"{unknown}; recorded as run {run}, session {session}: "
                                        "list shows it launched, then running or lost") from unknown
+
+    def approve(self, job_id: str, by: str = "user") -> None:
+        """Record the approval of the current ``goal.md`` of an unlaunched job.
+
+        Reads only this job. A second call for the same goal writes nothing.
+        """
+        record = self.store.load(job_id)
+        if record.closed is not None:
+            raise JobStateError(f"job {job_id} is abandoned; approve needs an open job")
+        if record.launches:
+            raise JobStateError(f"job {job_id} has a launched run; approve applies only before the first launch")
+        if record.result is not None:
+            raise JobStateError(f"job {job_id} has a result; approve needs a job without one")
+        if not record.has_goal:
+            raise JobStateError(f"job {job_id} has no goal file: {self.store.goal_path(job_id)} does not exist")
+        if record.approved:
+            return
+        self.store.append_event(job_id, Approved(record.goal_digest, by, self.clock()))
 
     def claim(self, job_id: str, names: Sequence[str], wait: float = 0) -> None:
         """Add ``names`` to the resources ``job_id`` names. Returns when the job holds every one.
@@ -413,8 +435,11 @@ def _live(session: Session | None) -> bool:
     return session is not None and session.status is not SessionStatus.STOPPED
 
 
-def _holders(views: list[JobView]) -> dict[str, str]:
-    return holders(view.record for view in views if view.state.is_open)
+def _resource_held(listing: Listing, record: JobRecord) -> ResourceHeld:
+    """The first resource of ``record`` that another job holds, with its holder."""
+    held = holders(view.record for view in listing.views if view.state.is_open)
+    name = next(name for name in sorted(record.resources) if held.get(name) not in (None, record.id))
+    return ResourceHeld(name, held[name])
 
 
 def _refuse_invalid(invalid_jobs: Sequence[InvalidJob], operation: str) -> None:

@@ -22,6 +22,7 @@ from typing import Callable, Iterator, NamedTuple, Sequence
 from . import job_id as ids
 from .errors import HandoffError, StoreError, UnknownJob
 from .events import Event, decode, encode
+from .goal import digest
 from .handoff import Handoff, parse_handoff
 from .job import JobRecord
 from .result import parse_result
@@ -303,7 +304,7 @@ class JobStore:
             id=job_id,
             dir=directory,
             handoff=_parse_stored_handoff(directory / _HANDOFF, handoff_text),
-            has_goal=(directory / _GOAL).is_file(),
+            goal_digest=_goal_digest(directory / _GOAL),
             events=events,
             result=None if result_text is None else parse_result(result_text),
             result_mtime=result_mtime,
@@ -339,6 +340,17 @@ def _archived_runs(directory: Path) -> frozenset[int]:
             return frozenset()
         raise
     return frozenset(int(match.group(1)) for match in map(_ARCHIVED.fullmatch, names) if match)
+
+
+def _goal_digest(path: Path) -> str | None:
+    try:
+        with _store_errors(path):
+            with open(path, "rb") as source:
+                return digest(source.read())
+    except StoreError as e:
+        if isinstance(e.__cause__, (FileNotFoundError, NotADirectoryError)):
+            return None
+        raise
 
 
 def _parse_stored_handoff(path: Path, text: str) -> Handoff:

@@ -87,7 +87,7 @@ def test_states_with_nothing_to_do_get_no_action(record, sessions):
 
 
 def test_held_job_gets_no_action():
-    records = [make_record(A), make_record(B)]
+    records = [make_record(A, approved=True), make_record(B, approved=True)]
     view = {v.record.id: v for v in derive(records, {}, NOW)}[B]
     assert view.state is State.HELD
     assert actions(view, {}) == []

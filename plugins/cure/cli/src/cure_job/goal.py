@@ -1,12 +1,14 @@
-"""Plugin paths in a goal file.
+"""The goal file: its digest, and the plugin paths in it.
 
-A goal file names files of the cure plugin by the path of the version that
+An approval names the sha256 of the goal file's bytes, so any edit of the file
+revokes it. A goal file names files of the cure plugin by the path of the version that
 wrote it, ``.../plugins/cache/<marketplace>/cure/<version>/``. A plugin update
 can remove that directory, so ``launch`` points each such path at the plugin
 this CLI belongs to.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -26,3 +28,8 @@ def retarget(text: str, plugin_root: Path) -> str:
     """``text`` with each cached cure plugin root replaced by ``plugin_root``."""
     replacement = str(plugin_root).rstrip("/") + "/"
     return _CACHED_ROOT.sub(lambda match: replacement, text)
+
+
+def digest(data: bytes) -> str:
+    """The digest an ``approved`` event names for a goal file of ``data``."""
+    return "sha256:" + hashlib.sha256(data).hexdigest()

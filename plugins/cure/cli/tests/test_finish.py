@@ -45,6 +45,7 @@ def make_job(jobs, store, clock, repo=REPO, launched=True):
     job_id = jobs.new(handoff_text((repo,)), "x")
     if launched:
         store.goal_path(job_id).write_text("goal", encoding="utf-8")
+        jobs.approve(job_id)
         jobs.launch(job_id)
     return job_id
 
@@ -139,6 +140,7 @@ class Harness:
         job_id = self.lines[-1]
         if launched:
             (self.root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+            assert self.run("approve", job_id) == 0
             assert self.run("launch", job_id) == 0
         self.lines.clear()
         return job_id
@@ -294,11 +296,13 @@ def test_f10_launch_refuses_a_lower_id_job_when_a_launched_job_holds_the_reposit
     clock.now = datetime(2026, 10, 25, 1, 30, tzinfo=timezone(timedelta(hours=3)))
     first = jobs.new(handoff_text((REPO,)), "x")
     store.goal_path(first).write_text("goal", encoding="utf-8")
+    jobs.approve(first)
     jobs.launch(first)
     clock.now = datetime(2026, 10, 25, 1, 10, tzinfo=timezone(timedelta(hours=2)))
     second = jobs.new(handoff_text((REPO,)), "y")
     assert second < first
     store.goal_path(second).write_text("goal", encoding="utf-8")
+    jobs.approve(second)
     with pytest.raises(ResourceHeld) as caught:
         jobs.launch(second)
     assert caught.value.holder == first
