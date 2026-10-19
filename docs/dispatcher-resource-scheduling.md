@@ -17,6 +17,8 @@ Cure 0.20.0 has these gaps:
 
 ## Decisions
 
+Each row is a rule the implementation follows, with the reason for it.
+
 | Decision | Reason |
 |---|---|
 | Changes stack in one workspace. | Yocto workspace with many repos. |
@@ -35,12 +37,16 @@ Cure 0.20.0 has these gaps:
 
 ## Out of scope
 
+This design does not provide:
+
 - Two bitbake runs in one build directory at the same time.
 - More than one bench device.
 - Priorities other than queue order.
 - Preemption of a running job.
 
 ## Resources
+
+A job claims three kinds of resource. Each kind is held for a different span of the job.
 
 | Resource | Held | Example value |
 |---|---|---|
@@ -56,6 +62,10 @@ therefore holds only repositories, and no launched job waits for a repository. N
 form.
 
 ## Job states
+
+The CLI derives a job's state from its event log and files. The diagram shows the states and what
+moves a job between them. `stalled` and `blocked`, the session states for a hung or prompting
+session, are left out.
 
 ```mermaid
 stateDiagram-v2
@@ -95,7 +105,8 @@ any state without a live session.
 
 ## Short holds in one run
 
-A job claims the build and the bench only for the step that needs them; other jobs use them in
+The diagram shows one job from launch to finish, with the messages between the dispatcher, the
+`cure-job` CLI and the job session. A job claims the build and the bench only for the step that needs them; other jobs use them in
 between.
 
 ```mermaid
@@ -123,7 +134,8 @@ sequenceDiagram
 
 ## Split
 
-Each part builds, passes its tests and is reviewable alone.
+`cure:dispatch` splits a change that is too large before any job exists. The diagram shows its
+decisions. Each part builds, passes its tests and is reviewable alone.
 
 ```mermaid
 flowchart TD
@@ -140,6 +152,8 @@ flowchart TD
 ```
 
 ## Rejected
+
+Alternatives that were considered and not chosen, with the reason.
 
 | Alternative | Reason |
 |---|---|
