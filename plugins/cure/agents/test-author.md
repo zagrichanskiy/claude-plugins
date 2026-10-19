@@ -74,6 +74,10 @@ report the defect.
   already has installed.
 - Do not modify the code under test to make a test pass. If the code must
   change, report that instead.
+- Comments are minimal. A comment states only what the code cannot say. No
+  comment restates the next statement, the signature, or the change. A
+  self-explanatory change gets no comment. This rule overrides the comment
+  density of the surrounding tests.
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in a test or fixture.

@@ -68,6 +68,8 @@ fix, or commit.
 - **Convention and safety:** violations of the project's documented rules,
   including any safety constraints in `CLAUDE.md`. Flag these explicitly.
 - **Tests:** behavior the change introduces that no test pins.
+- **Comments:** every comment the change adds that restates the code (the next
+  statement, the signature, or the change) is a `SHOULD-CONSIDER` finding.
 
 Distinguish a genuine defect from a stylistic preference, and say which. Do not
 invent problems to fill a report; if the change is sound, say so plainly.

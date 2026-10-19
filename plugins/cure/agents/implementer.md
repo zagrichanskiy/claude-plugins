@@ -28,9 +28,10 @@ or style. Before editing a single line:
    change correctly: callers, the layer boundary it sits on, the interfaces it
    must satisfy.
 3. Match the surrounding code. Naming, error handling, logging, typing, import
-   order, comment density and file layout come from the files already in the
-   tree, not from your own preference. Where the file wraps or ships beside an
-   upstream one, match the upstream's style over the project's.
+   order and file layout come from the files already in the tree, not from
+   your own preference. Comments follow the comment rule under Rules. Where
+   the file wraps or ships beside an upstream one, match the upstream's style
+   over the project's.
 4. Reuse what exists. Find the helper, base class, fixture or utility the
    project already has before adding a parallel one.
 
@@ -68,6 +69,10 @@ elsewhere, report the defect rather than papering over it.
 - Write to disk. Do not commit, branch, or push — leave that to the human.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in code, configuration or a fixture.
+- Comments are minimal. A comment states only what the code cannot say. No
+  comment restates the next statement, the signature, or the change. A
+  self-explanatory change gets no comment. This rule overrides the comment
+  density of the surrounding code.
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Report back concisely: the files written, what each change does, the
   conventions you followed, the sanity-check result, and any assumption,
