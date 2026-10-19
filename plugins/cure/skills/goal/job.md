@@ -87,7 +87,7 @@ The question for a failed Repository check offers these answers:
 
 | Answer | Effect |
 |---|---|
-| Re-dispatch | The dispatcher runs `cure-job close <id>`. The origin session queues a new handoff with the repository the change is made in first. |
+| Re-dispatch | The dispatcher runs `cure-job close <id>`. It sends the row's `origin` one line with `SendMessage`: the job id and "closed: re-dispatch with <repository> first in `repos`". When the `SendMessage` fails or the row has no `origin`, it prints the line in its own session. The origin session queues a new handoff with that repository first. |
 | Start in the first repository anyway | The decision is recorded under Settled in `goal.md`. The check passes on later wakes. |
 
 The dispatcher never adds a permission rule and never passes `--allowedTools` itself.
