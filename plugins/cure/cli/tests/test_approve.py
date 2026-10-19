@@ -45,7 +45,7 @@ def event_lines(h, job_id):
 
 
 def view_of(records, job_id):
-    return {view.record.id: view for view in derive(records, {}, NOW)}[job_id]
+    return {view.record.id: view for view in derive(records, {}, NOW, frozenset())}[job_id]
 
 
 # --- Done when 1 ---------------------------------------------------------------------------------------
@@ -205,14 +205,14 @@ def test_done_when_5_relaunch_of_a_lost_job_needs_no_approval(h, tmp_path):
 # --- Done when 6 ---------------------------------------------------------------------------------------
 
 def test_done_when_6_approved_higher_id_holds_and_unapproved_lower_id_is_held_behind_it():
-    result = derive([make_record(A, goal=True), make_record(B, approved=True)], {}, NOW)
+    result = derive([make_record(A, goal=True), make_record(B, approved=True)], {}, NOW, frozenset())
     by_id = {view.record.id: view for view in result}
     assert by_id[B].state is State.APPROVED and by_id[B].blocked_by == ()
     assert by_id[A].state is State.HELD and by_id[A].blocked_by == (B,)
 
 
 def test_done_when_6_unapproved_lower_id_without_a_goal_is_held_behind_the_approved_higher_id():
-    by_id = {v.record.id: v for v in derive([make_record(A), make_record(B, approved=True)], {}, NOW)}
+    by_id = {v.record.id: v for v in derive([make_record(A), make_record(B, approved=True)], {}, NOW, frozenset())}
     assert by_id[A].state is State.HELD and by_id[A].blocked_by == (B,)
 
 
@@ -237,7 +237,7 @@ def test_done_when_7_a_later_approved_job_on_the_free_repo_is_approved():
     holder = make_record(A, repos=(X,), events=(launched(A),))
     wide = make_record(B, repos=(X, Y), approved=True)
     later = make_record(C, repos=(Y,), approved=True)
-    result = derive([holder, wide, later], {A: SessionStatus.BUSY}, NOW)
+    result = derive([holder, wide, later], {A: SessionStatus.BUSY}, NOW, frozenset())
     by_id = {view.record.id: view for view in result}
     assert by_id[C].state is State.APPROVED and by_id[C].blocked_by == ()
     assert by_id[B].state is State.HELD and by_id[B].blocked_by == (A, C)
@@ -267,7 +267,7 @@ def test_done_when_8_no_blocked_by_names_a_job_in_queued_held_or_awaiting_approv
         make_record("261013-1005-video-core-f", repos=(X,), goal=True),
         make_record("261013-1006-video-core-g", repos=(Y,), approved=True),
     ]
-    views = derive(records, {A: SessionStatus.BUSY}, NOW)
+    views = derive(records, {A: SessionStatus.BUSY}, NOW, frozenset())
     state_of = {view.record.id: view.state for view in views}
     named = {holder for view in views for holder in view.blocked_by}
     assert named
@@ -278,7 +278,7 @@ def test_done_when_8_a_held_approved_job_is_not_named_as_a_blocker():
     wide = make_record(B, repos=(X, Y), approved=True)
     holder = make_record(A, repos=(X,), events=(launched(A),))
     later = make_record(C, repos=(X, Y), approved=True)
-    views = {view.record.id: view for view in derive([holder, wide, later], {A: SessionStatus.BUSY}, NOW)}
+    views = {view.record.id: view for view in derive([holder, wide, later], {A: SessionStatus.BUSY}, NOW, frozenset())}
     assert views[B].state is State.HELD and views[C].state is State.HELD
     assert views[C].blocked_by == (A,)
 
@@ -286,7 +286,7 @@ def test_done_when_8_a_held_approved_job_is_not_named_as_a_blocker():
 # --- Done when 9 ---------------------------------------------------------------------------------------
 
 def test_done_when_9_derive_does_not_raise_when_a_resource_is_unheld():
-    views = derive([make_record(A, repos=(X, Y), goal=True)], {}, NOW)
+    views = derive([make_record(A, repos=(X, Y), goal=True)], {}, NOW, frozenset())
     assert views[0].state is State.AWAITING_APPROVAL and views[0].blocked_by == ()
 
 
@@ -322,7 +322,7 @@ def test_done_when_9_launch_after_the_holder_ends_succeeds_with_resources_unheld
 # --- Done when 10 --------------------------------------------------------------------------------------
 
 def _names(records, job_id, sessions=None):
-    view = {v.record.id: v for v in derive(records, sessions or {}, NOW)}[job_id]
+    view = {v.record.id: v for v in derive(records, sessions or {}, NOW, frozenset())}[job_id]
     return [action.name for action in actions(view, {})]
 
 

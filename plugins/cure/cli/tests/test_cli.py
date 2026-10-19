@@ -31,11 +31,11 @@ class Harness:
     def run(self, *argv: str) -> int:
         return self.cli.run(list(argv))
 
-    def new(self, tmp_path, slug="x", repos=("/work/video-core",), device="none") -> str:
+    def new(self, tmp_path, slug="x", repos=("/work/video-core",), device="none", after=None) -> str:
         """Create a job through the command line and return its id; each call is a minute later."""
         self.clock.advance(timedelta(minutes=1))
         source = tmp_path / "handoff.md"
-        source.write_text(handoff_text(repos, device), encoding="utf-8")
+        source.write_text(handoff_text(repos, device, after), encoding="utf-8")
         self.lines.clear()
         assert self.run("new", "--slug", slug, str(source)) == 0
         return self.lines[0]
@@ -185,7 +185,7 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
         "resources": ["/work/video-core"], "blocked-by": [], "goal": True, "approved": True,
         "problem": None, "origin": None,
         "waiting-for": None, "reported": False, "sessions-removed": False,
-        "prs": []}
+        "prs": [], "after": None, "after-state": None}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
 
 

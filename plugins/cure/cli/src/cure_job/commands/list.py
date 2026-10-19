@@ -35,6 +35,8 @@ class ListCommand(Command):
             line = f"{row['id']:<{width}}  {row['state']}"
             if row["blocked-by"]:
                 line += "  blocked-by=" + ",".join(row["blocked-by"])
+            if row["after"]:
+                line += f"  after={row['after']}:{row['after-state']}"
             if row["prs"]:
                 line += "  prs=" + ",".join(row["prs"])
             if row["state"] == INVALID:
@@ -50,7 +52,8 @@ INVALID = "invalid"
 def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
-            "waiting-for": None, "reported": None, "sessions-removed": None, "prs": []}
+            "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
+            "after": None, "after-state": None}
 
 
 def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
@@ -74,4 +77,6 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "reported": record.reported,
         "sessions-removed": record.sessions_removed,
         "prs": list(record.result.prs) if record.result else [],
+        "after": view.after.id if view.after else None,
+        "after-state": view.after.state.value if view.after else None,
     }

@@ -74,6 +74,11 @@ class JobsProvider:
     def new(self, text: str, slug: str) -> str:
         """Queue the handoff ``text`` as a new job and return the job id."""
         handoff = parse_handoff(text)
+        if handoff.after is not None:
+            snapshot = self.store.snapshot()
+            if handoff.after not in {job.id for job in [*snapshot.records, *snapshot.invalid]}:
+                raise UnknownJob(f"after: unknown job {handoff.after}: "
+                                 f"{self.store.job_dir(handoff.after)} holds no handoff.md")
         created = self.clock()
         try:
             base = make_id(created, os.path.basename(handoff.launch_dir), slug)
@@ -94,7 +99,8 @@ class JobsProvider:
 
     def _listing(self, snapshot: Snapshot, sessions: Mapping[str, Session]) -> Listing:
         statuses = {name: session.status for name, session in sessions.items()}
-        return Listing(derive(snapshot.records, statuses, self.clock()), snapshot.invalid, sessions)
+        invalid_ids = {job.id for job in snapshot.invalid}
+        return Listing(derive(snapshot.records, statuses, self.clock(), invalid_ids), snapshot.invalid, sessions)
 
     def launch(self, job_id: str, claude_args: Sequence[str] = ()) -> str:
         """Start the next run of ``job_id`` and return the session name."""
@@ -104,6 +110,8 @@ class JobsProvider:
         if view.state is State.AWAITING_APPROVAL:
             raise JobStateError(f"job {job_id} is {view.state.value}; approve its goal first: "
                                 f"cure-job approve {job_id}")
+        if view.state is State.HELD and view.after is not None and not view.after.satisfied:
+            raise JobStateError(f"after {view.after.id} is {view.after.state.value}")
         if view.state is State.HELD and view.blocked_by and is_ready(record):
             raise _resource_held(listing, record)
         if not view.state.is_launchable:
@@ -251,7 +259,7 @@ class JobsProvider:
         _refuse_invalid(snapshot.invalid, "claim")
         # Holders need only the records: a lost holder keeps its holds.
         open_records = {other.id: other for other in snapshot.records if is_open(other)}
-        held = holders(open_records.values())
+        held = holders(snapshot.records)
         for name in names:
             holder = held.get(name)
             if holder not in (None, job_id):
@@ -403,11 +411,13 @@ class JobsProvider:
                 if now - entry.mtime > HALF_CREATED_AGE and self.store.remove_half_created(entry)]
 
     def prune(self) -> list[str]:
-        """Remove every job past its retention period and return the removed ids."""
+        """Remove every job past its retention period that no open job names as ``after``. Return the removed ids."""
         now = self.clock()
+        views = self.views()
+        predecessors = {view.after.id for view in views if view.after is not None and view.state.is_open}
         removed = []
-        for view in self.views():
-            if expired(view, now):
+        for view in views:
+            if expired(view, now) and view.record.id not in predecessors:
                 self.store.remove(view.record.id)
                 removed.append(view.record.id)
         return removed
@@ -437,7 +447,7 @@ def _live(session: Session | None) -> bool:
 
 def _resource_held(listing: Listing, record: JobRecord) -> ResourceHeld:
     """The first resource of ``record`` that another job holds, with its holder."""
-    held = holders(view.record for view in listing.views if view.state.is_open)
+    held = holders(view.record for view in listing.views)
     name = next(name for name in sorted(record.resources) if held.get(name) not in (None, record.id))
     return ResourceHeld(name, held[name])
 

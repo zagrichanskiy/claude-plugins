@@ -27,11 +27,11 @@ def launched(job_id: str, run: int = 1, age: timedelta = timedelta(minutes=5)) -
 
 
 def state_of(record, sessions=None, now=NOW):
-    return derive([record], sessions or {}, now)[0].state
+    return derive([record], sessions or {}, now, frozenset())[0].state
 
 
 def states(records, sessions=None, now=NOW):
-    return {view.record.id: view.state for view in derive(records, sessions or {}, now)}
+    return {view.record.id: view.state for view in derive(records, sessions or {}, now, frozenset())}
 
 
 # --- one test per States row ------------------------------------------------------------------------
@@ -146,7 +146,7 @@ def test_launched_beats_goal_file():
 
 
 def test_goal_file_beats_queued_and_held():
-    views = derive([make_record(A), make_record(B, goal=True)], {}, NOW)
+    views = derive([make_record(A), make_record(B, goal=True)], {}, NOW, frozenset())
     assert views[1].state is State.AWAITING_APPROVAL
 
 
@@ -191,7 +191,7 @@ def test_lowest_open_id_holds_and_the_others_are_held():
 
 
 def test_views_are_ascending_by_id_whatever_the_input_order():
-    views = derive([make_record(C), make_record(A), make_record(B)], {}, NOW)
+    views = derive([make_record(C), make_record(A), make_record(B)], {}, NOW, frozenset())
     assert [view.record.id for view in views] == [A, B, C]
 
 
@@ -199,13 +199,13 @@ def test_blocked_by_lists_ascending_ids_of_holders():
     one = make_record(A, repos=("/work/x",), approved=True)
     two = make_record(B, repos=("/work/y",), approved=True)
     three = make_record(C, repos=("/work/x", "/work/y"))
-    view = derive([one, two, three], {}, NOW)[2]
+    view = derive([one, two, three], {}, NOW, frozenset())[2]
     assert view.state is State.HELD
     assert view.blocked_by == (A, B)
 
 
 def test_job_holds_nothing_blocked_by_is_empty_for_the_holder():
-    views = derive([make_record(A, approved=True), make_record(B)], {}, NOW)
+    views = derive([make_record(A, approved=True), make_record(B)], {}, NOW, frozenset())
     assert views[0].blocked_by == ()
     assert views[1].blocked_by == (A,)
 
@@ -231,7 +231,7 @@ def test_lock_is_released_when_the_holder_closes_or_finishes(closer):
 
 
 def test_blocked_by_is_empty_for_jobs_that_are_not_open():
-    views = derive([make_record(A), make_record(B, events=(Closed(""),))], {}, NOW)
+    views = derive([make_record(A), make_record(B, events=(Closed(""),))], {}, NOW, frozenset())
     assert views[1].state is State.ABANDONED
     assert views[1].blocked_by == ()
 
@@ -272,7 +272,7 @@ def test_ids_compare_as_plain_strings():
 
 
 def test_blocked_job_with_a_goal_is_held_and_reports_the_holder_it_waits_for():
-    views = derive([make_record(A, approved=True), make_record(B, goal=True)], {}, NOW)
+    views = derive([make_record(A, approved=True), make_record(B, goal=True)], {}, NOW, frozenset())
     assert views[1].state is State.HELD
     assert views[1].blocked_by == (A,)
 
@@ -282,18 +282,18 @@ def test_blocked_job_with_a_goal_is_held_and_reports_the_holder_it_waits_for():
 def test_ended_at_of_done_and_failed_is_the_result_mtime():
     stamp = NOW - timedelta(days=3)
     for status in (ResultStatus.DONE, ResultStatus.FAILED):
-        view = derive([make_record(A, result=result_of(status), result_mtime=stamp)], {}, NOW)[0]
+        view = derive([make_record(A, result=result_of(status), result_mtime=stamp)], {}, NOW, frozenset())[0]
         assert view.ended_at == stamp
 
 
 def test_ended_at_of_abandoned_is_the_events_mtime():
     stamp = NOW - timedelta(days=3)
-    view = derive([make_record(A, events=(Closed(""),), events_mtime=stamp)], {}, NOW)[0]
+    view = derive([make_record(A, events=(Closed(""),), events_mtime=stamp)], {}, NOW, frozenset())[0]
     assert view.ended_at == stamp
 
 
 def test_ended_at_is_none_for_open_jobs():
-    view = derive([make_record(A, events_mtime=NOW)], {}, NOW)[0]
+    view = derive([make_record(A, events_mtime=NOW)], {}, NOW, frozenset())[0]
     assert view.ended_at is None
 
 
@@ -304,7 +304,7 @@ def test_retention_periods():
 
 def _expiry_view(status_kwargs, age):
     stamp = NOW - age
-    return derive([make_record(A, result_mtime=stamp, events_mtime=stamp, **status_kwargs)], {}, NOW)[0]
+    return derive([make_record(A, result_mtime=stamp, events_mtime=stamp, **status_kwargs)], {}, NOW, frozenset())[0]
 
 
 @pytest.mark.parametrize("kwargs, days", [
@@ -319,13 +319,13 @@ def test_expired_only_strictly_after_the_retention_period(kwargs, days):
 
 
 def test_open_job_never_expires():
-    view = derive([make_record(A, goal=True, events_mtime=NOW - timedelta(days=400))], {}, NOW)[0]
+    view = derive([make_record(A, goal=True, events_mtime=NOW - timedelta(days=400))], {}, NOW, frozenset())[0]
     assert not expired(view, NOW)
 
 
 def test_needs_input_job_never_expires():
     record = make_record(A, result=result_of(ResultStatus.NEEDS_INPUT), result_mtime=NOW - timedelta(days=400))
-    assert not expired(derive([record], {}, NOW)[0], NOW)
+    assert not expired(derive([record], {}, NOW, frozenset())[0], NOW)
 
 
 # --- needs_sessions --------------------------------------------------------------------------------------
