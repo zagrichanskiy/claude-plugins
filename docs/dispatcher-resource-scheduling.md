@@ -238,7 +238,7 @@ Reason: one source of truth per fact. `JobStore` does every read and write under
 | `list --json` | `after` is the resolved predecessor id. `after-state` is its state, `missing` or `invalid`. `continued-by` is the id a closed job names, else null. | The dispatcher's only input. |
 | Predecessor failed, missing, or abandoned without `continued-by` | The CLI derives `held`. The dispatcher closes the successor without asking and sends the origin "closed: predecessor <id> <state>; re-dispatch" (as `skills/goal/job.md:94`). Successors of the closed job follow on the next scan. | A failed job is terminal (`state.py:45`). |
 | Predecessor invalid | The dispatcher does nothing for the successor. The `invalid` row already asks the user to repair the predecessor. | Closing would be wrong while the user repairs the file. |
-| `base` | `cure:goal` job mode sets `base` to the predecessor's branch, read from the predecessor's `goal.md`, only for a repository the predecessor also changes. The predecessor is the row's `after` in `cure-job list --json`, never the handoff's `after:`. For any other repository `base` comes from the handoff as today. The dispatcher drafts a successor's goal only after the predecessor's row has `goal` true. | Handoff `branch` may be `current` (`skills/dispatch/defaults.md:12`). A branch exists only in its own repository. |
+| `base` | For each repository R of the job, `cure:goal` job mode sets `base` to the branch of the nearest job on the resolved `after` chain that changes R. It reads that branch from the job's `goal.md`. The walk starts at the row's `after` in `cure-job list --json`, never the handoff's `after:`. Each step moves to the current job's row `after`, which `derive` resolves through `continued-by`. The walk stops at the first job that changes R. When no job on the chain changes R, `base` comes from the handoff as today. Every job the walk passes is `done`, because each link waits for the one before it. The dispatcher drafts a successor's goal only after the predecessor's row has `goal` true. | Handoff `branch` may be `current` (`skills/dispatch/defaults.md:12`). A branch exists only in its own repository. The last job of a chain may not change every repository of the successor. Split rule 7 puts an under-limit repository in the part that needs it, which need not be the last part. |
 | Base check | For a base taken from a predecessor, work item 1 compares `<base>` with the local branch, not with `origin/<base>`. When `origin/<base>` exists, it checks `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Other bases keep the check of `skills/goal/rules.md:9-11`. | With `delivery: commit`, the default (`skills/dispatch/defaults.md:10`), the predecessor commits locally and nothing pushes. `origin/<base>` lacks its commits, and "base the work on `origin/<base>`" would drop them. |
 | Base commit | Work item 1 records `git rev-parse <base>` as the base commit: in the ledger, or in the transcript for Solo. The diff cap (`skills/goal/job.md:127-128`) and the retrospective's changed lines measure against it. | With `branch: current` the successor commits on `<base>` itself. A cap against the branch name would count only uncommitted lines. |
 | Cycles | No check at `new`: the predecessor must exist and the new id is fresh. `close ID --continued-by X` exits 1 when X is unknown, invalid, not open, ID itself, or its resolved `after` chain reaches ID. `derive` follows `after` one hop and `continued-by` any number of hops, and stops at a job reached twice. | Re-pointing through `continued-by` can build a cycle; `new` alone cannot. |
@@ -391,7 +391,7 @@ carries `continued-by: <last part id>`. `derive` resolves each successor's `afte
 | `repos`, `device`, `outcome`, Work, Done when | Per part | Kept |
 | `ticket` | New per part; with tracker none, the original's | Kept |
 | `branch` | Per part | Kept |
-| `base`, `delivery` | Copied; part k > 1 bases on part k-1 | Kept; `base` from the resolved predecessor |
+| `base`, `delivery` | Copied; part k > 1 takes `base` per repository by the `after` chain walk (`base` row in `after: <id>`) | Kept; `base` per repository by the same walk |
 | Settled, Resource risk, Tools | Copied | Kept |
 | Open | First part it affects | Kept |
 | `after` | Part 1: the original's row `after`; k > 1: part k-1's id | Kept; resolves to the last part |
@@ -609,9 +609,9 @@ Order: fork probe, then parts 1-6. Reasons:
 
 4. `after:` ordering
    - Issue: TBD
-   - Scope: handoff key `after:`; `JobView.after` and `PredecessorGone`; `derive` gains `invalid_ids`; `after` and `after-state` in `list`; launch refusal; the ready test excludes a job whose `after` is not satisfied; prune guard; `base` from a same-repository predecessor, which `cure:goal` reads from the row's `after`, with the local base check and the base commit; dispatcher rows for the successor of a failed, abandoned, missing or invalid predecessor.
+   - Scope: handoff key `after:`; `JobView.after` and `PredecessorGone`; `derive` gains `invalid_ids`; `after` and `after-state` in `list`; launch refusal; the ready test excludes a job whose `after` is not satisfied; prune guard; `base` per repository from the nearest job on the resolved `after` chain that changes the repository, which `cure:goal` walks from the row's `after`, with the local base check and the base commit; dispatcher rows for the successor of a failed, abandoned, missing or invalid predecessor.
    - Files: `handoff.py`, `state.py`, `providers/jobs.py`, `commands/list.py`; tests; `skills/dispatch/SKILL.md`, `skills/dispatch/template.md`, `skills/goal/job.md`, `skills/goal/SKILL.md`, `skills/goal/rules.md`, `agents/dispatcher.md`; `plugin.json`.
-   - Estimate: 390 changed lines in claude-plugins (115 code, 220 tests, 55 docs).
+   - Estimate: 400 changed lines in claude-plugins (115 code, 220 tests, 65 docs).
    - Depends on: part 3.
    - Done when:
      1. `new` with an unknown `after` exits 1.
@@ -621,7 +621,8 @@ Order: fork probe, then parts 1-6. Reasons:
      5. `prune` keeps an expired predecessor of an open job.
      6. `skills/goal/rules.md` states the local base check and the base commit for a predecessor's base.
      7. An approved successor on Y, whose predecessor names only X and is `needs-input`, holds nothing. A later approved job on Y lists `approved`.
-     8. `pytest` and `scripts/lint-plugin.py` pass.
+     8. The split case: jobs P1 on A and B, P2 on A after P1, and P3 on A after P2, then S on B after P3. S's stacked B commits are in P1, an earlier part, not the last part. S takes P1's branch as `base` for B.
+     9. `pytest` and `scripts/lint-plugin.py` pass.
 
 5. Split skill with tracker tickets
    - Issue: TBD
