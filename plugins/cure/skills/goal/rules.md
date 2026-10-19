@@ -15,7 +15,8 @@ add one.
   cause. Never base the work on `origin/<base>` in this case: that drops the predecessor's commits.
   Any other base keeps the check above.
 - Work item 1 records `git -C <repo> rev-parse <base>` for each repository as that repository's base
-  commit: in the ledger, or in the transcript for Solo. The repositories of one job can have
+  commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
+  `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
   different bases.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.

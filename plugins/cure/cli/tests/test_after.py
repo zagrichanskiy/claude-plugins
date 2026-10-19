@@ -8,9 +8,11 @@ import os
 import re
 import shutil
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
+from cure_job.handoff import parse_handoff
 from tests.builders import NOW, handoff_text
 from tests.test_approve import DONE_RESULT, NEEDS_INPUT_RESULT, _needs_input_job, goal_file, rows
 from tests.test_cli import Harness
@@ -215,9 +217,13 @@ def walk(listed, job_id, repo):
         if row["after-state"] in ("missing", "invalid"):
             return UNRESOLVED
         row = listed[row["after"]]
-        if repo in row["resources"]:
+        if repo in handoff_repos(row):
             return row["id"]
     return None
+
+
+def handoff_repos(row):
+    return parse_handoff((Path(row["dir"]) / "handoff.md").read_text(encoding="utf-8")).repos
 
 
 def branch_of(h, job_id):
@@ -249,6 +255,17 @@ def test_done_when_8_the_walk_from_s_reaches_p1_for_repository_b_and_p3_for_repo
 def test_done_when_8_the_walk_ends_with_no_base_when_no_job_on_the_chain_changes_the_repository(h, tmp_path):
     _, _, _, s = stack(h, tmp_path)
     assert walk(rows(h), s, "/work/other") is None
+
+
+def test_done_when_8_the_walk_passes_a_job_that_claimed_the_repository_without_listing_it_in_repos(h, tmp_path):
+    pred = h.new(tmp_path, repos=(X,))
+    h.approve(pred)
+    assert h.run("launch", pred) == 0
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    assert h.run("claim", pred, Y) == 0
+    listed = rows(h)
+    assert Y in listed[pred]["resources"]
+    assert walk(listed, succ, Y) is None
 
 
 def test_done_when_10_the_walk_stops_unresolved_at_a_row_with_after_state_missing(h, tmp_path):
@@ -305,3 +322,28 @@ def test_done_when_11_next_gives_no_action_for_the_successor_of_an_invalid_prede
     found = next_actions(h)
     assert succ not in found
     assert found[pred]["actions"] == ["repair"]
+
+
+def test_done_when_11_an_after_held_successor_blocked_by_a_higher_id_gets_no_note_starved(h, tmp_path):
+    pred = h.new(tmp_path, repos=(X,))
+    h.approve(pred)
+    assert h.run("launch", pred) == 0
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    h.approve(succ)
+    later = h.new(tmp_path, repos=(Y,))
+    h.approve(later)
+    assert h.run("launch", later) == 0
+    row = rows(h)[succ]
+    assert (row["state"], row["after-state"], row["blocked-by"]) == ("held", "running", [later])
+    assert next_actions(h).get(succ, {"actions": []})["actions"] == []
+
+
+@pytest.mark.parametrize("goal", [False, True], ids=["no-goal", "unapproved-goal"])
+def test_done_when_11_close_successor_replaces_draft_and_ask_approval(h, tmp_path, goal):
+    pred = failed_predecessor(h, tmp_path)
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    if goal:
+        goal_file(h, succ).write_text("goal", encoding="utf-8")
+    row = next_actions(h)[succ]
+    assert row["state"] == "held"
+    assert row["actions"] == ["close-successor"]

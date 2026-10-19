@@ -31,7 +31,7 @@ row's `after`. Never use the handoff's `after:`.
 | Step | Rule |
 |---|---|
 | Start | The job named by the row's `after`. |
-| Changes R | The job's row `resources` contain R. `resources` come from the handoff's `repos`; a repository added only by `claim` does not count. |
+| Changes R | R is in `repos` of the job's `handoff.md` (the row's `dir`). The row's `resources` also hold claimed repositories, which do not count. |
 | Stop, resolved | The first job that changes R. `base` is the branch named in that job's `goal.md`. |
 | Next job | The `after` of the current job's row. |
 | Stop, unresolved | A passed row has `after-state` `missing` or `invalid`. |
