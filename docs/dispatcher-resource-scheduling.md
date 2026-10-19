@@ -294,7 +294,7 @@ about to launch. The uncommitted-changes question therefore runs in `launch`, no
 |---|---|---|
 | File | `${CURE_JOB_ROOT:-~/.claude/cure}/config.json`. A missing file means every built-in default. | One home next to `jobs/`. |
 | Reader | `config.py` in the CLI loads and validates it. Skills and agents run `cure-job config get <key>`, which prints the effective value as JSON. They never parse the file. | One validator, one source of defaults. |
-| Validation | An unknown key, a wrong type or a value out of range makes every command that reads the file exit 1 with `config.json: <key>: <problem>`. `cure-job config check` runs only the validation. | An ignored typo costs the setting silently, as with agent frontmatter. |
+| Validation | An unknown key, a wrong type, a value out of range or an unreadable file is a config error. `cure-job config check` and `cure-job next` exit 1 with `config.json: <key>: <problem>`. Every other command uses the built-in default for each key in error, prints `config.json: <key>: <problem>; using default <value>` on stderr, and runs. | `next` failing stops the dispatcher's wake, and the dispatcher shows the error to the user. A typo never stops a running job's `finish`, `claim` or `release`. |
 | `cure-job config get` | No key: the whole effective configuration. A key: that value. An unknown key exits 1. | |
 | `cure-job config init` | Writes `config.json` from the built-in defaults and, when `defaults.md` exists, from its rows. Renames `defaults.md` to `defaults.md.bak`. Refuses when `config.json` exists. | One-time move from `defaults.md`. |
 | Example | `skills/dispatch/config.example.json` replaces `skills/dispatch/defaults.md`. | |
@@ -561,7 +561,7 @@ the second half is queued as the next part.
    - Depends on: part 5.
    - Done when:
      1. With no `config.json`, `config get` prints every key with its default.
-     2. An unknown key, a wrong type and an out-of-range value each make `config check` and `list` exit 1 naming the key.
+     2. An unknown key, a wrong type and an out-of-range value each make `config check` and `next` exit 1 naming the key. With the same file, `list`, `claim`, `release` and `finish` exit 0 and print the key and the default used on stderr.
      3. `config init` with a `defaults.md` holding `delivery: pr` and one resource-risk row writes both into `config.json` and renames `defaults.md`. A second `config init` exits 1.
      4. `prune.done-days: 1` prunes a `done` job after one day.
      5. `git grep -n "defaults.md" -- plugins/` prints nothing.
