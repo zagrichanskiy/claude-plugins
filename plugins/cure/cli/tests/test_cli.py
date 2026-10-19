@@ -16,7 +16,7 @@ from tests.builders import NOW, handoff_text
 from tests.conftest import FAKE_CLAUDE
 from tests.fakes import FakeClaude, FakeClock
 
-COMMANDS = ["new", "list", "launch", "resume", "claim", "stop", "origin", "close", "reported", "remove-sessions",
+COMMANDS = ["new", "list", "launch", "resume", "claim", "release", "stop", "origin", "close", "reported", "remove-sessions",
             "prune"]
 
 

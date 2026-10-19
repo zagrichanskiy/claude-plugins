@@ -19,6 +19,14 @@ class Launched:
 @dataclass(frozen=True)
 class Claim:
     resource: str
+    #: The run that claimed. ``None`` marks a claim written before run-scoped claims.
+    run: int | None = None
+
+
+@dataclass(frozen=True)
+class Release:
+    """``cure-job release`` ended the job's short hold on ``resource``."""
+    resource: str
 
 
 @dataclass(frozen=True)
@@ -53,10 +61,11 @@ class SessionsRemoved:
     at: datetime
 
 
-Event = Union[Launched, Claim, Closed, Origin, Reported, StopIssued, SessionsRemoved]
+Event = Union[Launched, Claim, Release, Closed, Origin, Reported, StopIssued, SessionsRemoved]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
+_RELEASE = "release"
 _CLOSED = "closed"
 _ORIGIN = "origin"
 _REPORTED = "reported"
@@ -69,6 +78,10 @@ def encode(event: Event) -> str:
         fields = {"event": _LAUNCHED, "run": event.run, "session": event.session, "at": format_local(event.at)}
     elif isinstance(event, Claim):
         fields = {"event": _CLAIM, "resource": event.resource}
+        if event.run is not None:
+            fields["run"] = event.run
+    elif isinstance(event, Release):
+        fields = {"event": _RELEASE, "resource": event.resource}
     elif isinstance(event, Origin):
         fields = {"event": _ORIGIN, "address": event.address, "at": format_local(event.at)}
     elif isinstance(event, Reported):
@@ -97,7 +110,9 @@ def decode(line: str) -> Event | None:
     if kind == _SESSIONS_REMOVED:
         return SessionsRemoved(parse_local(_text(fields, "at")))
     if kind == _CLAIM:
-        return Claim(_text(fields, "resource"))
+        return Claim(_text(fields, "resource"), None if "run" not in fields else _run(fields))
+    if kind == _RELEASE:
+        return Release(_text(fields, "resource"))
     if kind == _CLOSED:
         return Closed(_text(fields, "reason"))
     if kind == _ORIGIN:

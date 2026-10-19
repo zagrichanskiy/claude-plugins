@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .events import Claim, Closed, Event, Launched, Origin, Reported, SessionsRemoved, StopIssued
+from . import resource
+from .events import Claim, Closed, Event, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
 from .handoff import Handoff
 from .result import Result
 
@@ -20,6 +21,8 @@ class JobRecord:
     result: Result | None
     result_mtime: datetime | None
     events_mtime: datetime | None
+    #: The run numbers of the ``result-<run>.md`` files.
+    archived_runs: frozenset[int] = frozenset()
 
     @property
     def launches(self) -> tuple[Launched, ...]:
@@ -61,5 +64,19 @@ class JobRecord:
 
     @property
     def resources(self) -> frozenset[str]:
-        claimed = {event.resource for event in self.events if isinstance(event, Claim)}
+        """The handoff's resources, held to job end, and the claimed ones. A short-hold claim
+        counts while its run is the latest and has no result, current or archived, until a
+        release. A claim without a run counts for the whole job."""
+        claimed: set[str] = set()
+        for event in self.events:
+            if isinstance(event, Claim) and self._claim_counts(event):
+                claimed.add(event.resource)
+            elif isinstance(event, Release) and resource.is_short_hold(event.resource):
+                claimed.discard(event.resource)
         return self.handoff.resources | claimed
+
+    def _claim_counts(self, claim: Claim) -> bool:
+        if claim.run is None or not resource.is_short_hold(claim.resource):
+            return True
+        # A relaunch archives result.md before it records the next run.
+        return claim.run == self.run and self.result is None and claim.run not in self.archived_runs

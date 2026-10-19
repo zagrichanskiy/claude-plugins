@@ -1,9 +1,9 @@
-"""The twelve job operations.
+"""The thirteen job operations.
 
-Every operation except ``new``, ``finish`` and ``reported`` reads one snapshot
-of the state root, derives the job states from it and makes its writes.
-``finish`` and ``reported`` read only their own job. No operation holds a lock,
-so a check and its write are not atomic across processes.
+Every operation except ``new``, ``finish``, ``reported`` and ``release`` reads
+one snapshot of the state root, derives the job states from it and makes its
+writes. ``finish``, ``reported`` and ``release`` read only their own job. No
+operation holds a lock, so a check and its write are not atomic across processes.
 
 A job whose stored files do not read is invalid. ``list`` shows it, ``prune``
 skips it, and every other operation refuses it by id. Its resources and its
@@ -18,11 +18,12 @@ import time
 from pathlib import Path
 from typing import Callable, Mapping, NamedTuple, Sequence
 
+from .. import resource as resource_names
 from ..claude import Claude, Session, SessionStatus
 from ..clock import Clock
-from ..errors import (ClaudeError, ClaudeOutcomeUnknown, HandoffError, JobStateError, PluginError, ResourceHeld,
-                      SessionGone, StoreError, UnknownJob)
-from ..events import Claim, Closed, Launched, Origin, Reported, SessionsRemoved, StopIssued
+from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
+                      ResourceHeld, SessionGone, StoreError, UnknownJob)
+from ..events import Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
 from ..goal import PLUGIN_ROOT, RULES, retarget
 from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
@@ -194,7 +195,21 @@ class JobsProvider:
                 raise ResourceHeld(resource, holder)
         _refuse_invalid(listing, "claim")
         if resource not in view.record.resources:
-            self.store.append_event(job_id, Claim(resource))
+            self.store.append_event(job_id, Claim(resource, view.record.run or None))
+
+    def release(self, job_id: str, name: str) -> None:
+        """End the short hold of ``job_id`` on ``name``. Returns when the job does not hold it.
+
+        Reads only this job. A repository, and the bench a handoff names, are held until the job ends.
+        An abandoned job holds nothing and gets no write: its log mtime is its retention start.
+        """
+        if not resource_names.is_short_hold(name):
+            raise CureJobError(f"{name} is a repository; it is held until the job ends")
+        record = self.store.load(job_id)
+        if name in record.handoff.resources:
+            raise CureJobError(f"job {job_id}: the handoff names {name}; it is held until the job ends")
+        if record.closed is None and name in record.resources:
+            self.store.append_event(job_id, Release(name))
 
     def close(self, job_id: str, reason: str = "") -> None:
         """Abandon ``job_id``. A job with a session must be stopped first."""
