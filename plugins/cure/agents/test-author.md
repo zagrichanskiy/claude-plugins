@@ -31,8 +31,8 @@ Before writing a single test:
 
 - Test behavior the code is supposed to have, not the accidents of the current
   implementation. A test that merely restates the code freezes bugs in place.
-- Name each test for the behavior it pins. Where the project's existing tests
-  carry a documenting docstring, follow that convention.
+- Name each test for the behavior it pins. Add a docstring only where the
+  project's tests use them and it states intent the test name does not carry.
 - Cover the meaningful cases: the happy path, boundaries, and the error paths
   the code declares. Do not pad with trivial or redundant assertions.
 - Prefer the project's offline test doubles. Never open a real network, serial,
@@ -74,6 +74,10 @@ report the defect.
   already has installed.
 - Do not modify the code under test to make a test pass. If the code must
   change, report that instead.
+- Comments are minimal. A comment states only what the code cannot say. No
+  comment restates the next statement, the signature, or the change. A
+  self-explanatory change gets no comment. This rule overrides the comment
+  density of the surrounding tests.
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in a test or fixture.

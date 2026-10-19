@@ -80,7 +80,7 @@ def test_finish_writes_retro_kept_and_pr_that_parse_back(h, tmp_path):
                  "--kept", "/a/one.md", "--kept", "/b/two, three.md") == 0
     entries = parse((h.root / "jobs" / job_id / "result.md").read_text(encoding="utf-8"))
     assert entries["retro"] == str(retro)
-    assert entries["pr"] == "https://example.com/pr/7#x"
+    assert entries["pr"] == ["https://example.com/pr/7#x"]
     assert entries["kept"] == ["/a/one.md", "/b/two, three.md"]
     assert parse_result((h.root / "jobs" / job_id / "result.md").read_text(encoding="utf-8")).status is ResultStatus.DONE
 

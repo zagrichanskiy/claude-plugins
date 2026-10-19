@@ -26,7 +26,7 @@ again, take the `failed:` exit without the `finish` report.
 | `--unproven` | `N[,N...]`, done-when numbers | `done` with an item whose proof is unavailable |
 | `--question` | text, repeatable | `needs-input`, one per question |
 | `--retro` | path | The retrospective, when one was written |
-| `--pr` | URL | A pull request was opened |
+| `--pr` | full URL, repeatable | One per pull request on the job's branch |
 | `--kept` | path, repeatable | Each file left in the repository |
 
 Each text value (`--question`, `--retro`, `--pr`, `--kept`) is one line. A long question stays one

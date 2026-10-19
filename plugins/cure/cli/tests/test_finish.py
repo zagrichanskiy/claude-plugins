@@ -158,6 +158,20 @@ def test_cli_finish_prints_the_result_path_and_list_shows_the_state(h, tmp_path)
     assert json.loads(h.lines[0])[0]["state"] == "done"
 
 
+def test_cli_finish_writes_every_pr_to_result_md_and_list(h, tmp_path):
+    job_id = h.job(tmp_path)
+    urls = ["https://github.com/acme/video-core/pull/7", "https://github.com/acme/video-hal/pull/12"]
+    assert h.run("finish", job_id, "--status", "done", "--pr", urls[0], "--pr", urls[1]) == 0
+    text = (h.root / "jobs" / job_id / "result.md").read_text(encoding="utf-8")
+    assert parse_result(text).prs == tuple(urls)
+    h.lines.clear()
+    h.run("list", "--json")
+    assert json.loads(h.lines[0])[0]["prs"] == urls
+    h.lines.clear()
+    h.run("list")
+    assert h.lines[0].endswith("  prs=" + ",".join(urls))
+
+
 @pytest.mark.parametrize("extra", [["--unproven", "1", "--status", "failed"], ["--status", "needs-input"]])
 def test_cli_finish_value_refusals_exit_two(h, tmp_path, extra):
     job_id = h.job(tmp_path)

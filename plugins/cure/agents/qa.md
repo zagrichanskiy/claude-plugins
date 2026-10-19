@@ -26,6 +26,15 @@ You are a project-agnostic agent, so never guess the command:
 
 - Run the suite. Capture the outcome: total, passed, failed, skipped, and the
   wall-clock time.
+- Report the test count as passed / run / disabled, separately, for ctest
+  and gtest suites. A gtest `DISABLED_` test is counted as disabled, not run.
+- ctest: passed and "out of N" include Skipped tests (`SKIP_RETURN_CODE`).
+  Report passed minus skipped, and report skipped separately. A disabled test
+  is excluded from "out of N" and listed as "Not Run (Disabled)".
+- gtest under ctest: read the counts from the gtest binary's own output, via
+  `ctest -V` or by running the binary. On a green run ctest hides "YOU HAVE N
+  DISABLED TESTS". Under `gtest_discover_tests`, a `DISABLED_` case is its own
+  ctest test shown as "Not Run (Disabled)"; count it once.
 - For each failure, report the test name and the salient part of the output —
   the assertion or error and the location. Quote enough to diagnose, not the
   entire log. For noisy output, filter to the failing tests.

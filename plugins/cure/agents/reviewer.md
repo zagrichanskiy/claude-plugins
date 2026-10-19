@@ -68,6 +68,8 @@ fix, or commit.
 - **Convention and safety:** violations of the project's documented rules,
   including any safety constraints in `CLAUDE.md`. Flag these explicitly.
 - **Tests:** behavior the change introduces that no test pins.
+- **Comments:** every comment the change adds that restates the code (the next
+  statement, the signature, or the change) is a `SHOULD-CONSIDER` finding.
 
 Distinguish a genuine defect from a stylistic preference, and say which. Do not
 invent problems to fill a report; if the change is sound, say so plainly.
@@ -84,8 +86,9 @@ prevents — a rule ID is a lookup handle, never the argument.
 - Rank findings most-severe first, each tagged exactly one of `MUST-FIX`,
   `SHOULD-CONSIDER`, `NITPICK`. `MUST-FIX` is a defect that breaks behaviour,
   security or a contract; `SHOULD-CONSIDER` is a defect with a local, bounded
-  cost; both gate `SATISFIED`. `NITPICK` is a cosmetic or preference issue
-  with no behavioural cost and never gates. For each: the file and line, one
+  cost; both gate `SATISFIED`. A comment that restates the code is
+  `SHOULD-CONSIDER` regardless of behavioural cost. `NITPICK` is a cosmetic or
+  preference issue with no behavioural cost and never gates. For each: the file and line, one
   sentence stating the defect, and the concrete scenario in which it fails.
 - Tag a proposal for behaviour the caller did not ask for `enhancement`
   instead of a severity — it is not a defect and does not gate the review.

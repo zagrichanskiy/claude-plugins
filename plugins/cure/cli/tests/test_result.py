@@ -27,6 +27,16 @@ def test_unproven_inline_list_is_read():
     assert parse_result("---\nstatus: done\nunproven: [a, b]\n---\n").unproven == ("a", "b")
 
 
+def test_pr_list_is_read():
+    result = parse_result("---\nstatus: done\npr:\n  - https://example.com/a/pull/1\n  - https://example.com/b/pull/2\n---\n")
+    assert result.prs == ("https://example.com/a/pull/1", "https://example.com/b/pull/2")
+
+
+def test_scalar_pr_is_read_as_one_element_list():
+    assert parse_result("---\nstatus: done\npr: https://example.com/a/pull/1\n---\n").prs == (
+        "https://example.com/a/pull/1",)
+
+
 @pytest.mark.parametrize("text", [
     "",
     "just prose",
