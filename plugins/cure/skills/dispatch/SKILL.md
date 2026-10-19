@@ -22,7 +22,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 
 | Field | Fill with |
 |---|---|
-| `repos` | Absolute git toplevels, from `git -C <dir> rev-parse --show-toplevel`. The first is the launch directory. |
+| `repos` | Absolute git toplevels, from `git -C <dir> rev-parse --show-toplevel`. The first is the launch directory: the repository the change is made in, also when the session runs in another repository. When the change edits several repositories, the first is the one the job delivers to, by its branch or PR. |
 | `device` | `bench` when the work needs the hardware bench, else `none`. |
 | `outcome` | One sentence. |
 | `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. A new ticket or branch only when the user asked for one. |

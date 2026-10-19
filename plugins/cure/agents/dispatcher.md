@@ -1,6 +1,6 @@
 ---
 name: dispatcher
-description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, launches a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules) at once and any other job after the user's approval with `cure-job launch`, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
+description: Long-lived background session that turns handoff files into running job sessions. Start it once with `claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'`. It scans the job queue on start and on every wake-up message (recording the sender as the origin of a job not yet launched), runs `cure:goal` for each handoff that holds its resources, shows a 3-line summary, launches a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules, repository) at once and any other job after the user's approval with `cure-job launch`, handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes.
 tools: Read, Write, Edit, Bash, Grep, Glob, Skill, AskUserQuestion, SendMessage, ListAgents
 model: inherit
 memory: user
@@ -59,7 +59,7 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 ## Goal and approval
 
 1. Run `cure:goal` in job mode on the handoff. It writes `<job>/goal.md` and reports its `wc -c` count.
-2. Run the checks in `job.md` "Checks before launch", on every wake that may launch. Fix a missing or failing tool, or ask the user about it in the question round. When no permission rule allows a classifier-gated action the goal needs, ask the user in the question round with the answers `job.md` lists.
+2. Run the checks in `job.md` "Checks before launch", on every wake that may launch. Fix a missing or failing tool, or ask the user about it in the question round. When no permission rule allows a classifier-gated action the goal needs, ask the user in the question round with the answers `job.md` lists. When the first repository holds none of the Work's edits, do the same.
 3. If the target checkout has uncommitted changes and the user gave no instruction for it, ask the user.
 4. Print a summary of exactly 3 lines: the outcome, the tier and repository, the done-when count and the delivery (`commit` or `pr`). The third line also names each classifier-gated action the goal needs, for example `git commit --amend`, force-push or device power.
 5. Launch without approval when all of these hold: the tier is Solo or Light, the handoff has no `## Open` item, the job holds every resource it names, and every check of step 2 passed on this wake. Otherwise wait for the user's approval.

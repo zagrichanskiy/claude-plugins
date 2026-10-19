@@ -9,6 +9,8 @@ Installed plugins are cached at `~/.claude/plugins/cache/<marketplace>/<plugin>/
 by the `version` in `plugin.json` — not by file mtime. Editing anything under `plugins/<name>/`
 leaves the installed copy serving the old snapshot.
 
+Bump the version once per branch, not per commit.
+
 After any content change: bump `version`, then
 
 ```sh
