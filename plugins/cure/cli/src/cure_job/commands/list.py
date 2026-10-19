@@ -24,8 +24,8 @@ class ListCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
-        rows = sorted([_as_json(view, listing.sessions) for view in listing.views]
-                      + [_invalid_json(job) for job in listing.invalid],
+        rows = sorted([job_row(view, listing.sessions) for view in listing.views]
+                      + [invalid_row(job) for job in listing.invalid],
                       key=lambda row: row["id"])
         if args.json:
             self.cli.out(json.dumps(rows, separators=(",", ":")))
@@ -47,13 +47,13 @@ class ListCommand(Command):
 INVALID = "invalid"
 
 
-def _invalid_json(job: InvalidJob) -> dict:
+def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "problem": job.problem,
             "waiting-for": None, "reported": None, "sessions-removed": None, "prs": []}
 
 
-def _as_json(view: JobView, sessions: Mapping[str, Session]) -> dict:
+def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
     record = view.record
     waiting_for = None
     if view.state is State.BLOCKED:

@@ -24,6 +24,7 @@ from .commands.finish import FinishCommand
 from .commands.launch import LaunchCommand
 from .commands.list import ListCommand
 from .commands.new import NewCommand
+from .commands.next import NextCommand
 from .commands.origin import OriginCommand
 from .commands.prune import PruneCommand
 from .commands.release import ReleaseCommand
@@ -52,9 +53,9 @@ class Cli:
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
         self.out = out
         self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic)
-        self._commands = [NewCommand(self), ListCommand(self), LaunchCommand(self), ResumeCommand(self),
-                          ClaimCommand(self), ReleaseCommand(self), StopCommand(self), CloseCommand(self),
-                          OriginCommand(self), FinishCommand(self), ReportedCommand(self),
+        self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), LaunchCommand(self),
+                          ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self), StopCommand(self),
+                          CloseCommand(self), OriginCommand(self), FinishCommand(self), ReportedCommand(self),
                           RemoveSessionsCommand(self), PruneCommand(self)]
         self._parser = self._build_parser()
 
