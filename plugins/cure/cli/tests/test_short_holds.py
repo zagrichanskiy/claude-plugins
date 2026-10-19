@@ -1,13 +1,14 @@
 """Issue 32 part 1a: ``release``, run-scoped short-hold claims, ``resource`` kinds and the claim ``run`` field."""
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 
 import pytest
 
 from cure_job import resource
 from cure_job.cli import Cli
-from cure_job.errors import ResourceHeld
+from cure_job.errors import ClaudeError, ResourceHeld
 from cure_job.events import Claim, Release, decode, encode
 from cure_job.result import Report, ResultStatus
 from tests.builders import NOW, handoff_text
@@ -253,3 +254,94 @@ def test_release_line_shape_and_round_trip():
 def test_decode_rejects_malformed_release_and_claim_run(line):
     with pytest.raises(ValueError):
         decode(line)
+
+
+# --- an archived result ends the run's short holds before the next Launched is written ------------------------------
+
+def _archive_run_one(h, job_id):
+    h.jobs.finish(job_id, NEEDS_INPUT)
+    assert h.jobs.store.archive_result(job_id, 1)
+
+
+def test_archived_result_ends_a_short_hold_and_frees_the_bench_for_another_job(h, pair):
+    first, second = pair
+    h.jobs.claim(first, BENCH)
+    _archive_run_one(h, first)
+    assert BENCH not in h.resources(first)
+    assert h.run("claim", second, BENCH) == 0
+
+
+def test_failed_relaunch_leaves_the_bench_unheld(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, BENCH)
+    h.jobs.finish(first, NEEDS_INPUT)
+    del h.claude.statuses[first]
+    h.claude.fail_start = ClaudeError("cannot start")
+    with pytest.raises(ClaudeError):
+        h.jobs.launch(first)
+    assert (h.jobs.store.job_dir(first) / "result.md").is_file()
+    assert BENCH not in h.resources(first)
+
+
+def test_archived_result_keeps_a_repo_claim(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, "/work/extra")
+    _archive_run_one(h, first)
+    assert "/work/extra" in h.resources(first)
+
+
+def test_archived_result_keeps_a_legacy_bench_claim(h, pair):
+    first, _ = pair
+    h.jobs.store.append_event(first, Claim(BENCH))
+    _archive_run_one(h, first)
+    assert BENCH in h.resources(first)
+
+
+def test_archived_runs_are_the_positive_integer_result_files_only(h, pair):
+    first, _ = pair
+    directory = h.jobs.store.job_dir(first)
+    for name in ("result-1.md", "result-2.md", "result-0.md", "result-01.md", "result-x.md"):
+        (directory / name).write_text("---\nstatus: done\n---\n", encoding="utf-8")
+    assert h.jobs.store.load(first).archived_runs == {1, 2}
+
+
+# --- release on a job that no longer runs -------------------------------------------------------------------------
+
+def _closed_with_bench(h, job_id):
+    h.jobs.claim(job_id, BENCH)
+    h.jobs.stop(job_id)
+    h.jobs.close(job_id)
+    log = h.jobs.store.job_dir(job_id) / "dispatch.jsonl"
+    os.utime(log, (1_000_000_000, 1_000_000_000))
+    return log
+
+
+def test_release_on_a_closed_job_exits_zero_and_leaves_the_log_untouched(h, pair):
+    first, _ = pair
+    log = _closed_with_bench(h, first)
+    before = (log.read_bytes(), log.stat().st_mtime_ns)
+    assert h.run("release", first, BENCH) == 0
+    assert (log.read_bytes(), log.stat().st_mtime_ns) == before
+
+
+def test_release_of_a_repo_on_a_closed_job_still_exits_one(h, pair):
+    first, _ = pair
+    _closed_with_bench(h, first)
+    assert h.run("release", first, "/work/extra") == 1
+
+
+def test_release_on_a_done_job_exits_zero_and_writes_nothing(h, pair):
+    first, _ = pair
+    h.jobs.claim(first, BENCH)
+    h.jobs.finish(first, Report(ResultStatus.DONE))
+    log = h.jobs.store.job_dir(first) / "dispatch.jsonl"
+    before = log.read_bytes()
+    assert h.run("release", first, BENCH) == 0
+    assert log.read_bytes() == before
+
+
+def test_release_on_an_invalid_job_exits_one(h, pair, capsys):
+    first, _ = pair
+    (h.jobs.store.job_dir(first) / "dispatch.jsonl").write_text("{not json\n", encoding="utf-8")
+    assert h.run("release", first, BENCH) == 1
+    assert "invalid" in capsys.readouterr().err

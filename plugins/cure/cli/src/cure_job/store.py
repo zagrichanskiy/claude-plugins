@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import errno
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -31,6 +32,7 @@ _EVENTS = "dispatch.jsonl"
 _RESULT = "result.md"
 _ENCODING = "utf-8"
 _NEW_PREFIX = ".new-"
+_ARCHIVED = re.compile(r"result-([1-9][0-9]*)\.md")
 
 
 class HalfCreated(NamedTuple):
@@ -284,7 +286,8 @@ class JobStore:
             events=events,
             result=None if result_text is None else parse_result(result_text),
             result_mtime=result_mtime,
-            events_mtime=events_mtime)
+            events_mtime=events_mtime,
+            archived_runs=_archived_runs(directory))
 
     def _read_events(self, path: Path) -> tuple[tuple[Event, ...], datetime | None]:
         text, mtime = _read_text(path)
@@ -303,6 +306,18 @@ class JobStore:
 
 def _archived(run: int) -> str:
     return f"result-{run}.md"
+
+
+def _archived_runs(directory: Path) -> frozenset[int]:
+    try:
+        with _store_errors(directory):
+            names = os.listdir(directory)
+    except StoreError as e:
+        # The job directory was removed or replaced while it was read.
+        if isinstance(e.__cause__, (FileNotFoundError, NotADirectoryError)):
+            return frozenset()
+        raise
+    return frozenset(int(match.group(1)) for match in map(_ARCHIVED.fullmatch, names) if match)
 
 
 def _parse_stored_handoff(path: Path, text: str) -> Handoff:

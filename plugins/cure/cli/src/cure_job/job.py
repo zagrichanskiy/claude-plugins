@@ -21,6 +21,8 @@ class JobRecord:
     result: Result | None
     result_mtime: datetime | None
     events_mtime: datetime | None
+    #: The run numbers of the ``result-<run>.md`` files.
+    archived_runs: frozenset[int] = frozenset()
 
     @property
     def launches(self) -> tuple[Launched, ...]:
@@ -63,8 +65,8 @@ class JobRecord:
     @property
     def resources(self) -> frozenset[str]:
         """The handoff's resources, held to job end, and the claimed ones. A short-hold claim
-        counts while its run is the latest and has no result, until a release. A claim
-        without a run counts for the whole job."""
+        counts while its run is the latest and has no result, current or archived, until a
+        release. A claim without a run counts for the whole job."""
         claimed: set[str] = set()
         for event in self.events:
             if isinstance(event, Claim) and self._claim_counts(event):
@@ -76,4 +78,5 @@ class JobRecord:
     def _claim_counts(self, claim: Claim) -> bool:
         if claim.run is None or not resource.is_short_hold(claim.resource):
             return True
-        return claim.run == self.run and self.result is None
+        # A relaunch archives result.md before it records the next run.
+        return claim.run == self.run and self.result is None and claim.run not in self.archived_runs

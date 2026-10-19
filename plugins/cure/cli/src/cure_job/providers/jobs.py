@@ -201,13 +201,14 @@ class JobsProvider:
         """End the short hold of ``job_id`` on ``name``. Returns when the job does not hold it.
 
         Reads only this job. A repository, and the bench a handoff names, are held until the job ends.
+        An abandoned job holds nothing and gets no write: its log mtime is its retention start.
         """
         if not resource_names.is_short_hold(name):
             raise CureJobError(f"{name} is a repository; it is held until the job ends")
         record = self.store.load(job_id)
         if name in record.handoff.resources:
             raise CureJobError(f"job {job_id}: the handoff names {name}; it is held until the job ends")
-        if name in record.resources:
+        if record.closed is None and name in record.resources:
             self.store.append_event(job_id, Release(name))
 
     def close(self, job_id: str, reason: str = "") -> None:
