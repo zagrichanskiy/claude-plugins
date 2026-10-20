@@ -18,6 +18,11 @@ add one.
   commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
   `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
   different bases.
+- Branch: the goal names the job's branch as a literal name. A branch that does not exist on run 1 is
+  not a mismatch of work item 1. The step after the fact check creates the branch from `<base>` in each
+  repository with `git switch -c <branch> <base>`, or runs `git switch <branch>` when it exists (a run
+  after `needs-input`). Never use `git switch -C`: it resets the branch and drops earlier commits. In
+  Light and Full this step is the orchestrator's, in Solo the session's.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.
 - A fork whose options differ in nothing the user would see is not a question: take the recommended

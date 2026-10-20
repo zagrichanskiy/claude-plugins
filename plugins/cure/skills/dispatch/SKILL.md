@@ -26,7 +26,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | `repos` | Absolute git toplevels, from `git -C <dir> rev-parse --show-toplevel`. The first is the launch directory: the repository the change is made in, also when the session runs in another repository. When the change edits several repositories, the first is the one the job delivers to, by its branch or PR. |
 | `device` | `bench` when the work needs the hardware bench, else `none`. It declares the use. The job claims the bench for each step at run time; the handoff does not hold it from launch. |
 | `outcome` | One sentence. |
-| `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. |
+| `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. A job with `after` and no `branch` inherits the predecessor's branch. |
 | `base`, `delivery` | Only when the user stated them. Otherwise omit the key; the configuration supplies it. `delivery` is `commit` or `pr`. |
 | `after` | Only when this job continues the work of an open job of the same stack (any state other than `done`, `failed` or `abandoned`): that job's id, one only. Otherwise omit the key. `cure-job new` refuses an id with no job. The successor stays `held` until the predecessor is `done`. |
 | `## Settled` | Decisions taken in the session, each with its reason. |
@@ -97,7 +97,7 @@ Part handoffs:
 | `## Open` | Each item goes into the first part it affects. |
 | `after` | Part 1: the `after` of the unsplit draft, if any. Part k > 1: the job id of part k-1, printed by `cure-job new`. |
 | `ticket` | `delivery: pr`: the part own ticket. `delivery: commit`: the session ticket. |
-| `branch` | `delivery: pr`: `<ticket>_<slug>` per the repository branch convention. `delivery: commit`: one branch, the same explicit `branch:` value in every part; the parts stack as commits on it. |
+| `branch` | `delivery: pr`: `<ticket>_<slug>`, or `<slug>` without a ticket. `delivery: commit`: one branch, the same explicit `branch:` value in every part; the parts stack as commits on it. |
 | Slug | `<slug>-part<k>`. |
 
 Writing a split: queue as one job writes the unsplit handoff with the Estimate line. Split creates the tickets, then runs `cure-job new` for each part in order, each with `after` set as in the table above.
