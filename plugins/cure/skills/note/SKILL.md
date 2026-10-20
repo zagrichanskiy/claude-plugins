@@ -53,6 +53,14 @@ frontmatter keys above and no others. `supersedes_when` names the design documen
 implementing pull request.
 
 ```markdown
+---
+title: <Title>
+status: working              # working | resolved
+created: <YYYY-MM-DD>
+supersedes_when: <the design document or the implementing pull request>
+resolved_by:                 # the artifact, once it exists
+---
+
 # <Title>
 
 ## Problem
