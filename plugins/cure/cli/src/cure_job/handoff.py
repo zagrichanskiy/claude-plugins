@@ -2,7 +2,8 @@
 
 ``repos`` names the resources a job locks. ``device`` declares bench use; the
 bench is a short hold the job claims per step. ``origin``, optional,
-names the session the job reports back to. Every other field and section
+names the session the job reports back to. ``after``, optional, names the
+job this one is stacked on. Every other field and section
 belongs to the dispatcher and is not checked here.
 """
 from __future__ import annotations
@@ -11,6 +12,7 @@ import enum
 from dataclasses import dataclass
 from datetime import datetime
 
+from . import job_id as ids
 from . import resource
 from .clock import format_local
 from .errors import HandoffError
@@ -27,6 +29,7 @@ class Handoff:
     repos: tuple[str, ...]
     device: Device
     origin: str | None = None
+    after: str | None = None
 
     @property
     def launch_dir(self) -> str:
@@ -55,9 +58,14 @@ def parse_handoff(text: str) -> Handoff:
     origin = entries.get("origin")
     if isinstance(origin, list):
         raise HandoffError("origin is a list; expected one session name")
+    after = entries.get("after") or None
+    if isinstance(after, list):
+        raise HandoffError("after is a list; expected one job id")
+    if after is not None and not ids.is_valid(after):
+        raise HandoffError(f"after is {after!r}; expected a job id")
     device = entries.get("device")
     try:
-        return Handoff(repos=tuple(repos), device=Device(device), origin=origin or None)
+        return Handoff(repos=tuple(repos), device=Device(device), origin=origin or None, after=after)
     except ValueError:
         choices = " or ".join(member.value for member in Device)
         if device is None:

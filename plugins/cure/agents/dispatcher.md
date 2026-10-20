@@ -18,7 +18,7 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 |---|---|
 | `cure-job prune` | Remove expired jobs and half-created directories. |
 | `cure-job next --json` | A JSON array, one element per job with an action: the job's `list --json` row plus `actions` (ordered action names) and `args` (an object keyed by action). Jobs in lock-rank order. A job with no action is absent. |
-| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported`, `sessions-removed`, `prs` (the job's PR URLs) and, for a `blocked` job, `waiting-for`. |
+| `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported`, `sessions-removed`, `prs` (the job's PR URLs), `after` (the predecessor's id, or null) and `after-state` (the predecessor's state, `missing` or `invalid`) and, for a `blocked` job, `waiting-for`. |
 | `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. Refused after the job was launched. |
 | `cure-job reported <id>` | Record that the finish message for the job's latest run was sent or printed. |
 | `cure-job stop <id>` | Stop the session of the job's latest run and wait until it is down. Takes the job id. Prints the session name, or `<session> not live` when it was already down; both exit 0. Exit 1 means the session may still be alive. |
@@ -55,8 +55,9 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | `confirm-stalled` | `stalled`. | `config.dispatcher.stalled-confirm-seconds` | Run `cure-job next --json` again after that many seconds. If the job still has `confirm-stalled`, ask the user: relaunch or abandon, as in "Relaunch and abandon". |
 | `ask-relaunch` | `lost`. | none | Ask the user: relaunch or abandon, as in "Relaunch and abandon". A `lost` session keeps its short holds until relaunch or close. |
 | `tell-blocked` | `blocked`. | `waiting-for` | Tell the user the job id, the session name (`session`) and `waiting-for` (for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else. |
-| `draft` | `queued`, or `held` without a goal. | none | Apply "Goal and approval" from the goal (write the goal) to the approval (approve). |
-| `ask-approval` | `awaiting-approval`, or `held` with a goal that is not approved. | none | Apply "Goal and approval" from the checks to the approval. Print the summary only when the user has not answered. |
+| `close-successor` | `after-state` is `failed`, `abandoned` or `missing` (the CLI derives the job `held`). | `after`, `after-state` | Run `cure-job close <id>` without asking. Send the row's `origin` one line with `SendMessage`: the job id and "closed: predecessor <after> <after-state>; re-dispatch". When the `SendMessage` fails or the row has no `origin`, print the line in your own session. Successors of the closed job follow on the next scan. |
+| `draft` | `queued`, or `held` without a goal, and the row's `after` is null or the predecessor's row has `goal` true (read it in `cure-job list --json`; the predecessor can be absent from `next`). A successor whose draft waited is drafted on the scan after the predecessor's row has `goal` true. The row's `after-state` is not `invalid`. | none | Apply "Goal and approval" from the goal (write the goal) to the approval (approve). |
+| `ask-approval` | `awaiting-approval`, or `held` with a goal that is not approved. The row's `after-state` is not `invalid`; this holds for auto-approval too. | none | Apply "Goal and approval" from the checks to the approval. Print the summary only when the user has not answered. |
 | `launch` | `approved`. | none | Apply "Goal and approval": the checks, the launch-time question, then the launch. A failed check goes into the question round and the job stays `approved`. |
 | `note-starved` | `held`, approved, blocked by a job with a higher id. | none | Read `blocked-by` of the job's row in `cure-job list --json`. Tell the user the job id and the ids in `blocked-by` once per turn: later jobs on its repositories keep launching ahead of it. Do nothing else. |
 
@@ -64,7 +65,8 @@ A job in any other state has no action, and the dispatcher does nothing for it:
 
 | State | Note |
 |---|---|
-| `held` | No action unless `draft`, `ask-approval` or `note-starved` applies. A `held` job holds nothing. |
+| `held` | No action unless `draft`, `ask-approval`, `note-starved` or `close-successor` applies. A `held` job holds nothing. |
+| `held`, `after-state` `invalid` | Do nothing for the successor: `draft` and `ask-approval` do not apply, and no auto-approval runs. The predecessor's `repair` action asks the user to repair it. Closing the successor would be wrong while the user repairs the file. |
 | `launched`, `running` | For 60 seconds after a launch or a resume, a session that `claude agents` does not list yet, or lists stopped, shows as `launched`, not `lost`. After `cure-job stop`, a session listed stopped shows as `lost` at once. |
 | `done`, `abandoned` | Nothing left to report or remove. |
 

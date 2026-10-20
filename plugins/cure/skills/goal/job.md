@@ -20,6 +20,31 @@ directory. A worker session then runs the goal and cannot reach the user.
 - A handoff with `device: bench` declares bench use. The goal must carry the short-hold claim and
   release (below).
 
+## Base per repository
+
+Applies when the row of the job in `cure-job list --json` has `after`. Without it, `base` comes
+from the handoff.
+
+For each repository R in the handoff's `repos`, set `base` as follows. Walk the chain from the
+row's `after`. Never use the handoff's `after:`.
+
+| Step | Rule |
+|---|---|
+| Start | The job named by the row's `after`. |
+| Changes R | R is in `repos` of the job's `handoff.md` (the row's `dir`). The row's `resources` also hold claimed repositories, which do not count. |
+| Stop, resolved | The first job that changes R. `base` is the branch named in that job's `goal.md`. |
+| Next job | The `after` of the current job's row. |
+| Stop, unresolved | A passed row has `after-state` `missing` or `invalid`. |
+| End of chain | No job changes R: `base` comes from the handoff. |
+
+Ask the user for the base of each repository left unresolved, in the question round. A job on the
+chain need not be `done` when the goal is written, but it has a `goal.md`: the dispatcher drafts a
+successor's goal only after the predecessor's row has `goal` true. Every job on the chain is `done`
+when the successor launches, and the work item 1 base check tests the branch then.
+
+Write the base per repository in the goal's fact check. For a base taken from a predecessor, the
+fact check is the one in `rules.md`, not `<base>` equals `origin/<base>`.
+
 ## Writing the goal
 
 - Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts
@@ -138,7 +163,7 @@ Exits, in the template's exits slot:
 
 ```markdown
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
-<review cause>, or the diff passes <lines> lines (`git diff --shortstat <base>`), or `git fetch` or
+<review cause>, or the diff passes <lines> lines (per repository, `git -C <repo> diff --shortstat <base commit>`, the commit work item 1 recorded), or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice, or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
 transcript; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
@@ -151,6 +176,10 @@ needs-input`, and the final message starts with `needs-input:`.
 Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `SHOULD-CONSIDER` is
 open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated
 text carries no pull-request wording.
+
+The retrospective's changed lines are measured the same way, per repository against its base
+commit. A cap against the branch name would count only uncommitted lines when the job commits on
+`<base>` itself.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The
 failure path skips this item."

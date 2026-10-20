@@ -9,10 +9,14 @@ from dataclasses import dataclass, field
 from typing import Mapping
 
 from .result import short_hold_timeout
-from .state import JobView, State
+from .state import JobView, PredecessorGone, State
 
 #: Replaced by ``dispatcher.stalled-confirm-seconds`` of ``config.json`` once it exists.
 STALLED_CONFIRM_SECONDS = 60
+
+#: The ``after`` predecessor states that close a held successor. An invalid
+#: predecessor is left to its own ``repair``.
+CLOSING_PREDECESSOR = (State.FAILED, State.ABANDONED, PredecessorGone.MISSING)
 
 
 @dataclass(frozen=True)
@@ -46,13 +50,16 @@ def actions(view: JobView | None, row: Mapping[str, object]) -> list[Action]:
         found.append(Action("ask-relaunch"))
     elif state is State.BLOCKED:
         found.append(Action("tell-blocked", {"waiting-for": row["waiting-for"]}))
+    elif state is State.HELD and view.after is not None and view.after.state in CLOSING_PREDECESSOR:
+        found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
     elif state is State.QUEUED or (state is State.HELD and not record.has_goal):
         found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
         found.append(Action("ask-approval"))
     elif state is State.APPROVED:
         found.append(Action("launch"))
-    elif state is State.HELD and any(holder > record.id for holder in view.blocked_by):
+    elif (state is State.HELD and (view.after is None or view.after.satisfied)
+          and any(holder > record.id for holder in view.blocked_by)):
         # A held approved job that a higher id blocks can wait with no bound.
         found.append(Action("note-starved"))
     return found

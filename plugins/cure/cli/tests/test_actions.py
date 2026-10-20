@@ -17,7 +17,7 @@ TIMEOUT = "short-hold timeout: device:bench held by " + B
 
 
 def names(record, sessions=None, row=None):
-    view = derive([record], sessions or {}, NOW)[0]
+    view = derive([record], sessions or {}, NOW, frozenset())[0]
     return [action.name for action in actions(view, row or {})]
 
 
@@ -59,7 +59,7 @@ def test_needs_input_reported_job_gets_ask_input_only():
 
 def test_stalled_job_gets_confirm_stalled_with_the_wait():
     record = make_record(A, events=(launched(A, age=timedelta(minutes=5)),))
-    view = derive([record], {A: SessionStatus.IDLE}, NOW)[0]
+    view = derive([record], {A: SessionStatus.IDLE}, NOW, frozenset())[0]
     assert actions(view, {}) == [Action("confirm-stalled", {"stalled-confirm-seconds": STALLED_CONFIRM_SECONDS})]
 
 
@@ -70,7 +70,7 @@ def test_lost_job_gets_ask_relaunch():
 
 def test_blocked_job_gets_tell_blocked_with_waiting_for():
     record = make_record(A, events=(launched(A),))
-    view = derive([record], {A: SessionStatus.WAITING}, NOW)[0]
+    view = derive([record], {A: SessionStatus.WAITING}, NOW, frozenset())[0]
     assert view.state is State.BLOCKED
     assert actions(view, {"waiting-for": "a permission"}) == [Action("tell-blocked", {"waiting-for": "a permission"})]
 
@@ -88,7 +88,7 @@ def test_states_with_nothing_to_do_get_no_action(record, sessions):
 
 def test_held_job_gets_no_action():
     records = [make_record(A, approved=True), make_record(B, approved=True)]
-    view = {v.record.id: v for v in derive(records, {}, NOW)}[B]
+    view = {v.record.id: v for v in derive(records, {}, NOW, frozenset())}[B]
     assert view.state is State.HELD
     assert actions(view, {}) == []
 
@@ -100,14 +100,14 @@ def test_awaiting_approval_job_gets_ask_approval():
 def test_timeout_as_only_question_gets_ask_timeout_with_resource_and_holder():
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), (TIMEOUT,)))
-    view = derive([record], {}, NOW)[0]
+    view = derive([record], {}, NOW, frozenset())[0]
     assert actions(view, {}) == [Action("ask-timeout", {"resource": "device:bench", "holder": B})]
 
 
 def _timeout_actions(questions):
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), questions))
-    return actions(derive([record], {}, NOW)[0], {})
+    return actions(derive([record], {}, NOW, frozenset())[0], {})
 
 
 @pytest.mark.parametrize("question, resource, holder", [

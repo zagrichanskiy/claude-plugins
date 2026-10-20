@@ -9,6 +9,15 @@ add one.
 - Work item 1: run `git fetch`, then the fact check the item names. A false Settled statement, a
   failed fetch or a failed tool check is a failure cause. Base moved: base the work on
   `origin/<base>`. Other mismatch: record it, use the corrected value.
+- Base taken from a predecessor job: work item 1 compares `<base>` with the local branch, not with
+  `origin/<base>`, because the predecessor commits locally and pushes nothing. When `origin/<base>`
+  exists, it runs `git merge-base --is-ancestor origin/<base> <base>`. A failure is a failure
+  cause. Never base the work on `origin/<base>` in this case: that drops the predecessor's commits.
+  Any other base keeps the check above.
+- Work item 1 records `git -C <repo> rev-parse <base>` for each repository as that repository's base
+  commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
+  `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
+  different bases.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.
 - A fork whose options differ in nothing the user would see is not a question: take the recommended

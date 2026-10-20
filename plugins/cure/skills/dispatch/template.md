@@ -7,6 +7,7 @@ ticket: ABC-123
 branch: feature/name
 base: main
 delivery: commit
+after: <job id of the predecessor; omit when the job has none>
 ---
 
 ## Settled

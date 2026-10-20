@@ -78,7 +78,7 @@ the reasoning that would otherwise be re-litigated.
 Before work item 1, read `<plugin-root>/skills/goal/rules.md` and follow it. Read it again after a
 context compaction and before an exit.
 
-1. Fact check: `<base>` equals `origin/<base>`; <ticket, branch, named files>; <each tool Done-when
+1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor, the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
    runs>.
 2. <One step, its agent, its files.>
 N-1. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print its summary.

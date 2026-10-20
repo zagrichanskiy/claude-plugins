@@ -16,8 +16,11 @@ REPO = "/work/video-core"
 GOAL_DIGEST = digest(b"goal")
 
 
-def handoff_text(repos=(REPO,), device="none") -> str:
-    lines = ["---", "repos:"] + [f"  - {repo}" for repo in repos] + [f"device: {device}", "---", "", "# Outcome", ""]
+def handoff_text(repos=(REPO,), device="none", after: str | None = None) -> str:
+    lines = ["---", "repos:"] + [f"  - {repo}" for repo in repos] + [f"device: {device}"]
+    if after is not None:
+        lines.append(f"after: {after}")
+    lines += ["---", "", "# Outcome", ""]
     return "\n".join(lines)
 
 

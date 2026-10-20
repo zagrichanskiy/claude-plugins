@@ -26,7 +26,7 @@ def h(root):
 
 def state_of(age):
     record = make_record(A, events=(Launched(1, session_name(A, 1), NOW - age),))
-    return derive([record], {session_name(A, 1): WAITING}, NOW)[0].state
+    return derive([record], {session_name(A, 1): WAITING}, NOW, frozenset())[0].state
 
 
 def launch(h, tmp_path, **kwargs):
@@ -62,7 +62,7 @@ def test_a_waiting_session_with_a_result_is_needs_input_not_blocked():
     from cure_job.result import ResultStatus
     record = make_record(A, events=(Launched(1, session_name(A, 1), NOW - timedelta(minutes=5)),),
                          result=result_of(ResultStatus.NEEDS_INPUT))
-    assert derive([record], {session_name(A, 1): WAITING}, NOW)[0].state is State.NEEDS_INPUT
+    assert derive([record], {session_name(A, 1): WAITING}, NOW, frozenset())[0].state is State.NEEDS_INPUT
 
 
 def test_close_refuses_a_blocked_job_and_names_the_stop_command(h, tmp_path, capsys):
