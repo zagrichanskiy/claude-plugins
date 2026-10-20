@@ -130,6 +130,17 @@ Rules for the items:
   pass threshold, for example 3 runs, all pass.
 - Write the repository's base branch in the fact check. For base `main` the file says `main` equals
   `origin/main`.
+- An item that counts text states the unit, the grep root, whether the match is case-sensitive and
+  whether blank lines count.
+- An item that claims a reboot proves it with `/proc/uptime` after the cycle below 120 s.
+- An item about a skill's question round names a non-interactive test path that shows it unattended.
+  A "manual session" item cannot be proven by the job.
+- A static criterion is written once, in the briefs file, before round 1. A criterion changed
+  mid-run restarts the round count.
+- A measurement that runs `claude -p` headless states three things in the fact check. Scratch for
+  anything the run writes is outside `~/.claude/`, proven by one test write. A turn limit names its
+  counter, for example `subtype` is not `error_max_turns` and `num_turns` is at most N. The run
+  allows `Bash` whole inside a scratch directory, not a per-command list.
 
 Always end with the exits in the mode file. The `/goal` Stop hook blocks every stop that is not a
 met condition, so a cap that only says "stop" blocks every stop after it. The failure exit is a
@@ -148,6 +159,8 @@ and what the goal builds or delivers. The work item says the goal file, the retr
 backlog are kept. Save characters in Context or the work steps.
 
 A Settled statement is a decision or fact the goal rests on. A false one fails the run. A
+Settled fact copied from a note (a device or system fact) is marked "verify", and the writing agent
+checks it against the source. A
 mismatch in ticket, branch or base commit is recorded and corrected.
 
 ## Name the tools, not the intention
