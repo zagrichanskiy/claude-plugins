@@ -180,7 +180,9 @@ def check_bundled_paths(path, dirs):
                            "${CLAUDE_PLUGIN_ROOT}")
 
 
-SYNC = re.compile(r"<!-- sync: (\S+?)(?:#([^>]+?))? -->\n(.*?)\n<!-- /sync -->", re.S)
+SYNC = re.compile(r"<!-- sync: (\S+?)(?:#([^>]+?))? -->\n(.*?)^<!-- /sync -->", re.S | re.M)
+SYNC_OPEN = "<!-- sync:"
+SYNC_CLOSE = "<!-- /sync -->"
 
 
 def check_sync_blocks(plugin_root, path):
@@ -189,8 +191,23 @@ def check_sync_blocks(plugin_root, path):
     The orchestrator agent carries copies of skill files in its system prompt, because a prompt
     survives context compaction and a file read does not. This check keeps the copies in step.
     """
-    for match in SYNC.finditer(path.read_text()):
+    content = path.read_text()
+    matches = list(SYNC.finditer(content))
+    starts = {match.start() for match in matches}
+    for opening in re.finditer(re.escape(SYNC_OPEN), content):
+        if opening.start() not in starts:
+            number = content.count("\n", 0, opening.start()) + 1
+            fail(path, f"line {number}: sync marker does not open a well-formed block; "
+                       f"write '{SYNC_OPEN} <file>[#<section>] -->' and close with '{SYNC_CLOSE}'")
+    closings = content.count(SYNC_CLOSE)
+    if closings != len(matches):
+        fail(path, f"{closings} closing sync marker(s) for {len(matches)} well-formed block(s)")
+    for match in matches:
         source_name, section, block = match.groups()
+        if not block.strip():
+            number = content.count("\n", 0, match.start()) + 1
+            fail(path, f"line {number}: sync block is empty")
+            continue
         source = plugin_root / source_name
         if not source.is_file():
             fail(path, f"sync block names {source_name!r}, which does not exist")

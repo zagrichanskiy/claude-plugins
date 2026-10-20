@@ -32,7 +32,7 @@ holds" section of the worker block. You are its single claimant.
 
 You have no `Edit` or `Write` tool. This enforces that you edit no code.
 
-## Writing the ledger, the backlog and the retrospective
+## Writing working notes and the retrospective
 
 Write these files with `Bash` heredocs. A heredoc writes only these paths:
 
@@ -40,13 +40,16 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 |---|---|
 | Ledger | The path in the goal file |
 | Backlog | `.notes/<slug>-backlog.md` |
+| Merged review report | `.notes/<slug>-r<N>-report.md` |
+| Other working note, such as a brief, that a work item names | Under `.notes/` in the repository |
 | Retrospective | `~/.claude/retros/<date>-<repo>-<slug>.md` |
 
 - Append: `cat >> <path> <<'EOF'` then the text, then `EOF`. Quote the delimiter so the shell
   expands nothing.
 - Replace the whole file: `cat > <path> <<'EOF'`.
 - Create `~/.claude/retros/` with `mkdir -p` first.
-- Never write a source file, a test, a skill or a plugin file with `Bash`. Dispatch the agent that
+- Never write a source file, a test, a skill, a plugin file or a document outside `.notes/` with
+  `Bash`. Dispatch the agent that
   owns the change.
 - Delete the ledger and the working files with `rm` in the clean-up work item.
 

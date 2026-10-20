@@ -1,4 +1,4 @@
-"""``scripts/lint-plugin.py``: the ``autoCompactWindow`` range check. The script is imported by path."""
+"""``scripts/lint-plugin.py``: the ``autoCompactWindow`` range and sync-block checks, imported by path."""
 from __future__ import annotations
 
 import importlib.util
@@ -42,3 +42,39 @@ def test_rejects_a_value_outside_the_range_or_not_a_bare_integer(lint, value):
     assert len(found) == 1
     assert "autoCompactWindow" in found[0]
     assert "from 100000 to 1000000" in found[0]
+
+
+def sync_problems(lint, tmp_path, agent_text):
+    lint.ROOT = tmp_path
+    (tmp_path / "source.md").write_text("Source text.\n")
+    agent = tmp_path / "agent.md"
+    agent.write_text(agent_text)
+    lint.check_sync_blocks(tmp_path, agent)
+    return lint.problems
+
+
+def test_sync_accepts_a_block_equal_to_its_source(lint, tmp_path):
+    assert sync_problems(lint, tmp_path, "<!-- sync: source.md -->\nSource text.\n<!-- /sync -->\n") == []
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("<!-- sync: source.md-->\nSource text.\n<!-- /sync -->\n", "does not open a well-formed block"),
+    ("<!-- sync: source.md -->\nSource text.\n", "does not open a well-formed block"),
+    ("<!-- sync: source.md -->\n<!-- /sync -->\n", "sync block is empty"),
+], ids=["no-space-before-close", "missing-closing-marker", "empty-block"])
+def test_sync_rejects_a_malformed_block(lint, tmp_path, text, expected):
+    found = sync_problems(lint, tmp_path, text)
+    assert any(expected in problem for problem in found), found
+
+
+def test_sync_rejects_a_missing_closing_marker_between_two_blocks(lint, tmp_path):
+    text = ("<!-- sync: source.md -->\nSource text.\n"
+            "<!-- sync: source.md -->\nSource text.\n<!-- /sync -->\n")
+    found = sync_problems(lint, tmp_path, text)
+    assert any("does not open a well-formed block" in problem for problem in found), found
+
+
+def test_sync_rejects_a_stray_closing_marker(lint, tmp_path):
+    text = "<!-- sync: source.md -->\nSource text.\n<!-- /sync -->\n<!-- /sync -->\n"
+    found = sync_problems(lint, tmp_path, text)
+    assert any("2 closing sync marker(s) for 1" in problem for problem in found), found
