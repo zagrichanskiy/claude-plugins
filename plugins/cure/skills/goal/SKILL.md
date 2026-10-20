@@ -79,7 +79,7 @@ Before work item 1, read `<plugin-root>/skills/goal/rules.md` and follow it. Rea
 context compaction and before an exit.
 
 1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor, the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
-   runs>.
+   runs>; <each Settled fact marked verify>.
 2. <One step, its agent, its files.>
 N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
      its summary.
@@ -134,13 +134,15 @@ Rules for the items:
   whether blank lines count.
 - An item that claims a reboot proves it with `/proc/uptime` after the cycle below 120 s.
 - An item about a skill's question round names a non-interactive test path that shows it unattended.
-  A "manual session" item cannot be proven by the job.
-- A static criterion is written once, in the briefs file, before round 1. A criterion changed
-  mid-run restarts the round count.
-- A measurement that runs `claude -p` headless states three things in the fact check. Scratch for
-  anything the run writes is outside `~/.claude/`, proven by one test write. A turn limit names its
-  counter, for example `subtype` is not `error_max_turns` and `num_turns` is at most N. The run
-  allows `Bash` whole inside a scratch directory, not a per-command list.
+  For a manual check, see "Verification".
+- A static criterion is an expected value, threshold or prompt set that does not depend on the run's
+  output. It is written once, in the briefs file, before measurement round 1. Changing it restarts the
+  measurement round count. It does not reset the review-round cap in "Review-then-fix split".
+- A measurement that runs `claude -p`:
+  - The fact check makes one test write to a scratch directory outside `~/.claude/`.
+  - A done-when item with a turn limit checks that `subtype` is not `error_max_turns` and
+    `num_turns` is at most N.
+  - The run command allows `Bash` whole, with the scratch directory as its working directory.
 
 Always end with the exits in the mode file. The `/goal` Stop hook blocks every stop that is not a
 met condition, so a cap that only says "stop" blocks every stop after it. The failure exit is a
@@ -158,10 +160,10 @@ and the same path is in the clean-up item and in its done-when `ls`. This exclud
 and what the goal builds or delivers. The work item says the goal file, the retrospective and the
 backlog are kept. Save characters in Context or the work steps.
 
-A Settled statement is a decision or fact the goal rests on. A false one fails the run. A
-Settled fact copied from a note (a device or system fact) is marked "verify", and the writing agent
-checks it against the source. A
-mismatch in ticket, branch or base commit is recorded and corrected.
+A Settled statement is a decision or fact the goal rests on. A false one fails the run.
+A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1's fact
+check verifies it against the device, code or document the note cites, not against the note.
+A mismatch in ticket, branch or base commit is recorded and corrected.
 
 ## Name the tools, not the intention
 
