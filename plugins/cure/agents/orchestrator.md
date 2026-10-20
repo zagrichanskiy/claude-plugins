@@ -69,6 +69,12 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
   `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
   different bases.
+- Work item 1 also records, per repository, a dirty-tree baseline: branch, HEAD,
+  `git diff --shortstat` and the paths to exclude. Stop rules and line counts exclude those paths.
+- Work item 1 compares local HEAD with `origin/<branch>` and records each unpushed commit the job did
+  not make. Whether to push it is a question at work item 1, not at the push.
+- Before a goal changes an allow or deny rule, work item 1 checks the real tree for counter-examples,
+  for example `repo forall -c 'git remote get-url origin'`.
 - Branch: the goal names the job's branch as a literal name. A branch that does not exist on run 1 is
   not a mismatch of work item 1. The step after the fact check creates the branch from `<base>` in each
   repository with `git switch -c <branch> <base>`, or runs `git switch <branch>` when it exists (a run
@@ -113,6 +119,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round.
 - Record a mechanical choice in the ledger as an assumption.
+- Record the turn count in the ledger at each step.
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
