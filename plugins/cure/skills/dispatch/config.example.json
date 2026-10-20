@@ -1,7 +1,7 @@
 {
   "handoff.delivery": "commit",
   "handoff.base": "main",
-  "handoff.branch": "current",
+  "handoff.branch": "new",
   "handoff.resource-risk": [
     {"scope": "device: bench", "text": "bench is a test stand; any action on it is approved"},
     {"scope": "repo: /home/user/src/video-core", "text": "main is shared; never force-push it"},

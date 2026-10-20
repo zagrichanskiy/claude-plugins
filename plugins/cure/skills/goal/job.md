@@ -9,7 +9,7 @@ directory. A worker session then runs the goal and cannot reach the user.
 - Read the handoff file as the conversation.
 - Read `handoff.delivery`, `handoff.base`, `handoff.branch` and `handoff.resource-risk` with
   `<plugin-root>/bin/cure-job config get <key>` before the question round. Each prints JSON; the
-  built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch`; `current` is the branch checked out in the first repository of `repos`, the launch repository. Do not ask a fork a value answers; mark
+  built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`): `new` gives the job its own branch from `base`, named `<ticket>_<slug>` (`<slug>` without a ticket) by the repository branch convention of `skills/dispatch/SKILL.md`, the same name in every repository of the job; `current` is the branch checked out in the first repository of `repos`, the launch repository; any other value is a literal branch name. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `config.json` itself.
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
