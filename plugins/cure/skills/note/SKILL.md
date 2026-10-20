@@ -1,5 +1,5 @@
 ---
-description: Create, find and retire working notes — the scratch files, research dumps, session handoffs and drafts that carry state until a real artifact exists. Gives them one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged pull request or committed document has already superseded. Use when writing a scratch file, when asked to sweep or tidy working notes, or when a stale one turns up while doing something else.
+description: Create, find and retire working notes — the scratch files, research dumps, session handoffs and drafts that carry state until a real artifact exists. Gives them one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged pull request or committed document has already superseded. Also writes design notes (problem, decisions, rejected, open, next steps). Use when writing a scratch file, when asked to sweep or tidy working notes, when asked to "save this idea", "capture this for later" or "write this design down", or when a stale one turns up while doing something else.
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
@@ -45,11 +45,63 @@ name the artifact.
 A note that cannot name what would replace it is not a working note. It is either content that
 belongs in the repository proper, or nothing.
 
+## Design note
+
+A design note records a design worked out in the conversation, so a fresh session can implement it
+without replaying the conversation. It is a working note in `.notes/<slug>.md`. It uses the five
+frontmatter keys above and no others. `supersedes_when` names the design document or the
+implementing pull request.
+
+```markdown
+---
+title: <Title>
+status: working              # working | resolved
+created: <YYYY-MM-DD>
+supersedes_when: <the design document or the implementing pull request>
+resolved_by:                 # the artifact, once it exists
+---
+
+# <Title>
+
+## Problem
+
+<The need or friction, and why it is worth doing.>
+
+## Decisions
+
+| Decision | Reason |
+|---|---|
+| <what was decided> | <why> |
+
+## Rejected
+
+| Alternative | Reason |
+|---|---|
+| <what was not chosen> | <why not> |
+
+## Open decisions
+
+<Unresolved forks and questions. Omit the section when none is open.>
+
+## Next steps
+
+1. <The first concrete action for an implementer.>
+```
+
+Rules:
+
+- Write from the conversation, not from a fresh guess. Record what was decided and why.
+- One idea per file. If the session covered several, ask which one, or write one file for each.
+- The slug is kebab-case and stable. If `.notes/<slug>.md` exists, update it. Do not overwrite
+  agreed Decisions or Rejected rows.
+- Report the path and a one-line summary. Do not start implementing unless asked.
+
 ## Commands
 
 | Command | Effect |
 |---|---|
 | `/note <title>` | Create one in `.notes/`, asking for `supersedes_when` if it is not obvious |
+| `/note design <title>` | Create a design note in `.notes/` from the conversation, using the template in Design note |
 | `/note list` | Every working note in this repository, with age |
 | `/note sweep` | Check each against its `supersedes_when`, and offer deletions |
 | `/note resolve <name> <artifact>` | Record the artifact and delete the note |
@@ -63,6 +115,7 @@ committed document.
 - **Exists, and covers everything the note held** — delete it. Say what went and what holds it now.
 - **Exists, but part of the note never made it** — name that part, and offer to promote it or keep
   the note. Never delete an open question because most of the file is settled.
+- **Design note** — covered only when every row of Decisions, Rejected and Open decisions is in the artifact. A row that is not there is the part that never made it.
 - **Does not exist** — leave it, and report the age.
 
 **Report ages.** A working note older than thirty days whose artifact never appeared is usually
