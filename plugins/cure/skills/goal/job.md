@@ -174,12 +174,14 @@ Also done when a question only the user can answer is open, reported as in N+1 w
 needs-input`, and the final message starts with `needs-input:`.
 ```
 
+Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal.
+
 Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `SHOULD-CONSIDER` is
 open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated
 text carries no pull-request wording.
 
 The retrospective's changed lines are measured the same way, per repository against its base
-commit. A cap against the branch name would count only uncommitted lines when the job commits on
+commit, and the retrospective reports the estimate beside the cap. A cap against the branch name would count only uncommitted lines when the job commits on
 `<base>` itself.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The

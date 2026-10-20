@@ -219,7 +219,7 @@ It holds, in this order:
 | Section | Content |
 |---|---|
 | Outcome | "met", or "failed: <cause>, what is left". |
-| Measurements | Turns used of the cap. Per agent: dispatches, tokens where reported, review rounds, measured-failure rounds, findings per severity, findings accepted. Changed lines against the cap. |
+| Measurements | Turns used of the cap. Per agent: dispatches, tokens where reported, review rounds, measured-failure rounds, findings per severity, findings accepted. Changed lines against the cap, and against the handoff's estimate when it has one. |
 | Where it went wrong | Each event with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
 | Assumptions | Every assumption and every question with its answer, copied from the ledger before the ledger is deleted. |
 | Proposed changes | One row per change: target file (agent, skill, knowledge file, project `CLAUDE.md`, or this format), the change, the evidence row it rests on, the expected effect. |

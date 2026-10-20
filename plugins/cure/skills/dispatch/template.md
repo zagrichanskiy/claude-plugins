@@ -7,7 +7,7 @@ ticket: ABC-123
 branch: feature/name
 base: main
 delivery: commit
-after: <job id of the predecessor; omit when the job has none>
+after: <job id of the predecessor; omit when the job has none; part k of a split: part k-1>
 ---
 
 ## Settled
@@ -15,6 +15,7 @@ after: <job id of the predecessor; omit when the job has none>
 - Decision taken in the session, with the reason in one clause.
 - Resource risk: <resource>: <the user's words>. Omit when the user said nothing.
 - Branch: <why this branch>. Omit for other work.
+- Estimate: ~N changed lines. A split part also has "Split: part k of n".
 
 ## Work
 
