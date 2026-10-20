@@ -17,7 +17,7 @@ from tests.conftest import FAKE_CLAUDE
 from tests.fakes import FakeClaude, FakeClock
 
 COMMANDS = ["new", "list", "launch", "resume", "claim", "release", "stop", "origin", "close", "reported", "remove-sessions",
-            "prune"]
+            "prune", "next"]
 
 
 class Harness:
@@ -199,6 +199,66 @@ def test_list_json_reports_run_session_and_problem(h, tmp_path):
 def test_list_json_without_jobs_is_an_empty_array(h):
     h.run("list", "--json")
     assert h.lines == ["[]"]
+
+
+# --- next -----------------------------------------------------------------------------------------------
+
+def _next(h):
+    h.lines.clear()
+    assert h.run("next", "--json") == 0
+    assert len(h.lines) == 1
+    return json.loads(h.lines[0])
+
+
+def _write_result(h, job_id, text):
+    (h.root / "jobs" / job_id / "result.md").write_text(text, encoding="utf-8")
+
+
+def test_next_json_without_jobs_is_an_empty_array(h):
+    assert _next(h) == []
+
+
+def test_next_json_omits_a_done_job_that_is_reported_and_removed(h, tmp_path):
+    job_id = _launched(h, tmp_path)
+    _write_result(h, job_id, "---\nstatus: done\n---\n")
+    assert [item["actions"] for item in _next(h)] == [["report", "remove-sessions"]]
+    assert h.run("reported", job_id) == 0
+    assert h.run("remove-sessions", job_id) == 0
+    assert _next(h) == []
+
+
+def test_next_json_gives_ask_timeout_the_resource_and_holder(h, tmp_path):
+    job_id = _launched(h, tmp_path)
+    _write_result(h, job_id, "---\nstatus: needs-input\nquestion:\n"
+                  "  - 'short-hold timeout: device:bench held by other-job'\n---\n")
+    assert h.run("reported", job_id) == 0
+    [item] = _next(h)
+    assert item["actions"] == ["ask-timeout"]
+    assert item["args"] == {"ask-timeout": {"resource": "device:bench", "holder": "other-job"}}
+
+
+def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_question(h, tmp_path):
+    job_id = _launched(h, tmp_path)
+    _write_result(h, job_id, "---\nstatus: needs-input\nquestion:\n  - 'short-hold timeout:'\n---\n")
+    assert h.run("reported", job_id) == 0
+    [item] = _next(h)
+    assert item["actions"] == ["ask-timeout"]
+    assert item["args"] == {"ask-timeout": {"resource": "", "holder": None}}
+
+
+def test_next_json_lists_jobs_in_lock_order_with_row_fields_actions_and_args(h, tmp_path):
+    queued = h.new(tmp_path, repos=("/work/a",))
+    launched = _launched(h, tmp_path, repos=("/work/b",))
+    _write_result(h, launched, "---\nstatus: needs-input\n---\n")
+    h.lines.clear()
+    h.run("list", "--json")
+    rows = {row["id"]: row for row in json.loads(h.lines[0])}
+    items = _next(h)
+    assert [item["id"] for item in items] == [launched, queued]
+    for item in items:
+        assert {key: item[key] for key in rows[item["id"]]} == rows[item["id"]]
+    assert items[0]["actions"] == ["report", "ask-input"]
+    assert items[1]["actions"] == ["draft"]
 
 
 # --- launch, claim, close, prune ------------------------------------------------------------------------
