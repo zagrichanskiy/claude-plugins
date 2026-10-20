@@ -28,7 +28,7 @@ from ..config import Config
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
 from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
-from ..goal import PLUGIN_ROOT, RULES, retarget
+from ..goal import PLUGIN_ROOT, RULES, retarget, tier
 from ..handoff import parse_handoff, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
@@ -60,6 +60,11 @@ STOP_POLL_SECONDS = 0.5
 #: cap. A waiting claim polls the store this often.
 CLAIM_WAIT_MAX_SECONDS = 540
 CLAIM_POLL_SECONDS = 10.0
+
+#: The agent a launched session of a Light or Full goal runs as. A Solo goal, or
+#: a goal without a recognised tier, runs in a plain session.
+ORCHESTRATOR = "cure:orchestrator"
+ORCHESTRATED_TIERS = ("Light", "Full")
 
 
 class JobsProvider:
@@ -129,6 +134,8 @@ class JobsProvider:
                 raise JobStateError(f"job {job_id} is {view.state.value} and its session {name} is live; "
                                     f"continue it: cure-job resume {job_id}")
         prompt = self._prepare_run(listing, view, "launch")
+        if tier(self.store.read_goal(job_id)) in ORCHESTRATED_TIERS:
+            claude_args = ["--agent", ORCHESTRATOR, *claude_args]
         run = record.run + 1
         session = session_name(job_id, run)
         self._record_run(record, run, session,

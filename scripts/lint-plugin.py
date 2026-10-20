@@ -180,6 +180,50 @@ def check_bundled_paths(path, dirs):
                            "${CLAUDE_PLUGIN_ROOT}")
 
 
+SYNC = re.compile(r"<!-- sync: (\S+?)(?:#([^>]+?))? -->\n(.*?)^<!-- /sync -->", re.S | re.M)
+SYNC_OPEN = "<!-- sync:"
+SYNC_CLOSE = "<!-- /sync -->"
+
+
+def check_sync_blocks(plugin_root, path):
+    """A block between sync markers must equal the file (or the `## ` section) it names.
+
+    The orchestrator agent carries copies of skill files in its system prompt, because a prompt
+    survives context compaction and a file read does not. This check keeps the copies in step.
+    """
+    content = path.read_text()
+    matches = list(SYNC.finditer(content))
+    starts = {match.start() for match in matches}
+    for opening in re.finditer(re.escape(SYNC_OPEN), content):
+        if opening.start() not in starts:
+            number = content.count("\n", 0, opening.start()) + 1
+            fail(path, f"line {number}: sync marker does not open a well-formed block; "
+                       f"write '{SYNC_OPEN} <file>[#<section>] -->' and close with '{SYNC_CLOSE}'")
+    closings = content.count(SYNC_CLOSE)
+    if closings != len(matches):
+        fail(path, f"{closings} closing sync marker(s) for {len(matches)} well-formed block(s)")
+    for match in matches:
+        source_name, section, block = match.groups()
+        if not block.strip():
+            number = content.count("\n", 0, match.start()) + 1
+            fail(path, f"line {number}: sync block is empty")
+            continue
+        source = plugin_root / source_name
+        if not source.is_file():
+            fail(path, f"sync block names {source_name!r}, which does not exist")
+            continue
+        text = source.read_text()
+        if section:
+            found = re.search(rf"^## {re.escape(section)}\n.*?(?=^## |\Z)", text, re.S | re.M)
+            if not found:
+                fail(path, f"sync block names section {section!r}, absent from {source_name}")
+                continue
+            text = found.group(0)
+        if block.strip() != text.strip():
+            where = f"{source_name}#{section}" if section else source_name
+            fail(path, f"sync block differs from {where}; copy the file text into the block")
+
+
 def main():
     manifest_path = ROOT / ".claude-plugin" / "marketplace.json"
     manifest = json.loads(manifest_path.read_text())
@@ -208,6 +252,8 @@ def main():
         check_agent(path)
     for path in sorted(ROOT.glob("plugins/*/skills/*/SKILL.md")):
         check_skill(path)
+    for path in sorted(ROOT.glob("plugins/*/agents/*.md")):
+        check_sync_blocks(path.parent.parent, path)
     for path in sorted(ROOT.glob("plugins/*/output-styles/*.md")):
         check_output_style(path)
     for path in sorted(ROOT.glob("plugins/*/hooks/hooks.json")):

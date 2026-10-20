@@ -248,3 +248,15 @@ def test_unreadable_state_root_is_a_store_error(tmp_path):
     blocker.write_text("x", encoding="utf-8")
     with pytest.raises(StoreError):
         JobStore(blocker / "state").create(BASE, render)
+
+
+def test_read_goal_returns_the_goal_text(store):
+    job_id = store.create(BASE, render)
+    store.goal_path(job_id).write_text("the goal", encoding="utf-8")
+    assert store.read_goal(job_id) == "the goal"
+
+
+def test_read_goal_without_a_goal_file_raises_unknown_job(store):
+    job_id = store.create(BASE, render)
+    with pytest.raises(UnknownJob):
+        store.read_goal(job_id)

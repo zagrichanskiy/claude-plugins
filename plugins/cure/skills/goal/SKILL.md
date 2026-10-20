@@ -238,7 +238,7 @@ tokens and lines.
 
 ## Running it
 
-Report the launch line the mode file gives.
+Report the launch line the mode file gives. A job run of tier Light or Full starts with `--agent cure:orchestrator`, which carries `rules.md` and `worker.md` in its system prompt. A Solo job run and a direct run start as plain sessions.
 
 ## Notes
 
