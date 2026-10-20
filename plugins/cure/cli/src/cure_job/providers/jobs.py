@@ -190,11 +190,17 @@ class JobsProvider:
     def claim(self, job_id: str, names: Sequence[str], wait: float = 0) -> None:
         """Add ``names`` to the resources ``job_id`` names. Returns when the job holds every one.
 
-        A held resource is polled for up to ``wait`` seconds, then raises
+        Every name is granted or none. A held resource is polled for up to ``wait`` seconds, then raises
         :class:`ResourceHeld`. Each poll takes and drops the store lock; no sleep runs under it.
+        Only short holds are waited for, and a run that holds a short hold claims nothing new,
+        so no two runs wait for each other.
         """
         if not 0 <= wait <= CLAIM_WAIT_MAX_SECONDS:
             raise ValueError(f"wait {wait} is outside 0..{CLAIM_WAIT_MAX_SECONDS}")
+        if wait:
+            repos = [name for name in names if not resource_names.is_short_hold(name)]
+            if repos:
+                raise CureJobError(f"{repos[0]} is a repository; claim --wait accepts only device: and build:")
         deadline = self.monotonic() + wait
         while True:
             with self.store.locked():
@@ -217,6 +223,9 @@ class JobsProvider:
         # A relaunch archives result.md before it records the next run.
         if record.result is not None or record.run in record.archived_runs:
             raise JobStateError(f"job {job_id} has a result for run {record.run}; claim needs a running run")
+        short = sorted(name for name in record.resources if resource_names.is_short_hold(name))
+        if short and not set(names) <= record.resources:
+            raise CureJobError(f"job {job_id} holds {', '.join(short)}; release {', '.join(short)} first")
         _refuse_invalid(snapshot.invalid, "claim")
         # Holders need only the records: a lost holder keeps its holds.
         open_records = {other.id: other for other in snapshot.records if is_open(other)}
