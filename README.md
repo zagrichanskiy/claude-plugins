@@ -137,7 +137,7 @@ every job that finished while it was stopped.
 | Skill | Invocation | Description |
 |---|---|---|
 | `goal` | `/cure:goal` | Writes the brief that `/goal @<file>` runs from: asks every open question in one round first, then an orchestrator-led work list with an agent per step and a closing retrospective that writes evidence-backed change proposals to `~/.claude/retros/`, a review-then-fix split with a severity floor, designer and live-verification gates, a measurable done-when list and the standing rules, then measures the file with `wc -c`. |
-| `dispatch` | `/cure:dispatch` | Hands a task from the current session to the dispatcher as a queued job: fills a handoff file from the session's context, writes it with `cure-job new` and sends the dispatcher the job id. |
+| `dispatch` | `/cure:dispatch` | Hands a task from the current session to the dispatcher as a queued job: fills a handoff file from the session's context, writes it with `cure-job new` and sends the dispatcher the job id. When the estimate of a repository exceeds `split.limit`, it asks once and may queue the task as chained part jobs (`after:`). |
 | `capture-idea` | `/cure:capture-idea` | Captures an idea or design just discussed in a session as a structured goal file under `~/.claude/ideas/`, in a form a fresh session can pick up cold. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |

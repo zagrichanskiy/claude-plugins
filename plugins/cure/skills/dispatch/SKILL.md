@@ -1,7 +1,7 @@
 ---
 name: dispatch
 description: Hand a task from the current working session to the dispatcher as a queued job. Fills a handoff file from the session's context, writes it with `cure-job new`, and sends the `dispatcher` session the job id. Use when the user says "hand this off", "queue this as a job", "send this to the dispatcher", "dispatch this", or "/cure:dispatch".
-allowed-tools: Read, Bash, Grep, Glob, SendMessage
+allowed-tools: Read, Bash, Grep, Glob, SendMessage, AskUserQuestion
 ---
 
 # Dispatch
@@ -14,9 +14,10 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/template.md`.
 2. Fill the template from the session's context (table below).
-3. Write the handoff with `cure-job new` (below). Keep the printed job id.
-4. Send the dispatcher the job id (below).
-5. Tell the user the job id and whether the dispatcher was reached or started.
+3. Estimate and split (section "Estimate and split"). It yields one handoff, or one per part.
+4. Write each handoff with `cure-job new` (below). Keep the printed job id.
+5. Send the dispatcher each job id (below).
+6. Tell the user the job ids, the tickets of a split, and whether the dispatcher was reached or started.
 
 ## Fields
 
@@ -47,10 +48,65 @@ Never read the file. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json`
 | `handoff.base` | `base`, when the user did not state it. |
 | `handoff.branch` | Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
 
+| `split.limit` | Changed lines per repository above which the task is split (default 800). |
+
 Omit `id` and `created`. `cure-job new` sets them.
 
 Frontmatter grammar: `key: scalar` on one line, `key: [a, b]` inline lists, and block lists of
 `  - item` lines. Nothing else parses. Put no comma in an item of an inline list.
+
+## Estimate and split
+
+Runs after the template is filled and before any handoff is written.
+
+| # | Step |
+|---|---|
+| 1 | Estimate the change per repository (below). |
+| 2 | No repository above `split.limit`: add the Settled line "Estimate: ~N changed lines" (N is the largest repository sum) and write one handoff. Done. |
+| 3 | Otherwise cut the work into parts by the split rule and draft one handoff per part. |
+| 4 | Ask in one `AskUserQuestion`. The question lists each part with slug, repos and estimate. Options: split as proposed, or queue as one job. With `delivery: pr` and no tracker the skill can write to, the same round asks for one ticket id per part. When the work cannot be cut, the question gives the reason and offers queue as one job, or stop. |
+| 5 | Queue as one job: write the unsplit handoff with the Estimate line. Split: create the tickets, then run `cure-job new` for each part in order. |
+| 6 | Tell the user the part job ids and tickets in one line. |
+
+Estimate:
+
+1. From Work and Done when, list every file each step changes: new, edited, deleted, tests, docs. Read each file to be edited.
+2. Per file, estimate added plus deleted lines with a one-phrase basis.
+3. Sum per repository. The unit is insertions plus deletions of `git diff --shortstat <base>`.
+4. If `~/.claude/retros/` has a similar goal, check the sum against its Measurements row.
+
+Split rule:
+
+1. Cut only the repository over `split.limit`.
+2. Order by layer: types and interfaces, implementation, callers and wiring, removal of what was replaced, docs.
+3. Use the fewest parts, each at or below `split.limit`.
+4. Tests go with the code they test.
+5. No part leaves a caller of something that does not exist yet. Each part builds and passes its tests alone.
+6. A repository under the limit stays whole and goes with the part that needs it. That part lists both repos, the delivering repo first.
+7. With two repositories over the limit, the provider repository parts come first.
+8. The parts form one linear chain.
+
+Part handoffs:
+
+| Field | Value |
+|---|---|
+| `outcome`, `## Work`, `## Done when`, `device` | Per part. `device: bench` only if the part needs the bench. |
+| `## Settled` | The applicable lines, plus "Split: part k of n; estimate ~N changed lines". |
+| `Resource risk:` lines, `## Tools` | Copied verbatim. |
+| `## Open` | Each item goes into the first part it affects. |
+| `after` | Part 1: the `after` of the unsplit draft, if any. Part k > 1: the job id of part k-1, printed by `cure-job new`. |
+| `ticket` | `delivery: pr`: the part own ticket. `delivery: commit`: the session ticket. |
+| `branch` | `delivery: pr`: `<ticket>_<slug>` per the repository branch convention. `delivery: commit`: one branch; the parts stack as commits on it. |
+| Slug | `<slug>-part<k>`. |
+
+Tickets, only with `delivery: pr` and only after the user chose split:
+
+| Case | Action |
+|---|---|
+| The session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `gh repo view --json hasIssuesEnabled` is true for the delivering repository | `gh issue create --title "<outcome of the part>"`. The body names the parent ticket. |
+| Another tracker | The split question asks for one ticket id per part. The user creates them. |
+| `gh auth status` fails | Report it. The user gives the ticket ids. The skill never logs in and never reads or stores a token. |
+| A create or `cure-job new` fails | Stop. Tell the user the tickets and jobs already created. Created part jobs wait on their `after:` chain and are safe to close. |
 
 ## Writing the handoff
 
@@ -77,8 +133,8 @@ the command fails, show its error to the user and stop. Do not retry with a chan
 
 ## Waking the dispatcher
 
-Send one cross-session message with `SendMessage` to the session named `dispatcher`. The text is
-`job <id>` and nothing else.
+Send one cross-session message per job with `SendMessage` to the session named `dispatcher`. The text is
+`job <id>` and nothing else. A split sends one message per part, in order.
 
 The dispatcher takes the sender address from the message and records it as the job's origin. The handoff carries no `origin`.
 
