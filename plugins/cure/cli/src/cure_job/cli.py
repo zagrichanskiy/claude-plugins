@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import json
 import os
 import sys
 import time
@@ -17,10 +18,12 @@ from pathlib import Path
 from typing import Callable
 
 from .claude import Claude, ClaudeCli
+from . import config
 from .clock import Clock, local_now
 from .commands.approve import ApproveCommand
 from .commands.claim import ClaimCommand
 from .commands.close import CloseCommand
+from .commands.config import ConfigCommand
 from .commands.finish import FinishCommand
 from .commands.launch import LaunchCommand
 from .commands.list import ListCommand
@@ -53,11 +56,12 @@ class Cli:
                  out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT,
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
         self.out = out
-        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic)
+        self.config = config.load(root)
+        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config)
         self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
                           LaunchCommand(self), ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self),
                           StopCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
-                          ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self)]
+                          ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), ConfigCommand(self)]
         self._parser = self._build_parser()
 
     def _build_parser(self) -> argparse.ArgumentParser:
@@ -77,11 +81,27 @@ class Cli:
         if not hasattr(args, "handler"):
             self._parser.print_help()
             return 0
+        mode = getattr(args, "config_mode", "lenient")
+        if mode == "strict" and self.config.problems:
+            for problem in self.config.problems:
+                print(problem, file=sys.stderr)
+            return 1
+        if mode == "lenient":
+            for problem in self.config.problems:
+                print(_fallback(problem), file=sys.stderr)
         try:
             return args.handler(args, self.jobs)
         except CureJobError as e:  # expected operational failure; a real bug propagates
             print(f"error: {e}", file=sys.stderr)
             return 1
+
+
+def _fallback(problem: config.Problem) -> str:
+    if problem.key is None:
+        return f"{problem}; using every default"
+    if problem.key not in config.DEFAULTS:
+        return f"{problem}; ignored"
+    return f"{problem}; using default {json.dumps(config.DEFAULTS[problem.key])}"
 
 
 def main(argv: list[str] | None = None) -> int:

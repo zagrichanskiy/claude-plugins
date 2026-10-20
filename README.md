@@ -124,7 +124,7 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 |---|---|
 | Questions | Approval and other questions are answered in the dispatcher session (attach from `claude agents`). A message does not answer them. |
 | Workspace trust | Each repository a job runs in must have been opened in Claude Code once to accept the trust prompt. Otherwise `cure-job launch` fails with "Workspace not trusted". |
-| Defaults | Copy `plugins/cure/skills/dispatch/defaults.md` to `${CURE_JOB_ROOT:-~/.claude/cure}/defaults.md` and edit it. Without the file, every fork goes to the question round. |
+| Configuration | Optional file `${CURE_JOB_ROOT:-~/.claude/cure}/config.json`. Without it, every key has its built-in default. `plugins/cure/skills/dispatch/config.example.json` lists every key. `cure-job config get [<key>]` prints the effective value as JSON, `cure-job config check` validates the file (exit 1 with `config.json: <key>: <problem>`), `cure-job config init` writes `config.json` from the defaults and from an old `defaults.md` in the same directory, renamed to `defaults.md.bak`. `config init` refuses when `config.json` exists. |
 
 Pin step: open `claude agents` and press ctrl+t on the dispatcher session. The session moves to the
 top of the list. The dispatcher is also started automatically by `cure:dispatch` when its wake-up

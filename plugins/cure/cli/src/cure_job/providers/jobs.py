@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Mapping, NamedTuple, NoReturn, Sequence
 
 from .. import resource as resource_names
 from ..claude import Claude, Session, SessionStatus
 from ..clock import Clock
+from ..config import Config
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
 from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
@@ -32,7 +34,7 @@ from ..job_id import make_id, session_name
 from ..result import Report, render_result
 from ..job import JobRecord
 from ..state import (HALF_CREATED_AGE, JobView, State, derive, expired, holders, is_open, is_ready, lock_rank,
-                     needs_sessions)
+                     needs_sessions, retention)
 from ..store import InvalidJob, JobStore, Snapshot
 
 
@@ -62,8 +64,10 @@ CLAIM_POLL_SECONDS = 10.0
 
 class JobsProvider:
     def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path = PLUGIN_ROOT,
-                 sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
+                 sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic,
+                 config: Config = Config()):
         self.store = store
+        self.config = config
         self.claude = claude
         self.clock = clock
         self.plugin_root = plugin_root
@@ -100,7 +104,8 @@ class JobsProvider:
     def _listing(self, snapshot: Snapshot, sessions: Mapping[str, Session]) -> Listing:
         statuses = {name: session.status for name, session in sessions.items()}
         invalid_ids = {job.id for job in snapshot.invalid}
-        return Listing(derive(snapshot.records, statuses, self.clock(), invalid_ids), snapshot.invalid, sessions)
+        return Listing(derive(snapshot.records, statuses, self.clock(), invalid_ids,
+                              timedelta(seconds=self.config["launch-grace-seconds"])), snapshot.invalid, sessions)
 
     def launch(self, job_id: str, claude_args: Sequence[str] = ()) -> str:
         """Start the next run of ``job_id`` and return the session name."""
@@ -413,11 +418,12 @@ class JobsProvider:
     def prune(self) -> list[str]:
         """Remove every job past its retention period that no open job names as ``after``. Return the removed ids."""
         now = self.clock()
+        kept_for = retention(self.config)
         views = self.views()
         predecessors = {view.after.id for view in views if view.after is not None and view.state.is_open}
         removed = []
         for view in views:
-            if expired(view, now) and view.record.id not in predecessors:
+            if expired(view, now, kept_for) and view.record.id not in predecessors:
                 self.store.remove(view.record.id)
                 removed.append(view.record.id)
         return removed

@@ -7,15 +7,16 @@ directory. A worker session then runs the goal and cannot reach the user.
 
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
-- Read `defaults.md` under `${CURE_JOB_ROOT:-~/.claude/cure}` before the question round. A missing
-  file means no defaults. Do not ask a fork it answers; mark that decision `(default)` under
-  Settled.
+- Read `handoff.delivery`, `handoff.base`, `handoff.branch` and `handoff.resource-risk` with
+  `<plugin-root>/bin/cure-job config get <key>` before the question round. Each prints JSON; the
+  built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch`; `current` is the branch checked out in the first repository of `repos`, the launch repository. Do not ask a fork a value answers; mark
+  that decision `(default)` under Settled. Never read `config.json` itself.
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
-  each defaults row with key `resource risk` whose scope matches into Settled verbatim, marked
+  each `handoff.resource-risk` entry whose scope matches into Settled as its `text`, marked
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
-  job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. Never shorten
+  job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. A scope `repo: <path>` matches a handoff whose `repos` lists `<path>`. Never shorten
   or drop these lines to save characters.
 - A handoff with `device: bench` declares bench use. The goal must carry the short-hold claim and
   release (below).
@@ -77,7 +78,7 @@ directory belongs to the CLI: the goal never deletes it.
 ## Questions
 
 The dispatcher asks the user in the question round. The questions are the handoff's `## Open` items
-plus any fork `defaults.md` does not answer, except a fork with no user-visible effect: record its
+plus any fork `config get` does not answer, except a fork with no user-visible effect: record its
 recommended option under Settled as `(recommended)` and do not ask it. Ask them with
 `AskUserQuestion`, record the answers under Settled, then write `<job>/goal.md`.
 

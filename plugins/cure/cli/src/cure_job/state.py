@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from typing import AbstractSet, Iterable, Mapping, Sequence
 
 from .claude import SessionStatus
+from .config import DEFAULTS, Config
 from .job import JobRecord
 from .result import ResultStatus
 
@@ -53,13 +54,17 @@ class State(enum.Enum):
 #: listed stopped and was not stopped by `cure-job stop`, is not yet lost, and
 #: an idle session is not yet stalled. Measured on Claude Code 2.1.300: listed
 #: within 0.255 seconds. On 2.1.301 a fresh launch still read lost at once.
-LAUNCH_GRACE = timedelta(seconds=60)
+LAUNCH_GRACE = timedelta(seconds=DEFAULTS["launch-grace-seconds"])
 
-RETENTION = {
-    State.DONE: timedelta(days=14),
-    State.FAILED: timedelta(days=30),
-    State.ABANDONED: timedelta(days=30),
-}
+_RETENTION_KEYS = {State.DONE: "prune.done-days", State.FAILED: "prune.failed-days",
+                   State.ABANDONED: "prune.abandoned-days"}
+
+
+def retention(config: Config) -> dict[State, timedelta]:
+    return {state: timedelta(days=config[key]) for state, key in _RETENTION_KEYS.items()}
+
+
+RETENTION = retention(Config())
 
 #: `prune` removes an interrupted `new`'s empty jobs/<id> or jobs/.new-* after
 #: this long. An in-progress `new` owns them for milliseconds.
@@ -127,7 +132,7 @@ def holders(records: Iterable[JobRecord]) -> dict[str, str]:
 
 
 def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], now: datetime,
-           invalid_ids: AbstractSet[str]) -> list[JobView]:
+           invalid_ids: AbstractSet[str], launch_grace: timedelta = LAUNCH_GRACE) -> list[JobView]:
     """One view per record, ascending id. ``sessions`` maps a session name to its status.
     ``invalid_ids`` names the jobs whose files do not read."""
     ordered = sorted(records, key=lambda record: record.id)
@@ -142,7 +147,7 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], 
         blocked_by: tuple[str, ...] = ()
         if state is None:
             blocked_by = tuple(sorted({held.get(name) for name in record.resources} - {None, record.id}))
-            state = _open_state(record, sessions, now, blocked_by, _waits(record, terminal))
+            state = _open_state(record, sessions, now, blocked_by, _waits(record, terminal), launch_grace)
         states[record.id] = state
         blocked[record.id] = blocked_by
     return [JobView(record, states[record.id], blocked[record.id], _ended_at(record, states[record.id]),
@@ -150,8 +155,8 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], 
             for record in ordered]
 
 
-def expired(view: JobView, now: datetime) -> bool:
-    kept = RETENTION.get(view.state)
+def expired(view: JobView, now: datetime, kept_for: Mapping[State, timedelta] = RETENTION) -> bool:
+    kept = kept_for.get(view.state)
     return kept is not None and view.ended_at is not None and now - view.ended_at > kept
 
 
@@ -194,14 +199,14 @@ def _terminal_state(record: JobRecord) -> State | None:
 
 
 def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: datetime,
-                blocked_by: tuple[str, ...], waits: bool) -> State:
+                blocked_by: tuple[str, ...], waits: bool, launch_grace: timedelta) -> State:
     if record.result is not None:
         return State.NEEDS_INPUT
     launches = record.launches
     if launches:
         latest = launches[-1]
         status = sessions.get(latest.session)
-        within_grace = now - latest.at <= LAUNCH_GRACE
+        within_grace = now - latest.at <= launch_grace
         if status is SessionStatus.BUSY:
             return State.RUNNING
         # A session that waits for a permission or an answer needs the user
