@@ -48,6 +48,8 @@ is not a question: take the recommended option and record it as the mode file sa
 Print the chosen agent tier and its reason as part of the round (see "Agent tier"). When there is
 no question, print the tier decision alone and ask nothing. The user can override the tier.
 
+When a docs review may find two files that state one rule differently, one question asks which file owns the rule.
+
 Then, and only then, write the file. The mode file says where it goes.
 
 ## What goes in it
@@ -102,6 +104,8 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 ## Rules
 
 - Tier: <Solo, Light or Full>. <Agent plan: steps, agents, parallel work, advisor.>
+- Stops: this goal overrides the user's "run one step and stop" rule; it stops only at its exits.
+- Waiting: <what the session does while it waits on the user>.
 ```
 
 ## Writing the done-when list
@@ -194,8 +198,8 @@ unattended and pays for the orchestrator's context on every turn.
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
 | Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
-| Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
-| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
+| Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; a `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is asked before its round closes; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
+| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. The gate and every device check run after the last code change, or the goal says "re-run the device check after any code change". One doc-only edit pass is allowed after the last review round. |
 | Retrospective | A work item and a done-when item before the stats row item. |
 | Stats row | The second-last work item and the done-when item before the clean-up item, in every tier. |
 | Implementer brief | When the repository ships a versioned plugin or package, the brief states: bump the version once per branch, not per commit, and points to the repository's version rule where its `CLAUDE.md` has one. |
