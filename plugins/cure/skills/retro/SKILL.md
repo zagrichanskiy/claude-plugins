@@ -23,11 +23,12 @@ Create nothing and delete nothing before step 7.
 
 - List `~/.claude/retros/????-??-??-*.md`.
 - Report the other files in one line and leave them.
-- Run `cure-job list --json`. Skip a retrospective whose job is still open.
+- Run `cure-job list --json`. Its rows have `id` (`<yymmdd>-<hhmm>-<repo>-<slug>`), `state` and `dir`. A job matches a retrospective when its id ends in `-<repo>-<slug>`. The job is open in any state except `done`, `failed` or `abandoned`. Skip a retrospective whose job is open.
 
 ## 2. Backfill stats
 
-- For each retrospective that has a Measurements section and no row in `stats.md`, append a row with the command of `${CLAUDE_PLUGIN_ROOT}/skills/goal/rules.md` "All tiers". Read the values from the Measurements section. Use `-` for an unknown value.
+- A row matches a retrospective when `<date>-<repo>-<slug>` of the row, joined with `-`, equals the file name without `.md`. Repo names contain hyphens, so do not split the file name.
+- For each retrospective that has a Measurements section and no row in `stats.md`, append a row with the command of `${CLAUDE_PLUGIN_ROOT}/skills/goal/rules.md` "All tiers". Read the values from the Measurements section. Use `-` for an unknown value. Take the repo from the retrospective's content, and ask the user when it is unclear.
 - A retrospective without Measurements gets no row.
 
 ## 3. Read the proposals
@@ -39,7 +40,7 @@ Create nothing and delete nothing before step 7.
 
 - Merge proposals with the same Target and intent across retrospectives. Keep every source in `Seen in`.
 - Check each proposal against the current target file. If the file already holds the change, the status is `in <file>:<line>`.
-- Check each proposal against `gh issue list --state all` of its repository. A match with an open issue is `open #N` and is dropped, not commented. A match with a closed issue is `closed #N`.
+- Check each proposal against `gh issue list --state all --limit 1000 --json number,title,state` of its repository. A match with an open issue is `open #N` and is dropped, not commented. A match with a closed issue is `closed #N`.
 
 ## 5. Resolve the repository
 
@@ -67,7 +68,7 @@ Show one table:
 
 - Create each accepted issue with `gh issue create`. The body is self-contained: copy the evidence, do not link to the retrospective.
 - Delete a retrospective only when both hold:
-  - Its `stats.md` row exists, or it had no Measurements section.
+  - Its `stats.md` row exists (matched as in step 2), or it had no Measurements section.
   - Every proposal in it has an executed decision: issue created, dropped, or marked by hand.
 - A failed `gh issue create` keeps the retrospectives that contain that proposal.
 - Print the created issue numbers and the deleted files.

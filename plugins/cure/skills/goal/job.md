@@ -167,7 +167,7 @@ Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a meas
 <review cause>, or the diff passes <lines> lines (per repository, `git -C <repo> diff --shortstat <base commit>`, the commit work item 1 recorded), or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice, or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
-transcript; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
+transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
 twice; and (d) the final message starts with `failed:`.
 
 Also done when a question only the user can answer is open, reported as in N+1 with `--status
@@ -187,8 +187,8 @@ commit, and the row carries the estimate as `est_lines`. A cap against the branc
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The
 failure path skips this item."
 
-A Solo exit has (a) without `<rounds>` and `<review cause>`, then the report clause as (b) and the
-final-message clause as (c).
+A Solo exit has (a) without `<rounds>` and `<review cause>`, then "(b) the `stats.md` row is appended
+with outcome `failed`", the report clause as (c) and the final-message clause as (d).
 
 ## Launch line
 

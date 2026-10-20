@@ -43,12 +43,13 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 | Merged review report | `.notes/<slug>-r<N>-report.md` |
 | Other working note, such as a brief, that a work item names | Under `.notes/` in the repository |
 | Retrospective | `~/.claude/retros/<date>-<repo>-<slug>.md` |
+| Stats row | `~/.claude/retros/stats.md`, appended with the command in "All tiers" |
 
 - Append: `cat >> <path> <<'EOF'` then the text, then `EOF`. Quote the delimiter so the shell
   expands nothing.
 - Replace the whole file: `cat > <path> <<'EOF'`.
 - Create `~/.claude/retros/` with `mkdir -p` first.
-- Never write a source file, a test, a skill, a plugin file or a document outside `.notes/` with
+- Never write a source file, a test, a skill, a plugin file or a document outside `.notes/` and `~/.claude/retros/` with
   `Bash`. Dispatch the agent that
   owns the change.
 - Delete the ledger and the working files with `rm` in the clean-up work item.
@@ -83,7 +84,8 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md`, with this
   command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
-  Unknown value is `-`; approximate value is `~45`; `|` is stripped from the title.
+  Unknown value is `-`; approximate value is `~45`. `|` and `'` are stripped from every value (the
+  command quotes each value in single quotes). `outcome` is `met` or `failed`.
 
   ```sh
   mkdir -p ~/.claude/retros
@@ -109,7 +111,15 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
-  its summary, keep the ledger, take the failure exit.
+  its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
+  exit.
+- The retrospective is `~/.claude/retros/<date>-<repo>-<slug>.md` with these sections, in this order,
+  and no others: Outcome (`met`, or `failed: <cause>, what is left`); "Where it went wrong" (one row
+  per event, `W1…Wn`, each with its evidence); Proposed changes. No measurements: the `stats.md` row
+  holds them. Proposed changes table header: `| Target | Change | Evidence (Wn) | Expected effect |`.
+  A proposal with no `Wn` evidence is not made. Target forms: `<plugin>:<path>` (a file in a plugin,
+  for example `cure:skills/goal/rules.md`), `repo:<path>` (a file in the goal's own repository),
+  `user:CLAUDE.md` (the user's global instructions).
 <!-- /sync -->
 
 <!-- sync: skills/goal/worker.md -->

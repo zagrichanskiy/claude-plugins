@@ -33,7 +33,8 @@ add one.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md`, with this
   command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
-  Unknown value is `-`; approximate value is `~45`; `|` is stripped from the title.
+  Unknown value is `-`; approximate value is `~45`. `|` and `'` are stripped from every value (the
+  command quotes each value in single quotes). `outcome` is `met` or `failed`.
 
   ```sh
   mkdir -p ~/.claude/retros
@@ -57,7 +58,15 @@ add one.
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
-  its summary, keep the ledger, take the failure exit.
+  its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
+  exit.
+- The retrospective is `~/.claude/retros/<date>-<repo>-<slug>.md` with these sections, in this order,
+  and no others: Outcome (`met`, or `failed: <cause>, what is left`); "Where it went wrong" (one row
+  per event, `W1…Wn`, each with its evidence); Proposed changes. No measurements: the `stats.md` row
+  holds them. Proposed changes table header: `| Target | Change | Evidence (Wn) | Expected effect |`.
+  A proposal with no `Wn` evidence is not made. Target forms: `<plugin>:<path>` (a file in a plugin,
+  for example `cure:skills/goal/rules.md`), `repo:<path>` (a file in the goal's own repository),
+  `user:CLAUDE.md` (the user's global instructions).
 
 ## Solo
 
@@ -65,4 +74,5 @@ add one.
   retrospective, and runs the done-when checks.
 - Questions are the session's own (asked or exited per mode). Assumptions are recorded in the final
   message.
-- When a failure cause holds: stop, keep the working files, take the failure exit.
+- When a failure cause holds: stop, keep the working files, append the `stats.md` row with outcome
+  `failed`, take the failure exit.
