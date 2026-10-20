@@ -48,7 +48,7 @@ is not a question: take the recommended option and record it as the mode file sa
 Print the chosen agent tier and its reason as part of the round (see "Agent tier"). When there is
 no question, print the tier decision alone and ask nothing. The user can override the tier.
 
-When a docs review may find two files that state one rule differently, one question asks which file owns the rule.
+When a docs review may find two files that state one rule differently, no rule is known at question time. One question asks for an ownership policy: the file whose topic the rule is, or an ordered list of files. The answer goes under Settled.
 
 Then, and only then, write the file. The mode file says where it goes.
 
@@ -105,7 +105,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 - Tier: <Solo, Light or Full>. <Agent plan: steps, agents, parallel work, advisor.>
 - Stops: this goal overrides the user's "run one step and stop" rule; it stops only at its exits.
-- Waiting: <what the session does while it waits on the user>.
+- Waiting: <job mode: the mode file's Waiting line. Direct mode: what the session does while it waits on the user>.
 ```
 
 ## Writing the done-when list
@@ -134,6 +134,7 @@ Rules for the items:
   pass threshold, for example 3 runs, all pass.
 - Write the repository's base branch in the fact check. For base `main` the file says `main` equals
   `origin/main`.
+- The gate and every device check run after the last code change, or the goal says "re-run the device check after any code change".
 - An item that counts text states the unit, the grep root, whether the match is case-sensitive and
   whether blank lines count.
 - An item that claims a reboot proves it with `/proc/uptime` after the cycle below 120 s.
@@ -196,10 +197,10 @@ unattended and pays for the orchestrator's context on every turn.
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Branch and commits | Branch creation and every commit are orchestrator work items, committed with explicit paths. No work item or agent brief assigns them to `implementer`, `test-author` or `skill-author`, because these agents refuse to create a branch or commit. The orchestrator's commit messages omit attribution trailers (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids them, because that file overrides a session attribution reminder. Trailers the repository requires, such as `Signed-off-by:`, stay. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
-| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; a `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is asked before its round closes; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
-| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. The gate and every device check run after the last code change, or the goal says "re-run the device check after any code change". One doc-only edit pass is allowed after the last review round. |
+| Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
 | Retrospective | A work item and a done-when item before the stats row item. |
 | Stats row | The second-last work item and the done-when item before the clean-up item, in every tier. |
 | Implementer brief | When the repository ships a versioned plugin or package, the brief states: bump the version once per branch, not per commit, and points to the repository's version rule where its `CLAUDE.md` has one. |
@@ -228,7 +229,7 @@ A Solo goal differs from the template as follows:
 - No retrospective work item or done-when item, no ledger, no backlog. The stats row work item and
   done-when item stay, with `<date> | <repo> | <slug>` filled in.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
-- Rules: the one line "Tier: Solo."
+- Rules: the lines "Tier: Solo.", Stops and Waiting.
 
 The review-round cap and failure cause come from this tier rule, or from the user's own statement
 in a direct run. A cap in a handoff or a design source is never copied into the goal. The failure cause in the exit text, by tier:
