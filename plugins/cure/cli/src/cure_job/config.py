@@ -23,7 +23,7 @@ TIERS = ("Solo", "Light", "Full")
 DEFAULTS: dict[str, object] = {
     "handoff.delivery": "commit",
     "handoff.base": "main",
-    "handoff.branch": "current",
+    "handoff.branch": "new",
     "handoff.resource-risk": [],
     "dispatcher.auto-approve-tiers": ["Solo", "Light"],
     "dispatcher.stalled-confirm-seconds": 60,

@@ -43,12 +43,13 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 | Merged review report | `.notes/<slug>-r<N>-report.md` |
 | Other working note, such as a brief, that a work item names | Under `.notes/` in the repository |
 | Retrospective | `~/.claude/retros/<date>-<repo>-<slug>.md` |
+| Stats row | `~/.claude/retros/stats.md`, appended with the command in "All tiers" |
 
 - Append: `cat >> <path> <<'EOF'` then the text, then `EOF`. Quote the delimiter so the shell
   expands nothing.
 - Replace the whole file: `cat > <path> <<'EOF'`.
 - Create `~/.claude/retros/` with `mkdir -p` first.
-- Never write a source file, a test, a skill, a plugin file or a document outside `.notes/` with
+- Never write a source file, a test, a skill, a plugin file or a document outside `.notes/` and `~/.claude/retros/` with
   `Bash`. Dispatch the agent that
   owns the change.
 - Delete the ledger and the working files with `rm` in the clean-up work item.
@@ -68,6 +69,11 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
   `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
   different bases.
+- Branch: the goal names the job's branch as a literal name. A branch that does not exist on run 1 is
+  not a mismatch of work item 1. The step after the fact check creates the branch from `<base>` in each
+  repository with `git switch -c <branch> <base>`, or runs `git switch <branch>` when it exists (a run
+  after `needs-input`). Never use `git switch -C`: it resets the branch and drops earlier commits. In
+  Light and Full this step is the orchestrator's, in Solo the session's.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.
 - A fork whose options differ in nothing the user would see is not a question: take the recommended
@@ -81,6 +87,20 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -f body=...`. `gh issue view` and
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
+- Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md`, with this
+  command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
+  Unknown value is `-`; approximate value is `~45`. `|` and `'` are stripped from every value (the
+  command quotes each value in single quotes). `outcome` is `met` or `failed`.
+
+  ```sh
+  mkdir -p ~/.claude/retros
+  (set -C; printf '%s\n' '| date | repo | slug | tier | outcome | est_lines | lines | turns | agent_tokens | rounds | title |' '|---|---|---|---|---|---|---|---|---|---|---|' > ~/.claude/retros/stats.md) 2>/dev/null
+  grep -qF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md || printf '%s\n' '| <date> | <repo> | <slug> | <tier> | <outcome> | <est_lines> | <lines> | <turns> | <agent_tokens> | <rounds> | <title> |' >> ~/.claude/retros/stats.md
+  ```
+
+- The row's `lines` is insertions plus deletions of `git diff --shortstat <base>`, largest
+  repository. `agent_tokens` is the sum of the subagent token reports. `rounds` is the review rounds.
+- Done when: `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
 <!-- /sync -->
 
 <!-- sync: skills/goal/rules.md#Light and Full -->
@@ -96,7 +116,15 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
-  its summary, keep the ledger, take the failure exit.
+  its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
+  exit.
+- The retrospective is `~/.claude/retros/<date>-<repo>-<slug>.md` with these sections, in this order,
+  and no others: Outcome (`met`, or `failed: <cause>, what is left`); "Where it went wrong" (one row
+  per event, `W1…Wn`, each with its evidence); Proposed changes. No measurements: the `stats.md` row
+  holds them. Proposed changes table header: `| Target | Change | Evidence (Wn) | Expected effect |`.
+  A proposal with no `Wn` evidence is not made. Target forms: `<plugin>:<path>` (a file in a plugin,
+  for example `cure:skills/goal/rules.md`), `repo:<path>` (a file in the goal's own repository),
+  `user:CLAUDE.md` (the user's global instructions).
 <!-- /sync -->
 
 <!-- sync: skills/goal/worker.md -->

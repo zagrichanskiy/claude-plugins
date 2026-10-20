@@ -81,14 +81,18 @@ context compaction and before an exit.
 1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor, the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
    runs>.
 2. <One step, its agent, its files.>
-N-1. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print its summary.
+N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
+     its summary.
+N-1. Append the `stats.md` row with the command of `rules.md`. `<date> | <repo> | <slug>` is filled
+     in here.
 N. Delete `<ledger path>` and `<each working file>`. Keep the goal file, the retrospective,
    `.notes/<slug>-backlog.md`. The failure path skips this item.
 
 ## Done when
 
 1. <Measured by a command this session runs.>
-N-1. The retrospective has "Assumptions" and "Proposed changes" sections; its summary is printed.
+N-2. (Light and Full) The retrospective has "Outcome", "Where it went wrong" and "Proposed changes" sections; its summary is printed.
+N-1. `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
 N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 <Mode file: the closing done-when item, if any.>
@@ -130,7 +134,7 @@ Rules for the items:
 Always end with the exits in the mode file. The `/goal` Stop hook blocks every stop that is not a
 met condition, so a cap that only says "stop" blocks every stop after it. The failure exit is a
 conjunction: a failure cause holds, the retrospective's summary naming the cause is in the
-transcript, and the final message starts with `failed:`. A Solo goal has no retrospective clause.
+transcript, and the final message starts with `failed:`. A Solo goal has no retrospective clause; its failure exit has the `stats.md` clause.
 The evaluator reads the transcript only, so the summary is printed, not just written to a file. No
 exit clause depends on text that exists only in a shipped file.
 
@@ -172,7 +176,8 @@ unattended and pays for the orchestrator's context on every turn.
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
-| Retrospective | The second-last work item and the done-when item before the clean-up item. |
+| Retrospective | A work item and a done-when item before the stats row item. |
+| Stats row | The second-last work item and the done-when item before the clean-up item, in every tier. |
 | Implementer brief | When the repository ships a versioned plugin or package, the brief states: bump the version once per branch, not per commit, and points to the repository's version rule where its `CLAUDE.md` has one. |
 
 ## Agent tier
@@ -196,7 +201,8 @@ A Solo goal differs from the template as follows:
   working file. The clean-up item and its done-when item carry at least one path. With no working
   file, write neither; never write an empty path list. Its clean-up item reads "Delete `<each working file>`. Keep the goal
   file."
-- No retrospective work item or done-when item, no ledger, no backlog.
+- No retrospective work item or done-when item, no ledger, no backlog. The stats row work item and
+  done-when item stay, with `<date> | <repo> | <slug>` filled in.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
 - Rules: the one line "Tier: Solo."
 
@@ -211,21 +217,25 @@ in a direct run. A cap in a handoff or a design source is never copied into the 
 
 ## The retrospective
 
-A Solo goal writes none. A retrospective lives in `~/.claude/retros/`, not in `.notes/`. A working note is deleted when its work merges,
-and a retrospective there is deleted with it before anyone acts on it.
+A Solo goal writes none. The format below is copied into `rules.md` "Light and Full", which the session reads. A retrospective lives in `~/.claude/retros/`, not in `.notes/`. It is a short-lived inbox item: the user runs `/cure:retro`, which turns its proposals into issues and deletes it. A working note is deleted when its work merges, and a retrospective there is deleted with it before anyone acts on it.
 
-It holds, in this order:
+It holds these sections, in this order, and no others:
 
 | Section | Content |
 |---|---|
 | Outcome | "met", or "failed: <cause>, what is left". |
-| Measurements | Turns used of the cap. Per agent: dispatches, tokens where reported, review rounds, measured-failure rounds, findings per severity, findings accepted. Changed lines against the cap, and against the handoff's estimate when it has one. |
-| Where it went wrong | Each event with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
-| Assumptions | Every assumption and every question with its answer, copied from the ledger before the ledger is deleted. |
-| Proposed changes | One row per change: target file (agent, skill, knowledge file, project `CLAUDE.md`, or this format), the change, the evidence row it rests on, the expected effect. |
+| Where it went wrong | One row per event, `W1…Wn`, with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
+| Proposed changes | The table below. |
 
-A proposal with no evidence row is not made. The session writes proposals only; it never edits a
-plugin or a skill. The user applies them in the plugin repository.
+Proposed changes table: `| Target | Change | Evidence (Wn) | Expected effect |`. One row per change. Target forms:
+
+| Form | Meaning |
+|---|---|
+| `<plugin>:<path>` | A file in a plugin, for example `cure:skills/goal/rules.md` |
+| `repo:<path>` | A file in the goal's own repository |
+| `user:CLAUDE.md` | The user's global instructions |
+
+A proposal with no `Wn` evidence is not made. The retrospective holds no measurements: the `stats.md` row is their only copy. Assumptions and answered questions stay in the ledger, and the printed summary lists them. The session writes proposals only; it never edits a plugin or a skill. The user applies them through `/cure:retro`.
 
 ## Sizing a goal
 
@@ -233,8 +243,8 @@ Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and 
 user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
 reaches it takes the failure exit instead of growing.
 
-Size a goal from earlier retrospectives. The "Measurements" table of a similar goal gives turns,
-tokens and lines.
+Size a goal from `~/.claude/retros/stats.md`: `grep '| <repo> |' ~/.claude/retros/stats.md` lists
+the earlier goals of the repository with their turns, tokens and lines. Do not read the retrospectives for this.
 
 ## Running it
 

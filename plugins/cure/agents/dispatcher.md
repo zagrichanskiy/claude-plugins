@@ -138,7 +138,7 @@ Your `memory: user` directory holds only facts that stay true after `jobs/` is e
 | `reference-claude-code.md` | Claude Code behaviour with its version. |
 | `user-interaction.md` | How the user wants to be asked. |
 
-Never store job ids, statuses, session ids, answers, default values or lessons. Lessons go to `~/.claude/retros/`.
+Never store job ids, statuses, session ids, answers, default values or lessons. Lessons go to `~/.claude/retros/` as a retrospective: Outcome, "Where it went wrong" (`W1…Wn`) and a Proposed changes table `| Target | Change | Evidence (Wn) | Expected effect |`. Targets are `<plugin>:<path>`, `repo:<path>` or `user:CLAUDE.md`.
 
 ## Rules
 

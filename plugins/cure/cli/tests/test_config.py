@@ -64,6 +64,11 @@ def test_config_get_with_a_key_prints_that_value_as_json(h):
     assert h.lines == ["900", '"commit"']
 
 
+def test_config_get_handoff_branch_without_a_file_prints_new(h):
+    assert h.run("config", "get", "handoff.branch") == 0
+    assert h.lines == ['"new"']
+
+
 def test_config_get_with_an_unknown_key_exits_one(h, capsys):
     assert h.run("config", "get", "no.such-key") == 1
     assert "no.such-key" in capsys.readouterr().err
@@ -176,6 +181,7 @@ def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewher
 
 
 @pytest.mark.parametrize("data", [{"handoff.delivery": "pr"}, {"handoff.branch": "feature/x"},
+                                  {"handoff.branch": "new"}, {"handoff.branch": "current"},
                                   {"dispatcher.auto-approve-tiers": []}, {"handoff.resource-risk": [
                                       RISK, {"scope": "repo: /work/a", "text": "t"}]}])
 def test_an_accepted_value_passes_check(h, data):

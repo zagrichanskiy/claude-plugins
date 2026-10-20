@@ -9,7 +9,7 @@ directory. A worker session then runs the goal and cannot reach the user.
 - Read the handoff file as the conversation.
 - Read `handoff.delivery`, `handoff.base`, `handoff.branch` and `handoff.resource-risk` with
   `<plugin-root>/bin/cure-job config get <key>` before the question round. Each prints JSON; the
-  built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch`; `current` is the branch checked out in the first repository of `repos`, the launch repository. Do not ask a fork a value answers; mark
+  built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `config.json` itself.
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
@@ -167,7 +167,7 @@ Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a meas
 <review cause>, or the diff passes <lines> lines (per repository, `git -C <repo> diff --shortstat <base commit>`, the commit work item 1 recorded), or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice, or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
-transcript; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
+transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
 twice; and (d) the final message starts with `failed:`.
 
 Also done when a question only the user can answer is open, reported as in N+1 with `--status
@@ -180,15 +180,15 @@ Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `S
 open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated
 text carries no pull-request wording.
 
-The retrospective's changed lines are measured the same way, per repository against its base
-commit, and the retrospective reports the estimate beside the cap. A cap against the branch name would count only uncommitted lines when the job commits on
+The `lines` value of the `stats.md` row is measured the same way, per repository against its base
+commit, and the row carries the estimate as `est_lines`. A cap against the branch name would count only uncommitted lines when the job commits on
 `<base>` itself.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The
 failure path skips this item."
 
-A Solo exit has (a) without `<rounds>` and `<review cause>`, then the report clause as (b) and the
-final-message clause as (c).
+A Solo exit has (a) without `<rounds>` and `<review cause>`, then "(b) the `stats.md` row is appended
+with outcome `failed`", the report clause as (c) and the final-message clause as (d).
 
 ## Launch line
 

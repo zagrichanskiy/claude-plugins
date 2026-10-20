@@ -28,10 +28,10 @@ Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a meas
 <review cause>, or the diff passes <lines> lines (`git diff --shortstat <base>`), or `git fetch` or
 a tool check failed, or a Settled statement is false or the title's outcome is unachievable, or an
 asked question was dismissed or left unanswered; and (b) the retrospective's summary, naming the
-cause, is in the transcript; and (c) the final message starts with `failed:`.
+cause, is in the transcript and the `stats.md` row is appended with outcome `failed`; and (c) the final message starts with `failed:`.
 ```
 
-A Solo exit has (a) without `<rounds>` and `<review cause>`, then the final-message clause as (b).
+A Solo exit has (a) without `<rounds>` and `<review cause>`, then "(b) the `stats.md` row is appended with outcome `failed`", then the final-message clause as (c).
 
 ## Launch line
 
