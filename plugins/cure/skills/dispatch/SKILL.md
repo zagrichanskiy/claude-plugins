@@ -14,8 +14,8 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/template.md`.
 2. Fill the template from the session's context (table below).
-3. Estimate and split (section "Estimate and split"). It yields one handoff, or one per part.
-4. Write each handoff with `cure-job new` (below). Keep the printed job id.
+3. Estimate and split (section "Estimate and split"). It yields drafts and the user's choice: one handoff, or one per part.
+4. Create the tickets of a split (section "Estimate and split"). Write each handoff with `cure-job new` (below), the parts in order. Keep the printed job id.
 5. Send the dispatcher each job id (below).
 6. Tell the user the job ids, the tickets of a split, and whether the dispatcher was reached or started.
 
@@ -57,16 +57,17 @@ Frontmatter grammar: `key: scalar` on one line, `key: [a, b]` inline lists, and 
 
 ## Estimate and split
 
-Runs after the template is filled and before any handoff is written.
+Runs after the template is filled and before any handoff is written. It ends with the drafts and the user's choice. The main list writes the handoffs and reports.
+
+The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The rules below use it.
 
 | # | Step |
 |---|---|
 | 1 | Estimate the change per repository (below). |
 | 2 | No repository above `split.limit`: add the Settled line "Estimate: ~N changed lines" (N is the largest repository sum) and write one handoff. Done. |
 | 3 | Otherwise cut the work into parts by the split rule and draft one handoff per part. |
-| 4 | Ask in one `AskUserQuestion`. The question lists each part with slug, repos and estimate. Options: split as proposed, or queue as one job. With `delivery: pr` and no tracker the skill can write to, the same round asks for one ticket id per part. When the work cannot be cut, the question gives the reason and offers queue as one job, or stop. |
-| 5 | Queue as one job: write the unsplit handoff with the Estimate line. Split: create the tickets, then run `cure-job new` for each part in order. |
-| 6 | Tell the user the part job ids and tickets in one line. |
+| 4 | With the effective `delivery: pr` on GitHub, run `gh auth status` and `gh repo view <owner/repo> --json hasIssuesEnabled` first (see Tickets). Then ask in one `AskUserQuestion`. The question lists each part with slug, repos and estimate. Options: split as proposed, or queue as one job. With `delivery: pr` and no tracker the skill can write to, the same round asks for one ticket id per part. When the work cannot be cut, the question gives the reason and offers queue as one job, or stop. |
+| 5 | Keep the drafts and the answer. Write nothing yet. |
 
 Estimate:
 
@@ -91,22 +92,24 @@ Part handoffs:
 | Field | Value |
 |---|---|
 | `outcome`, `## Work`, `## Done when`, `device` | Per part. `device: bench` only if the part needs the bench. |
-| `## Settled` | The applicable lines, plus "Split: part k of n; estimate ~N changed lines". |
+| `## Settled` | The applicable lines, plus "Estimate: ~N changed lines" (N is the part's largest repository sum) and "Split: part k of n". |
 | `Resource risk:` lines, `## Tools` | Copied verbatim. |
 | `## Open` | Each item goes into the first part it affects. |
 | `after` | Part 1: the `after` of the unsplit draft, if any. Part k > 1: the job id of part k-1, printed by `cure-job new`. |
 | `ticket` | `delivery: pr`: the part own ticket. `delivery: commit`: the session ticket. |
-| `branch` | `delivery: pr`: `<ticket>_<slug>` per the repository branch convention. `delivery: commit`: one branch; the parts stack as commits on it. |
+| `branch` | `delivery: pr`: `<ticket>_<slug>` per the repository branch convention. `delivery: commit`: one branch, the same explicit `branch:` value in every part; the parts stack as commits on it. |
 | Slug | `<slug>-part<k>`. |
 
-Tickets, only with `delivery: pr` and only after the user chose split:
+Writing a split: queue as one job writes the unsplit handoff with the Estimate line. Split creates the tickets, then runs `cure-job new` for each part in order, each with `after` set as in the table above.
+
+Tickets, only with the effective `delivery: pr` and only after the user chose split. `<owner/repo>` comes from an `owner/repo#N` or URL ticket, else from the remote of the delivering repository. Pass it as `--repo` to every `gh` command:
 
 | Case | Action |
 |---|---|
-| The session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `gh repo view --json hasIssuesEnabled` is true for the delivering repository | `gh issue create --title "<outcome of the part>"`. The body names the parent ticket. |
+| The session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `gh repo view <owner/repo> --json hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>"`. The body names the parent ticket. |
 | Another tracker | The split question asks for one ticket id per part. The user creates them. |
-| `gh auth status` fails | Report it. The user gives the ticket ids. The skill never logs in and never reads or stores a token. |
-| A create or `cure-job new` fails | Stop. Tell the user the tickets and jobs already created. Created part jobs wait on their `after:` chain and are safe to close. |
+| `gh auth status` fails | Run before the question. Report it. The question asks for the ticket ids; the user gives the ticket ids. The skill never logs in and never reads or stores a token. |
+| A create or `cure-job new` fails | Stop. Tell the user the ids of the tickets and jobs already created. Part 1 is queued and the dispatcher may launch it on its next wake or at once. Parts after part 1 wait on their `after:` chain. The user closes the created jobs with `cure-job close <id>`; for a running job, `cure-job stop <id>` first. |
 
 ## Writing the handoff
 

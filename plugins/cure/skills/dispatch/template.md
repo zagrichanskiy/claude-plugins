@@ -15,7 +15,7 @@ after: <job id of the predecessor; omit when the job has none; part k of a split
 - Decision taken in the session, with the reason in one clause.
 - Resource risk: <resource>: <the user's words>. Omit when the user said nothing.
 - Branch: <why this branch>. Omit for other work.
-- Estimate: ~N changed lines. Split part: "Split: part k of n; estimate ~N changed lines".
+- Estimate: ~N changed lines. A split part also has "Split: part k of n".
 
 ## Work
 
