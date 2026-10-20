@@ -185,6 +185,36 @@ def test_launch_passes_claude_arguments_through(jobs, claude, clock):
     assert claude.started[0][3] == ("--add-dir", "/work/other")
 
 
+def tiered_job(jobs, clock, tier_line):
+    clock.advance(timedelta(minutes=1))
+    job_id = jobs.new(handoff_text((REPO,), "none"), "x")
+    jobs.store.goal_path(job_id).write_text(f"# Goal\n\n## Rules\n\n{tier_line}\n", encoding="utf-8")
+    jobs.approve(job_id)
+    return job_id
+
+
+@pytest.mark.parametrize("tier", ["Light", "Full"])
+def test_launch_runs_a_light_or_full_goal_as_the_orchestrator(jobs, claude, clock, tier):
+    job_id = tiered_job(jobs, clock, f"- Tier: {tier}.")
+    jobs.launch(job_id)
+    assert claude.started[0][3] == ("--agent", "cure:orchestrator")
+
+
+@pytest.mark.parametrize("tier_line", ["- Tier: Solo.", "- Tier: Huge.", "no tier named"])
+def test_launch_runs_a_solo_unrecognised_or_untiered_goal_without_an_agent(jobs, claude, clock, tier_line):
+    job_id = tiered_job(jobs, clock, tier_line)
+    jobs.launch(job_id)
+    assert claude.started[0][3] == ()
+
+
+def test_launch_puts_the_orchestrator_before_user_arguments_and_the_prompt_last(jobs, claude, store, clock):
+    job_id = tiered_job(jobs, clock, "- Tier: Full.")
+    jobs.launch(job_id, ["--add-dir", "/work/other"])
+    _, _, prompt, args = claude.started[0]
+    assert args == ("--agent", "cure:orchestrator", "--add-dir", "/work/other")
+    assert prompt == f"/goal @{store.goal_path(job_id)}"
+
+
 def test_launch_records_a_launched_event(jobs, store, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)

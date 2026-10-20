@@ -192,6 +192,8 @@ final-message clause as (c).
 
 ## Launch line
 
+`cure-job launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session without `--agent`. The goal file does not name the agent.
+
 Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
 
 ```

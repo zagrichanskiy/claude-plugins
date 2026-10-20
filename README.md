@@ -100,13 +100,14 @@ the project's conventions, test command and run command from the repo.
 | `verifier` | Drives the change end-to-end in the real application to confirm the behaviour works, rather than that the suite passes. Never edits. |
 | `skill-author` | Creates and updates Claude Code skills from a description or source material, including the skills in this repository. |
 
-*Dispatcher* — a long-lived background session that turns handoff files into running job sessions.
+*Dispatcher* — a long-lived background session that turns handoff files into running job sessions. `cure-job launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session without `--agent`.
 
 | Agent | Description |
 |---|---|
 | `dispatcher` | Scans the job queue (`cure-job prune`, then `cure-job next --json`: one element per job with its ordered actions) on start and on every wake-up message, runs `cure:goal` for each queued or held handoff, prints a 3-line summary, then runs `cure-job approve` (`--by auto` for a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules); otherwise after the user's answer) and `cure-job launch` for an `approved` job. `launch` refuses a run-1 job that is not `approved`. It alone asks a job's questions. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
+| `orchestrator` | The session agent of a Light or Full job run. Its system prompt carries `skills/goal/rules.md` (the "All tiers" and "Light and Full" sections), `skills/goal/worker.md` and so the short-hold claim protocol, which context compaction does not drop. `scripts/lint-plugin.py` fails when a copy differs from its file. Tools: `Read`, `Grep`, `Glob`, `Bash`, `Agent`, `Skill`, `SendMessage`; no `Edit` or `Write`, so it edits no code. It writes the ledger, backlog and retrospective with `Bash` heredocs. |
 
-Start it once per machine:
+Start the dispatcher once per machine:
 
 ```sh
 claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'

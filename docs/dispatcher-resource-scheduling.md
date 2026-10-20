@@ -117,7 +117,7 @@ sequenceDiagram
     D->>C: next --json
     C-->>D: job 7: launch
     D->>C: launch 7
-    C->>J: start /goal
+    C->>J: start /goal (Light, Full: --agent cure:orchestrator; Solo: plain session)
     J->>C: claim --wait 7 build:<yocto-root>/build
     C-->>J: granted
     Note over J: bitbake

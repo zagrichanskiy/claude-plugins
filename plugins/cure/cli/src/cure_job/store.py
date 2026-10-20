@@ -195,6 +195,13 @@ class JobStore:
                 os.unlink(temp)
         return True
 
+    def read_goal(self, job_id: str) -> str:
+        target = self.goal_path(job_id)
+        text, _ = _read_text(target)
+        if text is None:
+            raise UnknownJob(f"job {job_id}: {target} does not exist")
+        return text
+
     def rewrite_goal(self, job_id: str, change: Callable[[str], str]) -> bool:
         """Replace ``goal.md`` with ``change(text)`` in one step. False when the text is unchanged."""
         target = self.goal_path(job_id)
