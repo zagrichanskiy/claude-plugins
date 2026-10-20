@@ -138,7 +138,7 @@ def test_views_report_running_then_lost_as_the_session_changes(jobs, claude, clo
     jobs.launch(job_id)
     assert state_map(jobs)[job_id] is State.RUNNING
     claude.statuses[job_id] = SessionStatus.STOPPED
-    # Stopped is launched in the grace: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+    # Stopped is launched in the grace: PR #25.
     clock.advance(LAUNCH_GRACE + timedelta(seconds=1))
     assert state_map(jobs)[job_id] is State.LOST
     del claude.statuses[job_id]
@@ -270,7 +270,7 @@ def test_launch_of_a_lost_job_uses_the_next_run_and_session_name(jobs, claude, c
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
     claude.statuses[job_id] = SessionStatus.STOPPED
-    # Stopped is launched in the grace: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+    # Stopped is launched in the grace: PR #25.
     clock.advance(LAUNCH_GRACE + timedelta(seconds=1))
     assert jobs.launch(job_id) == job_id + "-r2"
     assert state_map(jobs)[job_id] is State.RUNNING
@@ -346,7 +346,7 @@ def test_launch_runs_sessions_at_most_once(jobs, claude, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
     claude.statuses[job_id] = SessionStatus.STOPPED
-    # Stopped is launched in the grace: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+    # Stopped is launched in the grace: PR #25.
     clock.advance(LAUNCH_GRACE + timedelta(seconds=1))
     claude.sessions_calls = 0
     jobs.launch(job_id)
@@ -460,7 +460,7 @@ def test_close_abandons_a_job_in_each_closable_state(jobs, claude, store, clock,
         jobs.launch(first)
         if setup == "lost":
             claude.statuses[first] = SessionStatus.STOPPED
-            # Stopped is launched in the grace: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+            # Stopped is launched in the grace: PR #25.
             clock.advance(LAUNCH_GRACE + timedelta(seconds=1))
         else:
             (store.job_dir(first) / "result.md").write_text("---\nstatus: needs-input\n---\n", encoding="utf-8")

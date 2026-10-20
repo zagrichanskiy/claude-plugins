@@ -75,7 +75,7 @@ def test_row_5_latest_launch_names_the_session_checked():
 
 
 def test_row_6_stopped_session_is_launched_inside_the_grace_period():
-    # Listed without a pid while starting: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+    # Listed without a pid while starting: PR #25.
     record = make_record(A, events=(launched(A, age=timedelta(seconds=1)),))
     assert state_of(record, {A: STOPPED}) is State.LAUNCHED
 

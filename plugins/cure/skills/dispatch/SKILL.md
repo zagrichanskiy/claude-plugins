@@ -74,7 +74,7 @@ Estimate:
 1. From Work and Done when, list every file each step changes: new, edited, deleted, tests, docs. Read each file to be edited.
 2. Per file, estimate added plus deleted lines with a one-phrase basis.
 3. Sum per repository. The unit is insertions plus deletions of `git diff --shortstat <base>`.
-4. If `~/.claude/retros/` has a similar goal, check the sum against its Measurements row.
+4. Run `grep '| <repo> |' ~/.claude/retros/stats.md`. If a row is a similar goal, check the sum against its `lines`.
 
 Split rule:
 

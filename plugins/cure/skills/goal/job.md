@@ -180,8 +180,8 @@ Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `S
 open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated
 text carries no pull-request wording.
 
-The retrospective's changed lines are measured the same way, per repository against its base
-commit, and the retrospective reports the estimate beside the cap. A cap against the branch name would count only uncommitted lines when the job commits on
+The `lines` value of the `stats.md` row is measured the same way, per repository against its base
+commit, and the row carries the estimate as `est_lines`. A cap against the branch name would count only uncommitted lines when the job commits on
 `<base>` itself.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The

@@ -65,7 +65,7 @@ def test_finish_refuses_a_job_without_a_launched_event(jobs, store, clock):
 
 def test_finish_refuses_a_closed_job(jobs, store, clock, claude):
     job_id = make_job(jobs, store, clock)
-    # cure-job stop ends the grace: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+    # cure-job stop ends the grace: PR #25.
     jobs.stop(job_id)
     jobs.close(job_id, "stop")
     with pytest.raises(JobStateError, match="abandoned"):
@@ -189,7 +189,7 @@ def test_cli_finish_without_a_launched_event_exits_one(h, tmp_path):
 
 def test_cli_finish_of_a_closed_job_exits_one(h, tmp_path):
     job_id = h.job(tmp_path)
-    # cure-job stop ends the grace: row 9 of ~/.claude/retros/2026-10-16-cure-dispatcher-first-run.md.
+    # cure-job stop ends the grace: PR #25.
     assert h.run("stop", job_id) == 0
     assert h.run("close", job_id) == 0
     assert h.run("finish", job_id, "--status", "done") == 1

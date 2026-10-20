@@ -82,13 +82,16 @@ context compaction and before an exit.
    runs>.
 2. <One step, its agent, its files.>
 N-1. Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print its summary.
+     Append the `stats.md` row with the command of `rules.md`; `<date> | <repo> | <slug>` is filled
+     in here.
 N. Delete `<ledger path>` and `<each working file>`. Keep the goal file, the retrospective,
    `.notes/<slug>-backlog.md`. The failure path skips this item.
 
 ## Done when
 
 1. <Measured by a command this session runs.>
-N-1. The retrospective has "Assumptions" and "Proposed changes" sections; its summary is printed.
+N-1. The retrospective has "Outcome", "Where it went wrong" and "Proposed changes" sections; its summary is printed.
+     `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
 N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 <Mode file: the closing done-when item, if any.>
@@ -211,21 +214,25 @@ in a direct run. A cap in a handoff or a design source is never copied into the 
 
 ## The retrospective
 
-A Solo goal writes none. A retrospective lives in `~/.claude/retros/`, not in `.notes/`. A working note is deleted when its work merges,
-and a retrospective there is deleted with it before anyone acts on it.
+A Solo goal writes none. A retrospective lives in `~/.claude/retros/`, not in `.notes/`. It is a short-lived inbox item: the user runs `/cure:retro`, which turns its proposals into issues and deletes it. A working note is deleted when its work merges, and a retrospective there is deleted with it before anyone acts on it.
 
-It holds, in this order:
+It holds these sections, in this order, and no others:
 
 | Section | Content |
 |---|---|
 | Outcome | "met", or "failed: <cause>, what is left". |
-| Measurements | Turns used of the cap. Per agent: dispatches, tokens where reported, review rounds, measured-failure rounds, findings per severity, findings accepted. Changed lines against the cap, and against the handoff's estimate when it has one. |
-| Where it went wrong | Each event with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
-| Assumptions | Every assumption and every question with its answer, copied from the ledger before the ledger is deleted. |
-| Proposed changes | One row per change: target file (agent, skill, knowledge file, project `CLAUDE.md`, or this format), the change, the evidence row it rests on, the expected effect. |
+| Where it went wrong | One row per event, `W1…Wn`, with its evidence: the turn, agent, finding id or command. Rework, stale facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`. |
+| Proposed changes | The table below. |
 
-A proposal with no evidence row is not made. The session writes proposals only; it never edits a
-plugin or a skill. The user applies them in the plugin repository.
+Proposed changes table: `| Target | Change | Evidence (Wn) | Expected effect |`. One row per change. Target forms:
+
+| Form | Meaning |
+|---|---|
+| `<plugin>:<path>` | A file in a plugin, for example `cure:skills/goal/rules.md` |
+| `repo:<path>` | A file in the goal's own repository |
+| `user:CLAUDE.md` | The user's global instructions |
+
+A proposal with no `Wn` evidence is not made. The retrospective holds no measurements: the `stats.md` row is their only copy. Assumptions and answered questions stay in the ledger, and the printed summary lists them. The session writes proposals only; it never edits a plugin or a skill. The user applies them through `/cure:retro`.
 
 ## Sizing a goal
 
@@ -233,8 +240,8 @@ Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and 
 user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
 reaches it takes the failure exit instead of growing.
 
-Size a goal from earlier retrospectives. The "Measurements" table of a similar goal gives turns,
-tokens and lines.
+Size a goal from `~/.claude/retros/stats.md`: `grep '| <repo> |' ~/.claude/retros/stats.md` lists
+the earlier goals of the repository with their turns, tokens and lines. Do not read the retrospectives for this.
 
 ## Running it
 

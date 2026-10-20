@@ -81,6 +81,19 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -f body=...`. `gh issue view` and
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
+- Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md`, with this
+  command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
+  Unknown value is `-`; approximate value is `~45`; `|` is stripped from the title.
+
+  ```sh
+  mkdir -p ~/.claude/retros
+  (set -C; printf '%s\n' '| date | repo | slug | tier | outcome | est_lines | lines | turns | agent_tokens | rounds | title |' '|---|---|---|---|---|---|---|---|---|---|---|' > ~/.claude/retros/stats.md) 2>/dev/null
+  grep -qF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md || printf '%s\n' '| <date> | <repo> | <slug> | <tier> | <outcome> | <est_lines> | <lines> | <turns> | <agent_tokens> | <rounds> | <title> |' >> ~/.claude/retros/stats.md
+  ```
+
+- The row's `lines` is insertions plus deletions of `git diff --shortstat <base>`, largest
+  repository. `agent_tokens` is the sum of the subagent token reports. `rounds` is the review rounds.
+- Done when: `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
 <!-- /sync -->
 
 <!-- sync: skills/goal/rules.md#Light and Full -->
