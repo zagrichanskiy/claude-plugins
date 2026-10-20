@@ -81,11 +81,13 @@ def test_cli_check_scenario(tmp_path, workdir, root, fake_state):
     first = run(workdir, "new", "--slug", "check", str(handoff)).stdout.strip()
     second = run(workdir, "new", "--slug", "check", str(handoff)).stdout.strip()
     assert second == first + "-2"
-    assert list_states(workdir) == [(first, "queued"), (second, "held")]
+    assert list_states(workdir) == [(first, "queued"), (second, "queued")]
 
-    # Step 2: the dispatcher writes goal.md.
+    # Step 2: the dispatcher writes goal.md and approves it.
     (root / "jobs" / first / "goal.md").write_text("goal", encoding="utf-8")
-    assert list_states(workdir) == [(first, "awaiting-approval"), (second, "held")]
+    assert list_states(workdir) == [(first, "awaiting-approval"), (second, "queued")]
+    assert run(workdir, "approve", first).returncode == 0
+    assert list_states(workdir) == [(first, "approved"), (second, "held")]
 
     # Step 3: launch through the fake claude.
     launched = run(workdir, "launch", first)

@@ -18,6 +18,7 @@ from typing import Callable
 
 from .claude import Claude, ClaudeCli
 from .clock import Clock, local_now
+from .commands.approve import ApproveCommand
 from .commands.claim import ClaimCommand
 from .commands.close import CloseCommand
 from .commands.finish import FinishCommand
@@ -53,10 +54,10 @@ class Cli:
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
         self.out = out
         self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic)
-        self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), LaunchCommand(self),
-                          ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self), StopCommand(self),
-                          CloseCommand(self), OriginCommand(self), FinishCommand(self), ReportedCommand(self),
-                          RemoveSessionsCommand(self), PruneCommand(self)]
+        self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
+                          LaunchCommand(self), ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self),
+                          StopCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
+                          ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self)]
         self._parser = self._build_parser()
 
     def _build_parser(self) -> argparse.ArgumentParser:

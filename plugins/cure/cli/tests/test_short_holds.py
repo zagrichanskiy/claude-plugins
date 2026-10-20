@@ -61,6 +61,7 @@ class Harness:
         assert self.run("new", "--slug", "x", str(source)) == 0
         job_id = self.lines[0]
         self.jobs.store.goal_path(job_id).write_text("goal", encoding="utf-8")
+        assert self.run("approve", job_id) == 0
         assert self.run("launch", job_id) == 0
         return job_id
 

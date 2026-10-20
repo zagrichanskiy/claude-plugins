@@ -51,12 +51,16 @@ def state_map(jobs):
     return {view.record.id: view.state for view in jobs.views()}
 
 
-def new_job(jobs, clock, slug="x", repos=(REPO,), device="none", approved=False):
-    """Create a job; advance the clock one minute first so that ids sort in creation order."""
+def new_job(jobs, clock, slug="x", repos=(REPO,), device="none", approved=False, goal=False):
+    """Create a job; advance the clock one minute first so that ids sort in creation order.
+
+    ``goal`` writes goal.md; ``approved`` writes it and approves it."""
     clock.advance(timedelta(minutes=1))
     job_id = jobs.new(handoff_text(repos, device), slug)
-    if approved:
+    if goal or approved:
         jobs.store.goal_path(job_id).write_text("goal", encoding="utf-8")
+    if approved:
+        jobs.approve(job_id)
     return job_id
 
 
@@ -109,10 +113,10 @@ def test_views_are_empty_without_jobs(jobs):
     assert jobs.views() == []
 
 
-def test_views_first_job_queued_second_held(jobs, clock):
-    first = new_job(jobs, clock)
+def test_views_first_job_approved_second_held(jobs, clock):
+    first = new_job(jobs, clock, approved=True)
     second = new_job(jobs, clock)
-    assert state_map(jobs) == {first: State.QUEUED, second: State.HELD}
+    assert state_map(jobs) == {first: State.APPROVED, second: State.HELD}
 
 
 def test_views_ask_for_sessions_only_when_a_state_depends_on_them(jobs, claude, clock):
@@ -184,7 +188,7 @@ def test_launch_passes_claude_arguments_through(jobs, claude, clock):
 def test_launch_records_a_launched_event(jobs, store, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
-    assert store.load(job_id).events == (Launched(1, job_id, clock.now),)
+    assert store.load(job_id).launches == (Launched(1, job_id, clock.now),)
 
 
 def test_launch_leaves_the_job_launched_then_running(jobs, claude, clock):
@@ -223,7 +227,7 @@ def test_launch_refuses_states_other_than_launchable(jobs, claude, store, clock,
 
 
 def test_launch_refuses_a_job_whose_resource_is_held_naming_holder_and_resource(jobs, claude, clock):
-    holder = new_job(jobs, clock)
+    holder = new_job(jobs, clock, approved=True)
     waiting = new_job(jobs, clock, approved=True)
     with pytest.raises(ResourceHeld) as caught:
         jobs.launch(waiting)
@@ -280,7 +284,7 @@ def test_launch_retry_after_a_failed_start_reuses_the_run_number(jobs, claude, c
     claude.fail_start = ClaudeError("cannot start")
     with pytest.raises(ClaudeError):
         jobs.launch(job_id)
-    assert jobs.store.load(job_id).events == ()
+    assert jobs.store.load(job_id).launches == ()
     claude.fail_start = None
     assert jobs.launch(job_id) == job_id
     assert jobs.store.load(job_id).run == 1
@@ -291,7 +295,7 @@ def test_launch_start_failure_records_no_event(jobs, claude, store, clock):
     claude.fail_start = ClaudeError("cannot start")
     with pytest.raises(ClaudeError):
         jobs.launch(job_id)
-    assert not (store.job_dir(job_id) / "dispatch.jsonl").exists()
+    assert store.load(job_id).launches == ()
 
 
 def test_launch_event_write_failure_names_the_unrecorded_session(jobs, claude, store, clock, monkeypatch):
@@ -418,7 +422,7 @@ def test_claim_allowed_over_a_higher_job_that_was_not_launched(jobs, clock):
     ("lost", State.LOST), ("needs-input", State.NEEDS_INPUT),
 ])
 def test_close_abandons_a_job_in_each_closable_state(jobs, claude, store, clock, setup, expected):
-    first = new_job(jobs, clock, approved=setup != "queued")
+    first = new_job(jobs, clock, goal=setup != "queued", approved=setup not in ("queued", "awaiting-approval"))
     target = first
     if setup == "held":
         target = new_job(jobs, clock)

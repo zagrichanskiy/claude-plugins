@@ -8,11 +8,11 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Claim, Closed, Launched, StopIssued
+from cure_job.events import Approved, Claim, Closed, Launched, StopIssued
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
-from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, needs_sessions
+from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, is_ready, needs_sessions
 from tests.builders import NOW, make_record, result_of
 
 BUSY, IDLE, STOPPED = SessionStatus.BUSY, SessionStatus.IDLE, SessionStatus.STOPPED
@@ -115,7 +115,7 @@ def test_row_10_job_holding_every_resource_is_queued():
 
 
 def test_row_11_job_not_holding_a_resource_is_held():
-    assert states([make_record(A), make_record(B)])[B] is State.HELD
+    assert states([make_record(A, approved=True), make_record(B)])[B] is State.HELD
 
 
 # --- precedence ----------------------------------------------------------------------------------------
@@ -167,15 +167,27 @@ def test_is_open(state, is_open):
 
 def test_state_values_are_the_documented_words():
     assert {s.value for s in State} == {
-        "queued", "held", "awaiting-approval", "launched", "running", "stalled", "blocked", "lost", "needs-input", "done",
-        "failed", "abandoned"}
+        "queued", "held", "awaiting-approval", "approved", "launched", "running", "stalled", "blocked", "lost",
+        "needs-input", "done", "failed", "abandoned"}
 
 
 # --- lock rule ----------------------------------------------------------------------------------------
 
+@pytest.mark.parametrize("blocked", [False, True])
+@pytest.mark.parametrize("result", [None, ResultStatus.NEEDS_INPUT])
+@pytest.mark.parametrize("goal", ["none", "unapproved", "stale", "approved"])
+def test_is_ready_is_true_exactly_when_an_unlaunched_job_derives_approved_or_held_approved(goal, result, blocked):
+    events = (Approved("sha256:other", "user", NOW),) if goal == "stale" else ()
+    record = make_record(B, goal=goal != "none", approved=goal == "approved", events=events,
+                         result=None if result is None else result_of(result))
+    others = [make_record(A, approved=True)] if blocked else []
+    state = states(others + [record])[B]
+    assert is_ready(record) is (state is State.APPROVED or (state is State.HELD and record.approved))
+
+
 def test_lowest_open_id_holds_and_the_others_are_held():
-    result = states([make_record(C), make_record(A), make_record(B)])
-    assert result == {A: State.QUEUED, B: State.HELD, C: State.HELD}
+    result = states([make_record(C, approved=True), make_record(A, approved=True), make_record(B, approved=True)])
+    assert result == {A: State.APPROVED, B: State.HELD, C: State.HELD}
 
 
 def test_views_are_ascending_by_id_whatever_the_input_order():
@@ -184,8 +196,8 @@ def test_views_are_ascending_by_id_whatever_the_input_order():
 
 
 def test_blocked_by_lists_ascending_ids_of_holders():
-    one = make_record(A, repos=("/work/x",))
-    two = make_record(B, repos=("/work/y",))
+    one = make_record(A, repos=("/work/x",), approved=True)
+    two = make_record(B, repos=("/work/y",), approved=True)
     three = make_record(C, repos=("/work/x", "/work/y"))
     view = derive([one, two, three], {}, NOW)[2]
     assert view.state is State.HELD
@@ -193,7 +205,7 @@ def test_blocked_by_lists_ascending_ids_of_holders():
 
 
 def test_job_holds_nothing_blocked_by_is_empty_for_the_holder():
-    views = derive([make_record(A), make_record(B)], {}, NOW)
+    views = derive([make_record(A, approved=True), make_record(B)], {}, NOW)
     assert views[0].blocked_by == ()
     assert views[1].blocked_by == (A,)
 
@@ -204,7 +216,7 @@ def test_disjoint_resources_do_not_block():
 
 
 def test_job_holding_one_resource_but_not_the_other_is_held():
-    result = states([make_record(A, repos=("/work/x",)), make_record(B, repos=("/work/y", "/work/x"))])
+    result = states([make_record(A, repos=("/work/x",), approved=True), make_record(B, repos=("/work/y", "/work/x"))])
     assert result[B] is State.HELD
 
 
@@ -235,12 +247,13 @@ def test_lost_job_is_open_and_keeps_its_resources(sessions, age):
 
 
 def test_needs_input_job_keeps_its_resources():
-    result = states([make_record(A, result=result_of(ResultStatus.NEEDS_INPUT)), make_record(B)])
+    result = states([make_record(A, events=(launched(A),), result=result_of(ResultStatus.NEEDS_INPUT)),
+                     make_record(B)])
     assert result[B] is State.HELD
 
 
 def test_claim_event_adds_a_resource_to_the_job():
-    claimed = make_record(A, events=(Claim(DEVICE_BENCH),))
+    claimed = make_record(A, events=(launched(A), Claim(DEVICE_BENCH)))
     other = make_record(B, device=Device.BENCH)
     assert claimed.resources == frozenset({"/work/video-core", DEVICE_BENCH})
     assert states([claimed, other])[B] is State.HELD
@@ -254,13 +267,13 @@ def test_device_bench_in_the_handoff_does_not_hold_the_bench():
 
 def test_ids_compare_as_plain_strings():
     low = "261013-0959-video-core-z"
-    result = states([make_record(A), make_record(low)])
-    assert result == {low: State.QUEUED, A: State.HELD}
+    result = states([make_record(A, approved=True), make_record(low, approved=True)])
+    assert result == {low: State.APPROVED, A: State.HELD}
 
 
-def test_awaiting_approval_job_still_reports_the_holder_it_waits_for():
-    views = derive([make_record(A), make_record(B, goal=True)], {}, NOW)
-    assert views[1].state is State.AWAITING_APPROVAL
+def test_blocked_job_with_a_goal_is_held_and_reports_the_holder_it_waits_for():
+    views = derive([make_record(A, approved=True), make_record(B, goal=True)], {}, NOW)
+    assert views[1].state is State.HELD
     assert views[1].blocked_by == (A,)
 
 

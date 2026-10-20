@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import resource
-from .events import Claim, Closed, Event, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
+from .events import Approved, Claim, Closed, Event, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
 from .handoff import Handoff
 from .result import Result
 
@@ -16,13 +16,24 @@ class JobRecord:
     id: str
     dir: Path
     handoff: Handoff
-    has_goal: bool
+    #: The digest of ``goal.md`` as read, or ``None`` when it does not exist.
+    goal_digest: str | None
     events: tuple[Event, ...]
     result: Result | None
     result_mtime: datetime | None
     events_mtime: datetime | None
     #: The run numbers of the ``result-<run>.md`` files.
     archived_runs: frozenset[int] = frozenset()
+
+    @property
+    def has_goal(self) -> bool:
+        return self.goal_digest is not None
+
+    @property
+    def approved(self) -> bool:
+        """An ``approved`` event names the digest of the current ``goal.md``."""
+        return self.has_goal and any(isinstance(event, Approved) and event.goal == self.goal_digest
+                                     for event in self.events)
 
     @property
     def launches(self) -> tuple[Launched, ...]:

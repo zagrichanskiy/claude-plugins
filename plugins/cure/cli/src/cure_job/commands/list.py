@@ -49,7 +49,7 @@ INVALID = "invalid"
 
 def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
-            "origin": None, "resources": [], "blocked-by": [], "problem": job.problem,
+            "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
             "waiting-for": None, "reported": None, "sessions-removed": None, "prs": []}
 
 
@@ -67,6 +67,8 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "origin": record.origin,
         "resources": sorted(record.resources),
         "blocked-by": list(view.blocked_by),
+        "goal": record.has_goal,
+        "approved": record.approved,
         "problem": record.result.problem if record.result else None,
         "waiting-for": waiting_for,
         "reported": record.reported,

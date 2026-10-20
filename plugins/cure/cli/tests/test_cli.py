@@ -16,8 +16,8 @@ from tests.builders import NOW, handoff_text
 from tests.conftest import FAKE_CLAUDE
 from tests.fakes import FakeClaude, FakeClock
 
-COMMANDS = ["new", "list", "launch", "resume", "claim", "release", "stop", "origin", "close", "reported", "remove-sessions",
-            "prune", "next"]
+COMMANDS = ["new", "list", "approve", "launch", "resume", "claim", "release", "stop", "origin", "close", "reported",
+            "remove-sessions", "prune", "next"]
 
 
 class Harness:
@@ -42,6 +42,7 @@ class Harness:
 
     def approve(self, job_id: str) -> None:
         (self.root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+        assert self.run("approve", job_id) == 0
 
 
 @pytest.fixture
@@ -150,16 +151,19 @@ def test_list_without_jobs_prints_nothing(h):
 
 def test_list_text_has_one_aligned_line_per_job_with_blocked_by(h, tmp_path):
     first = h.new(tmp_path, slug="a")
+    h.approve(first)
     second = h.new(tmp_path, slug="a-much-longer-slug")
     h.lines.clear()
     assert h.run("list") == 0
     width = len(second)
-    assert h.lines == [f"{first.ljust(width)}  queued", f"{second}  held  blocked-by={first}"]
+    assert h.lines == [f"{first.ljust(width)}  approved", f"{second}  held  blocked-by={first}"]
 
 
 def test_list_text_joins_several_blockers_with_commas(h, tmp_path):
     first = h.new(tmp_path, repos=("/work/a",))
+    h.approve(first)
     second = h.new(tmp_path, repos=("/work/b",))
+    h.approve(second)
     third = h.new(tmp_path, repos=("/work/a", "/work/b"))
     h.lines.clear()
     h.run("list")
@@ -168,6 +172,7 @@ def test_list_text_joins_several_blockers_with_commas(h, tmp_path):
 
 def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
     first = h.new(tmp_path)
+    h.approve(first)
     second = h.new(tmp_path)
     h.lines.clear()
     assert h.run("list", "--json") == 0
@@ -176,8 +181,9 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
     data = json.loads(h.lines[0])
     assert [item["id"] for item in data] == [first, second]
     assert data[0] == {
-        "id": first, "state": "queued", "dir": str(h.root / "jobs" / first), "run": 0, "session": None,
-        "resources": ["/work/video-core"], "blocked-by": [], "problem": None, "origin": None,
+        "id": first, "state": "approved", "dir": str(h.root / "jobs" / first), "run": 0, "session": None,
+        "resources": ["/work/video-core"], "blocked-by": [], "goal": True, "approved": True,
+        "problem": None, "origin": None,
         "waiting-for": None, "reported": False, "sessions-removed": False,
         "prs": []}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
@@ -280,7 +286,7 @@ def test_launch_passes_arguments_after_double_dash_without_the_dash(h, tmp_path)
 
 
 def test_launch_of_a_held_job_returns_one(h, tmp_path, capsys):
-    h.new(tmp_path)
+    h.approve(h.new(tmp_path))
     second = h.new(tmp_path)
     h.approve(second)
     assert h.run("launch", second) == 1
@@ -465,6 +471,7 @@ def test_main_uses_root_and_binary_from_the_environment(root, fake_state, tmp_pa
     job_id = capsys.readouterr().out.strip()
     assert (root / "jobs" / job_id / "handoff.md").is_file()
     (root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+    assert main(["approve", job_id]) == 0
     assert main(["launch", job_id]) == 0
     calls = [json.loads(line) for line in (fake_state / "calls.jsonl").read_text(encoding="utf-8").splitlines()]
     assert calls[-1]["argv"][:3] == ["--bg", "--name", job_id]
@@ -493,6 +500,7 @@ def test_main_makes_a_relative_binary_path_absolute(tmp_path, monkeypatch, capsy
     job_id = capsys.readouterr().out.strip()
     root = tmp_path / "cure"
     (root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+    assert main(["approve", job_id]) == 0
     assert main(["launch", job_id]) == 0
 
 

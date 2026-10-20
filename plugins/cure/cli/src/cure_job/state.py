@@ -1,9 +1,11 @@
 """Job states, derived and never stored.
 
 This module holds the States table, the lock rule and the retention rule. No
-lock file exists: the holder of a resource is the first open job in lock order
-among those that name it. Lock order puts a job with a launched event first,
-then ascending id.
+lock file exists. Lock order puts a job with a launched event first, then
+ascending id. In lock order, a launched open job holds each resource it names
+that no job before it holds. A ready job (see :func:`is_ready`) holds every
+resource it names when no job before it holds any of them, else none. Every
+other job holds nothing.
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ class State(enum.Enum):
     QUEUED = "queued"
     HELD = "held"
     AWAITING_APPROVAL = "awaiting-approval"
+    APPROVED = "approved"
     LAUNCHED = "launched"
     RUNNING = "running"
     STALLED = "stalled"
@@ -42,7 +45,7 @@ class State(enum.Enum):
 
     @property
     def is_launchable(self) -> bool:
-        return self in (State.AWAITING_APPROVAL, State.LOST, State.NEEDS_INPUT)
+        return self in (State.APPROVED, State.LOST, State.NEEDS_INPUT)
 
 
 #: `claude --bg` returns before `claude agents` lists the session as live. For
@@ -87,13 +90,22 @@ def lock_rank(record: JobRecord) -> tuple[bool, str]:
     return (not record.launches, record.id)
 
 
+def is_ready(record: JobRecord) -> bool:
+    """The open job may start its first run: unlaunched, no result, and an approval of its current goal.
+
+    The run-1 launch test and the lock rule's test for an unlaunched job."""
+    return not record.launches and record.result is None and record.approved
+
+
 def holders(open_records: Iterable[JobRecord]) -> dict[str, str]:
-    """Each resource an open job names, mapped to its holder: the first of the
-    jobs that name it in lock order."""
+    """Each held resource mapped to its holder, by the lock rule."""
     found: dict[str, str] = {}
     for record in sorted(open_records, key=lock_rank):
-        for name in record.resources:
-            found.setdefault(name, record.id)
+        if record.launches:
+            for name in record.resources:
+                found.setdefault(name, record.id)
+        elif is_ready(record) and not found.keys() & record.resources:
+            found.update(dict.fromkeys(record.resources, record.id))
     return found
 
 
@@ -109,7 +121,7 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], 
         state = terminal[record.id]
         blocked_by: tuple[str, ...] = ()
         if state is None:
-            blocked_by = tuple(sorted({held[name] for name in record.resources} - {record.id}))
+            blocked_by = tuple(sorted({held.get(name) for name in record.resources} - {None, record.id}))
             state = _open_state(record, sessions, now, blocked_by)
         views.append(JobView(record, state, blocked_by, _ended_at(record, state)))
     return views
@@ -156,9 +168,11 @@ def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: d
         if starting and within_grace:
             return State.LAUNCHED
         return State.LOST
-    if record.has_goal:
-        return State.AWAITING_APPROVAL
-    return State.HELD if blocked_by else State.QUEUED
+    if blocked_by:
+        return State.HELD
+    if not record.has_goal:
+        return State.QUEUED
+    return State.APPROVED if is_ready(record) else State.AWAITING_APPROVAL
 
 
 def _ended_at(record: JobRecord, state: State) -> datetime | None:

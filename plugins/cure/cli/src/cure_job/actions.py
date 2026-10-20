@@ -46,8 +46,13 @@ def actions(view: JobView | None, row: Mapping[str, object]) -> list[Action]:
         found.append(Action("ask-relaunch"))
     elif state is State.BLOCKED:
         found.append(Action("tell-blocked", {"waiting-for": row["waiting-for"]}))
-    elif state is State.QUEUED:
+    elif state is State.QUEUED or (state is State.HELD and not record.has_goal):
         found.append(Action("draft"))
-    elif state is State.AWAITING_APPROVAL:
+    elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
         found.append(Action("ask-approval"))
+    elif state is State.APPROVED:
+        found.append(Action("launch"))
+    elif state is State.HELD and any(holder > record.id for holder in view.blocked_by):
+        # A held approved job that a higher id blocks can wait with no bound.
+        found.append(Action("note-starved"))
     return found

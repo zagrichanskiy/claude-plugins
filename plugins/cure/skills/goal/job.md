@@ -160,7 +160,7 @@ final-message clause as (c).
 
 ## Launch line
 
-Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`:
+Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
 
 ```
 <plugin-root>/bin/cure-job launch <id>
