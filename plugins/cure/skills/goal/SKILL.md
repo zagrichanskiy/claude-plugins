@@ -277,6 +277,12 @@ Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and 
 user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
 reaches it takes the failure exit instead of growing.
 
+- Count changed lines as the failure exit states: `git diff --shortstat <base>` plus the lines of untracked files. Do not use `git add -N`; its entries break `git stash` and `git rebase`.
+- Estimate tests apart from code. Tests of a state-machine change are estimated at 2x its code. Validator tests are estimated per key. A legacy parser is estimated separately.
+- The test-author brief states a line budget beside the list of behaviours to cover. The budget is the test estimate above.
+- A goal with a test-author step has a work item between the implementer item and the test-author item. It measures the diff as the failure exit states and prints the count.
+- The cut line is the point where a change is divided into a delivered part and a rest. The goal writer plans it, or the session that writes the follow-up goal after a failure exit at the cap applies it. Under `delivery: pr`, it rewords the ticket to the delivered part and opens a new ticket for the rest. Each ticket has one PR per repository, and the PR does not reference the split.
+
 Size a goal from `~/.claude/retros/stats.md`: `grep '| <repo> |' ~/.claude/retros/stats.md` lists
 the earlier goals of the repository with their turns, tokens and lines. Do not read the retrospectives for this.
 
