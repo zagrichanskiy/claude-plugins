@@ -31,8 +31,10 @@ esac
 findings=$(printf '%s' "$text" | perl -0777 -ne '
   s/```.*?```//gs;
   s/`[^`\n]*`//g;
+  # A work-item or step number is a reference, not an identifier.
+  s/\bwork\s+items?\s+#?\d+(?:\.\d+)?//gi;
   # An identifier with a number must carry its name in parentheses right after it.
-  while (/\b((?:item|task|control|question|section|requirement|epic|milestone|step)s?\s+#?\d+(?:\.\d+)?|(?:RND|OPS|SEC)-\d+|(?:PR|issue)\s+#\d+)(?![\d.])(?!\s*\()/gi) {
+  while (/\b((?:item|task|control|question|section|requirement|epic|milestone)s?\s+#?\d+(?:\.\d+)?|(?:RND|OPS|SEC)-\d+|(?:PR|issue)\s+#\d+)(?![\d.])(?!\s*\()/gi) {
     print "bare identifier: $1\n";
   }
   # Soft offers and permission-asking closers.
