@@ -115,8 +115,9 @@ committed document.
 - **Exists, and covers everything the note held** — delete it. Say what went and what holds it now.
 - **Exists, but part of the note never made it** — name that part, and offer to promote it or keep
   the note. Never delete an open question because most of the file is settled.
-- **Design note** — a note with both a `## Decisions` and a `## Rejected` heading. It has no
-  `kind:` key. Other notes follow the rules above.
+- **Design note** — a note with both a `## Decisions` and a `## Rejected` heading. Other notes
+  follow the rules above. A design note follows the same outcome rules. These tests decide
+  whether it is covered.
   - Covered by a document: every Decisions row, Rejected row and open decision is in the document.
   - Covered by a merged pull request: every Decisions row is in the diff, body or commits. Every
     Rejected row and open decision is in the body or a committed document.
