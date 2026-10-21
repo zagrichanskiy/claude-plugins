@@ -72,7 +72,7 @@ The effective `delivery` is the stated value, else the output of `cure-job confi
 Estimate:
 
 1. From Work and Done when, list every file each step changes: new, edited, deleted, tests, docs. Read each file to be edited.
-2. Per file, estimate added plus deleted lines with a one-phrase basis.
+2. Per file, estimate added plus deleted lines with a one-phrase basis. Estimate tests apart from code by the rule in the goal skill, section "Sizing a goal".
 3. Sum per repository. The unit is insertions plus deletions of `git diff --shortstat <base>`.
 4. Run `grep '| <repo> |' ~/.claude/retros/stats.md`. If a row is a similar goal, check the sum against its `lines`.
 
@@ -100,9 +100,9 @@ Part handoffs:
 | `branch` | `delivery: pr`: `<ticket>_<slug>`, or `<slug>` without a ticket. `delivery: commit`: one branch, the same explicit `branch:` value in every part; the parts stack as commits on it. |
 | Slug | `<slug>-part<k>`. |
 
-Part spec rules. Each part's `## Work`, `## Done when`, the ticket body and any Events or Scope list follow them:
+Part spec rules. Each part's handoff and ticket body, including any list of events or scope items in the ticket body, follow them:
 
-1. List only the items this part owns. Mark each item an earlier part delivered as "delivered by part j" and do not list it as work.
+1. List only the items this part owns. Mark each item an earlier part delivers as "delivered by part j" and do not list it as work. The marked items go in a separate list, not under work.
 2. For each config key the spec cites, say whether it exists at the base of this part. A key that a later part adds is marked "not yet".
 3. Name each line a downstream reader parses, with its exact form: the file, the line text and the parser.
 4. A part that creates a file format includes the format's frontmatter block in the spec.

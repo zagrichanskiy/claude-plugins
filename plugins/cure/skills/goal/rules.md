@@ -66,8 +66,8 @@ add one.
   grep -qF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md || printf '%s\n' '| <date> | <repo> | <slug> | <tier> | <outcome> | <est_lines> | <lines> | <turns> | <agent_tokens> | <rounds> | <title> |' >> ~/.claude/retros/stats.md
   ```
 
-- The row's `lines` is insertions plus deletions of `git diff --shortstat <base>`, largest
-  repository. `agent_tokens` is the sum of the subagent token reports. `rounds` is the review rounds.
+- The row's `lines` is the count of the failure exit's changed-line cap (untracked files included),
+  largest repository. `agent_tokens` is the sum of the subagent token reports. `rounds` is the review rounds.
 - Done when: `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
 
 ## Light and Full
