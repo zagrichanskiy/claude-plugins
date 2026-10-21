@@ -164,6 +164,11 @@ A Settled statement is a decision or fact the goal rests on. A false one fails t
 A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1's fact
 check verifies it against the device, code or document the note cites, not against the note.
 A mismatch in ticket, branch or base commit is recorded and corrected.
+When writing a backlog-fix goal, check each backlog item against the document at `<base>`.
+List the items already fixed under Settled.
+For a backlog row that defines a term, the goal quotes the definition.
+An analysis goal that reads a design document names the document's branch or commit under Settled
+when the checkout that holds the document is not on its default branch.
 
 ## Name the tools, not the intention
 

@@ -69,6 +69,18 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
   `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
   different bases.
+- Work item 1 also records, per repository, a dirty-tree baseline: branch, HEAD,
+  `git diff --shortstat` and the paths that `git -C <repo> status --porcelain` lists. It records them
+  where the base commit is recorded. The changed-line cap in the failure exit and the stats row's
+  `lines` exclude those paths.
+- A goal that pushes: work item 1 runs `git -C <repo> log --oneline origin/<branch>..<branch>` when
+  both refs exist, and skips the check otherwise. Commits of predecessor jobs on the chain are
+  excluded. Each remaining commit is recorded where the base commit is recorded. Whether to push it is
+  a question at work item 1, not at the push.
+- Before a goal changes a rule in the code that accepts or rejects input (a gate, a filter, a pattern
+  list), work item 1 runs the changed rule against the workspace it runs against, for example
+  `repo forall -c 'git remote get-url origin'`, and records the output. A counter-example the changed
+  rule misclassifies is a question.
 - Branch: the goal names the job's branch as a literal name. A branch that does not exist on run 1 is
   not a mismatch of work item 1. The step after the fact check creates the branch from `<base>` in each
   repository with `git switch -c <branch> <base>`, or runs `git switch <branch>` when it exists (a run
@@ -113,6 +125,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round.
 - Record a mechanical choice in the ledger as an assumption.
+- Record the turn count in the ledger after each work item.
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
