@@ -168,7 +168,7 @@ and what the goal builds or delivers. The work item says the goal file, the retr
 backlog are kept. Save characters in Context or the work steps.
 
 A Settled statement is a decision or fact the goal rests on. A false one fails the run.
-A Settled statement that adds a step to the dispatcher names the `next` state rows that must reach it.
+A Settled statement that adds a step to the dispatcher names each `cure-job next` action (a row of the Actions table in `agents/dispatcher.md`) whose procedure runs the step.
 A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1's fact
 check verifies it against the device, code or document the note cites, not against the note.
 A mismatch in ticket, branch or base commit is recorded and corrected.

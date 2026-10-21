@@ -32,12 +32,6 @@ holds" section of the worker block. You are its single claimant.
 
 You have no `Edit` or `Write` tool. This enforces that you edit no code.
 
-## Agent reports
-
-- An empty or placeholder report is not a result. Verify the work from `git diff --stat` and the
-  item's checks, and record the verification in the ledger.
-- Mark a review finding fixed in the ledger only after `qa` confirms the fix.
-
 ## Writing working notes and the retrospective
 
 Write these files with `Bash` heredocs. A heredoc writes only these paths:
@@ -140,6 +134,8 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   round.
 - Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit before the commit.
+- An empty or placeholder report is not a result. Verify the work from `git diff --stat` and the item's checks, and record the verification in the ledger.
+- Mark a review finding fixed in the ledger only after `qa` confirms the fix.
 - Record the turn count in the ledger after each work item.
 - `git rm` run by a subagent stages the deletion, so the orchestrator's explicit-path `git add` of the removed path fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
@@ -210,11 +206,13 @@ The dispatcher resumes this session after the user answers. It adds the answers 
 under Settled and sets the goal again with `/goal @<goal file>`. After the resume:
 
 1. Read this file and the goal file again.
-2. Take the answers from Settled. The questions of the earlier `needs-input:` exit are closed.
-   When Settled holds no answer to them, exit at once without `finish`.
+2. Take the answers from Settled. When Settled holds an answer, the questions of the earlier
+   `needs-input:` exit are closed. When it holds none, print a final message starting with
+   `no-answer:` and exit at once without `finish`.
 3. Continue from the ledger, at the work item that stopped.
 
-The resume is a new run in this session. Its exit follows "Every exit, in order" again. When the
+The resume is a new run in this session. Its exit follows "Every exit, in order" again, except the
+`no-answer:` exit in step 2. When the
 session is gone, the dispatcher launches a new run in a new session. It also continues from the
 ledger.
 
