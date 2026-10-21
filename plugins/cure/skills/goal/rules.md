@@ -81,6 +81,7 @@ add one.
 - Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit before the commit.
 - Record the turn count in the ledger after each work item.
+- `git rm` run by a subagent stages the deletion, so the orchestrator's explicit-path `git add` of the removed path fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print

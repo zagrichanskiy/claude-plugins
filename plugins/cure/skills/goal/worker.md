@@ -52,6 +52,7 @@ under Settled and sets the goal again with `/goal @<goal file>`. After the resum
 
 1. Read this file and the goal file again.
 2. Take the answers from Settled. The questions of the earlier `needs-input:` exit are closed.
+   When Settled holds no answer to them, exit at once without `finish`.
 3. Continue from the ledger, at the work item that stopped.
 
 The resume is a new run in this session. Its exit follows "Every exit, in order" again. When the

@@ -87,6 +87,8 @@ Settled: "Run <n>: the questions of the earlier `needs-input` exit are answered 
 continue from `<ledger path>`". Solo: "Run <n>: the questions of the earlier `needs-input` exit are
 answered above and closed; earlier work is in the tree".
 
+When a goal is extended after a `done` run, the new Settled line names the retrospective and the commits as the state. The ledger is deleted.
+
 The line holds for both next steps: a resume of the kept session (`cure-job resume`) and a new run
 in a new session (`cure-job launch`) when the old one is gone.
 

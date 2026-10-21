@@ -138,6 +138,7 @@ Rules for the items:
 - The gate and every device check run after the last code change, or the goal says "re-run the device check after any code change".
 - An item that counts text states the unit, the grep root, whether the match is case-sensitive and
   whether blank lines count.
+- A command that can run over 120 s states its Bash timeout in its work item; the tool default is 120000 ms.
 - An item that claims a reboot proves it with `/proc/uptime` after the cycle below 120 s.
 - An item about a skill's question round names a non-interactive test path that shows it unattended.
   For a manual check, see "Verification".
@@ -167,6 +168,7 @@ and what the goal builds or delivers. The work item says the goal file, the retr
 backlog are kept. Save characters in Context or the work steps.
 
 A Settled statement is a decision or fact the goal rests on. A false one fails the run.
+A Settled statement that adds a step to the dispatcher names the `next` state rows that must reach it.
 A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1's fact
 check verifies it against the device, code or document the note cites, not against the note.
 A mismatch in ticket, branch or base commit is recorded and corrected.
@@ -189,7 +191,7 @@ something. A general plugin's reviewer named for work a project
 agent covers proposes a tool the project does not use.
 
 A goal for an issue that changes how a job is launched or resumed names `agents/dispatcher.md` in the
-work item that makes the change. All tiers follow this rule.
+work item that makes the change. A goal that changes a format a run session follows names `rules.md` or `worker.md`, and its copy in `agents/orchestrator.md`, in the work item that makes the change. All tiers follow these rules.
 
 ## Delegate, then reflect
 
@@ -200,7 +202,7 @@ unattended and pays for the orchestrator's context on every turn.
 |---|---|
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Branch and commits | Branch creation and every commit are orchestrator work items, committed with explicit paths. No work item or agent brief assigns them to `implementer`, `test-author` or `skill-author`, because these agents refuse to create a branch or commit. The orchestrator's commit messages omit attribution trailers (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids them, because that file overrides a session attribution reminder. Trailers the repository requires, such as `Signed-off-by:`, stay. |
-| Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
+| Agent per step | Each work item names its agent. Items with disjoint files run in parallel. Two writing agents that share a CLI or a file format get its command names, run semantics and format in both briefs; otherwise the docs agent runs after the CLI. |
 | Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; a `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is asked before its round closes; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |

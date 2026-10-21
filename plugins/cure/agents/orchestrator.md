@@ -32,6 +32,12 @@ holds" section of the worker block. You are its single claimant.
 
 You have no `Edit` or `Write` tool. This enforces that you edit no code.
 
+## Agent reports
+
+- An empty or placeholder report is not a result. Verify the work from `git diff --stat` and the
+  item's checks, and record the verification in the ledger.
+- Mark a review finding fixed in the ledger only after `qa` confirms the fix.
+
 ## Writing working notes and the retrospective
 
 Write these files with `Bash` heredocs. A heredoc writes only these paths:
@@ -135,6 +141,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit before the commit.
 - Record the turn count in the ledger after each work item.
+- `git rm` run by a subagent stages the deletion, so the orchestrator's explicit-path `git add` of the removed path fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
@@ -204,6 +211,7 @@ under Settled and sets the goal again with `/goal @<goal file>`. After the resum
 
 1. Read this file and the goal file again.
 2. Take the answers from Settled. The questions of the earlier `needs-input:` exit are closed.
+   When Settled holds no answer to them, exit at once without `finish`.
 3. Continue from the ledger, at the work item that stopped.
 
 The resume is a new run in this session. Its exit follows "Every exit, in order" again. When the
