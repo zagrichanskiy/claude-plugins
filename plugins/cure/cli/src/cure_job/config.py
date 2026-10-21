@@ -39,7 +39,11 @@ DEFAULTS: dict[str, object] = {
 GROUPS = tuple(dict.fromkeys(key.split(".")[0] for key in DEFAULTS if "." in key))
 
 #: Removed keys by (group, name), and why.
-REMOVED = {("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch"}
+REMOVED = {
+    ("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch",
+    ("prune", "done-days"): "a done job is pruned once its finish is reported and its sessions are removed",
+    ("prune", "abandoned-days"): "an abandoned job is pruned once its sessions are removed",
+}
 
 
 class ConfigError(CureJobError):

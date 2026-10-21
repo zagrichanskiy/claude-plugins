@@ -4,16 +4,14 @@ Each test names the "Done when" item of the issue it pins."""
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from cure_job.handoff import parse_handoff
-from tests.builders import NOW, handoff_text
+from tests.builders import handoff_text
 from tests.test_approve import DONE_RESULT, NEEDS_INPUT_RESULT, _needs_input_job, goal_file, rows
 from tests.test_cli import Harness
 

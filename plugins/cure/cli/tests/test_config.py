@@ -22,7 +22,13 @@ BAD_CONFIGS = {
 
 
 REMOVED_KEY = ".".join(("handoff", "base"))
-DROPPED_PRUNE_KEYS = tuple(f"prune.{state}-" + "days" for state in ("done", "abandoned"))
+DROPPED_PRUNE_MESSAGES = {
+    "prune.done-days": 'prune: "done-days" is removed; a done job is pruned once its finish is reported '
+                       "and its sessions are removed",
+    "prune.abandoned-days": 'prune: "abandoned-days" is removed; an abandoned job is pruned once its '
+                            "sessions are removed",
+}
+DROPPED_PRUNE_KEYS = tuple(DROPPED_PRUNE_MESSAGES)
 REMOVED_MESSAGE = ('handoff: "base" is removed; a job\'s base is the base stated in the handoff, '
                    "else the repository's default branch")
 INIT_DROPPED = ('defaults.md: handoff: "base" is removed; row dropped; a job\'s base is the base stated '
@@ -185,18 +191,26 @@ def test_config_init_without_defaults_md_writes_the_built_in_defaults(h):
 # --- Done when 4 ---------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("key", DROPPED_PRUNE_KEYS)
-def test_done_when_4_a_dropped_prune_key_is_unknown_and_ignored(h, capsys, key):
+def test_done_when_4_a_dropped_prune_key_is_reported_as_removed_and_ignored(h, capsys, key):
     group, _, name = key.partition(".")
     configure(h, {group: {name: 1}})
     assert h.run("list") == 0
-    err = capsys.readouterr().err
-    assert key in err and "; ignored" in err
+    assert f"config.json: {DROPPED_PRUNE_MESSAGES[key]}; ignored" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("key", DROPPED_PRUNE_KEYS)
 def test_done_when_4_config_get_of_a_dropped_prune_key_exits_one(h, capsys, key):
     assert h.run("config", "get", key) == 1
-    assert key in capsys.readouterr().err
+    assert f"error: {DROPPED_PRUNE_MESSAGES[key]}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("argv", [("config", "check"), ("next", "--json")], ids=["check", "next"])
+def test_done_when_4_strict_mode_rejects_both_dropped_prune_keys(h, capsys, argv):
+    configure(h, {"prune": {"done-days": 7, "abandoned-days": 7}})
+    assert h.run(*argv) == 1
+    err = capsys.readouterr().err
+    for message in DROPPED_PRUNE_MESSAGES.values():
+        assert f"config.json: {message}" in err
 
 
 # --- review finding 9: rejecting branches -------------------------------------------------------------
