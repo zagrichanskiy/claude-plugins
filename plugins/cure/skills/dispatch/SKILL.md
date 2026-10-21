@@ -27,7 +27,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | `device` | `bench` when the work needs the hardware bench, else `none`. It declares the use. The job claims the bench for each step at run time; the handoff does not hold it from launch. |
 | `outcome` | One sentence. |
 | `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. A job with `after` and no `branch` inherits the predecessor's branch. |
-| `base`, `delivery` | Only when the user stated them, or, for `base`, when the job is stacked on a predecessor's branch without `after` (see `after`). Otherwise omit the key; `cure:goal` resolves `base` from the default branch of each repository. `delivery` is `commit` or `pr`. |
+| `base`, `delivery` | Only when the user stated them, or, for `base`, when the job is stacked on a predecessor's branch without `after` (see `after`). Otherwise omit the key; `cure:goal` resolves `base` from the default branch of each repository. `delivery` is `commit` or `pr`; an omitted `delivery` comes from `handoff.delivery`. |
 | `after` | Only when this job builds on the result of an open job of the same stack (any state other than `done`, `failed` or `abandoned`): that job's id, one only. Otherwise omit the key. A job stacked only because it edits the same files gets no `after`. Its `base` is the predecessor's branch. The repository resource runs the jobs in order, and a failed predecessor does not close it. `cure-job new` refuses an id with no job. The successor stays `held` until the predecessor is `done`. |
 | `## Settled` | Decisions taken in the session, each with its reason. |
 | Resource risk | One Settled line per resource the user rated in the session, in the user's words, for example "Resource risk: bench is a test stand; any action on it is approved". Omit when the user said nothing. |
@@ -46,7 +46,6 @@ Never read the file. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json`
 |---|---|
 | `handoff.delivery` | `delivery`, when the user did not state it. |
 | `handoff.branch` | Values: `new` (default), `current`, or a literal branch name. Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
-
 | `split.limit` | Changed lines per repository above which the task is split (default 800). |
 
 Omit `id` and `created`. `cure-job new` sets them.

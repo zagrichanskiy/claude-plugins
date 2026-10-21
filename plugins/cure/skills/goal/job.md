@@ -14,7 +14,8 @@ directory. A worker session then runs the goal and cannot reach the user.
 - Base of a job without `after`: the `base` the handoff states. When it states none, the default
   branch of each repository in `repos`, detected per repository with
   `git -C <repo> symbolic-ref --short refs/remotes/origin/HEAD` (strip the `origin/` prefix). When
-  that fails, use `gh repo view --json defaultBranchRef` run in the repository. No configuration key
+  that fails, use `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` run in the repository.
+  When both fail, ask the user for the base in the question round, as the chain rule does. No configuration key
   holds a base. A job with `after` follows "Base per repository".
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.

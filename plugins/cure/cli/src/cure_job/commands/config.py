@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 
 from .. import config
 from ..help import HelpFormatter, style
@@ -29,7 +30,7 @@ class ConfigCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         if args.config_action == "init":
-            self.cli.out(str(config.init(jobs.store.root)))
+            self.cli.out(str(config.init(jobs.store.root, lambda line: print(line, file=sys.stderr))))
         elif args.config_action == "get":
             values = self.cli.config.values
             if args.key is None:
@@ -37,5 +38,6 @@ class ConfigCommand(Command):
             elif args.key in values:
                 self.cli.out(json.dumps(values[args.key]))
             else:
-                raise config.ConfigError(config.removed(args.key) or f"unknown key: {args.key}")
+                problem = config.removed(args.key)
+                raise config.ConfigError(f"{problem.key}: {problem.problem}" if problem else f"unknown key: {args.key}")
         return 0

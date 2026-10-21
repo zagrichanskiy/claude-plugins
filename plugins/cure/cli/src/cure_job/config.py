@@ -53,11 +53,9 @@ class Problem:
     #: ``None`` when the whole file is in error.
     key: str | None
     problem: str
-    #: The problem text names the key itself.
-    standalone: bool = False
 
     def __str__(self) -> str:
-        if self.key and not self.standalone:
+        if self.key:
             return f"{FILE}: {self.key}: {self.problem}"
         return f"{FILE}: {self.problem}"
 
@@ -101,8 +99,7 @@ def validate(data: dict) -> Config:
                 problems.append(Problem(key, f"group is not a JSON object, got {json.dumps(value)}"))
         elif "." in key and key in DEFAULTS:
             group, name = key.split(".", 1)
-            problems.append(Problem(
-                key, f'"{key}" is a flat key; write it as {{"{group}": {{"{name}": ...}}}}', standalone=True))
+            problems.append(Problem(key, f'flat key; write it as {{"{group}": {{"{name}": ...}}}}'))
         else:
             _check(key, value, values, problems)
     return Config(values, tuple(problems))
@@ -121,8 +118,9 @@ def nest(values: dict[str, object]) -> dict[str, object]:
 
 
 def _check(key: str, value: object, values: dict[str, object], problems: list[Problem]) -> None:
-    if message := removed(key):
-        problems.append(Problem(key, message, standalone=True))
+    if problem := removed(key):
+        if problem not in problems:
+            problems.append(problem)
     elif key not in DEFAULTS:
         problems.append(Problem(key, "unknown key"))
     elif problem := _CHECKS[key](value):
@@ -131,11 +129,11 @@ def _check(key: str, value: object, values: dict[str, object], problems: list[Pr
         values[key] = value
 
 
-def removed(key: str) -> str | None:
-    """The message for a removed dotted ``key``; ``None`` when ``key`` is not removed."""
+def removed(key: str) -> Problem | None:
+    """The problem for a removed dotted ``key``, reported under its group; ``None`` when ``key`` is not removed."""
     group, _, name = key.partition(".")
     reason = REMOVED.get((group, name))
-    return f'"{name}" in group "{group}" is removed; {reason}' if reason else None
+    return Problem(group, f'"{name}" is removed; {reason}') if reason else None
 
 
 def _int_range(low: int, high: int) -> Callable[[object], str | None]:
@@ -199,14 +197,17 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
 _OLD_SCALARS = {"delivery": "handoff.delivery", "branch": "handoff.branch"}
 
 
-def init(root: Path) -> Path:
-    """Write ``config.json`` from the defaults and ``defaults.md``, then rename ``defaults.md``."""
+def init(root: Path, notice: Callable[[str], None]) -> Path:
+    """Write ``config.json`` from the defaults and ``defaults.md``, then rename ``defaults.md``.
+
+    ``notice`` receives one line for each ``defaults.md`` row that is dropped.
+    """
     path, old = root / FILE, root / OLD_FILE
     if path.exists():
         raise ConfigError(f"{path} exists")
     data: dict[str, object] = dict(DEFAULTS)
     if old.exists():
-        data.update(_from_defaults_md(old))
+        data.update(_from_defaults_md(old, notice))
     data = nest(data)
     problems = validate(data).problems
     if problems:
@@ -222,7 +223,7 @@ def init(root: Path) -> Path:
     return path
 
 
-def _from_defaults_md(path: Path) -> dict[str, object]:
+def _from_defaults_md(path: Path, notice: Callable[[str], None]) -> dict[str, object]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError) as e:
@@ -256,8 +257,8 @@ def _from_defaults_md(path: Path) -> dict[str, object]:
         key, value, scope = cells
         if key == "resource risk":
             risks.append({"scope": scope, "text": value})
-        elif message := removed(f"handoff.{key}"):
-            raise ConfigError(f"{path}:{number}: {message}")
+        elif reason := REMOVED.get(("handoff", key)):
+            notice(f'{OLD_FILE}: handoff: "{key}" is removed; row dropped; {reason}')
         elif key in _OLD_SCALARS and scope == "all":
             found[_OLD_SCALARS[key]] = value
         else:

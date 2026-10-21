@@ -22,7 +22,10 @@ BAD_CONFIGS = {
 
 
 REMOVED_KEY = ".".join(("handoff", "base"))
-REMOVED_MESSAGE = '"base" in group "handoff" is removed'
+REMOVED_MESSAGE = ('handoff: "base" is removed; a job\'s base is the base stated in the handoff, '
+                   "else the repository's default branch")
+INIT_DROPPED = ('defaults.md: handoff: "base" is removed; row dropped; a job\'s base is the base stated '
+                "in the handoff, else the repository's default branch")
 
 
 def nest(flat):
@@ -103,7 +106,7 @@ def test_config_get_reads_a_nested_top_level_scalar_by_its_name(h):
 
 def test_config_get_of_the_removed_base_key_exits_one(h, capsys):
     assert h.run("config", "get", REMOVED_KEY) == 1
-    assert "base" in capsys.readouterr().err
+    assert 'handoff: "base" is removed' in capsys.readouterr().err
 
 
 def test_config_get_with_an_unknown_key_exits_one(h, capsys):
@@ -231,10 +234,12 @@ def test_an_accepted_value_passes_check(h, data):
 
 
 SHAPE_REJECTED = {
-    "flat-key": ({"handoff.delivery": "pr"}, ['"handoff.delivery" is a flat key', '{"handoff": {"delivery": ...}}']),
-    "flat-scalar-group-key": ({"split.limit": 900}, ['"split.limit" is a flat key', '{"split": {"limit": ...}}']),
-    "base-flat": ({REMOVED_KEY: "main"}, [REMOVED_MESSAGE, "the repository's default branch"]),
-    "base-nested": ({"handoff": {"base": "main"}}, [REMOVED_MESSAGE, "the base stated in the handoff"]),
+    "flat-key": ({"handoff.delivery": "pr"},
+                 ['config.json: handoff.delivery: flat key; write it as {"handoff": {"delivery": ...}}']),
+    "flat-scalar-group-key": ({"split.limit": 900},
+                              ['config.json: split.limit: flat key; write it as {"split": {"limit": ...}}']),
+    "base-flat": ({REMOVED_KEY: "main"}, [f"config.json: {REMOVED_MESSAGE}"]),
+    "base-nested": ({"handoff": {"base": "main"}}, [f"config.json: {REMOVED_MESSAGE}"]),
     "unknown-in-group": ({"handoff": {"foo": 1}}, ['handoff.foo']),
     "unknown-top-level": ({"bogus": 1}, ['bogus']),
     "group-not-an-object": ({"handoff": "pr"}, ['handoff']),
@@ -297,6 +302,19 @@ def test_an_unknown_key_is_reported_as_ignored_by_a_lenient_command(h, capsys):
     assert "config.json: handoff.bogus: unknown key; ignored" in capsys.readouterr().err
 
 
+def test_a_file_with_flat_and_nested_base_prints_the_removed_line_once(h, capsys):
+    configure(h, {REMOVED_KEY: "main", "handoff": {"base": "main"}})
+    assert h.run("config", "check") == 1
+    assert capsys.readouterr().err.count(REMOVED_MESSAGE) == 1
+
+
+@pytest.mark.parametrize("data", [{REMOVED_KEY: "main"}, {"handoff": {"base": "main"}}], ids=["flat", "nested"])
+def test_a_lenient_command_reports_the_removed_key_as_ignored(h, capsys, data):
+    configure(h, data)
+    assert h.run("list") == 0
+    assert f"config.json: {REMOVED_MESSAGE}; ignored" in capsys.readouterr().err
+
+
 def init_refused(h, capsys, defaults_md, expect="error:"):
     h.root.mkdir(parents=True)
     (h.root / "defaults.md").write_text(defaults_md, encoding="utf-8")
@@ -313,8 +331,6 @@ def table(*rows):
 
 INIT_REFUSED = {
     "delivery-scoped": "| delivery | pr | device: bench |",
-    "base-scoped": "| base | develop | repo: /work/a |",
-    "base-unscoped": "| base | develop | all |",
     "branch-scoped": "| branch | feature | device: bench |",
     "invalid-value": "| delivery | push | all |",
     "escaped-pipe": "| resource risk | a \\| b | all |",
@@ -326,8 +342,14 @@ INIT_REFUSED = {
 
 
 @pytest.mark.parametrize("row", ["| base | develop | all |", "| base | develop | repo: /work/a |"])
-def test_config_init_refuses_a_base_row_with_the_removed_key_message(h, capsys, row):
-    init_refused(h, capsys, table(row), expect=REMOVED_MESSAGE)
+def test_config_init_drops_a_base_row_with_a_notice_and_succeeds(h, capsys, row):
+    h.root.mkdir(parents=True)
+    (h.root / "defaults.md").write_text(table(row, "| delivery | pr | all |"), encoding="utf-8")
+    assert h.run("config", "init") == 0
+    assert INIT_DROPPED in capsys.readouterr().err
+    written = json.loads((h.root / "config.json").read_text(encoding="utf-8"))
+    assert "base" not in written["handoff"]
+    assert written["handoff"]["delivery"] == "pr"
 
 
 @pytest.mark.parametrize("row", INIT_REFUSED.values(), ids=INIT_REFUSED)
