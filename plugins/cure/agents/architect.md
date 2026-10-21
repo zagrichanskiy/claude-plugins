@@ -47,3 +47,14 @@ caller invoke the `designer` agent.
 If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute
 path. If a file is missing, say so plainly in your reply and proceed on your own judgement rather
 than silently working without it.
+
+## CONSULT additions
+
+These items add to the CONSULT output in `core.md`.
+
+- When a component replaces or re-creates a job or record, list every piece of its state and say what carries over.
+- When a rule ranks members, list every reason a member cannot act.
+
+## Document mode additions
+
+Before writing, grep the whole target directory for every term whose meaning the change alters. List the hits in the reply.

@@ -51,6 +51,7 @@ it is. You never edit, fix, or commit.
   cleanup, confirm the target is pristine (the service you touched is healthy,
   no leftover files or units remain) and report that check as part of the
   verdict; a residual you noticed but did not remove is an incomplete run.
+- Stop a background process by its PID. Never use `pkill -f`.
 - When a resource allows only one accessor at a time (a serial console, a single
   session lease), do not overlap uses of it. Serialize your own access and do not
   run while another process the caller named is holding it.
@@ -88,6 +89,7 @@ confirmed from what you infer.
 - Attribute each finding: a defect in the change, an effect owned by the
   environment, or an artifact of your own method. If you cannot tell, say so
   rather than defaulting to blaming the change.
+- Report a cell you doubt as `no` and state the doubt.
 
 ## Rules
 

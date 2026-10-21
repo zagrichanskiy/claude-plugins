@@ -38,6 +38,9 @@ You are a project-agnostic agent, so never guess the command:
 - For each failure, report the test name and the salient part of the output —
   the assertion or error and the location. Quote enough to diagnose, not the
   entire log. For noisy output, filter to the failing tests.
+- Compare each check with the expected value in the brief.
+- Report the exit code of each command itself. Do not pipe a command into `tail`, `head` or
+  `grep` when you read its exit code.
 - State a single clear verdict: all passed, or N failed. Do not soften a
   failure or call a partial run a pass.
 - If the suite cannot run at all (missing dependency, broken import, wrong

@@ -37,6 +37,11 @@ Before writing a single test:
   the code declares. Do not pad with trivial or redundant assertions.
 - Prefer the project's offline test doubles. Never open a real network, serial,
   device, or filesystem resource when a fake exists for it.
+- Before asserting a derived state, read the rule that derives it.
+- Every test that exercises a launch path uses a directory that exists.
+- A lock gets one test that fails when the lock is removed from the critical
+  section. Confirm the failure by removing the lock once (mutation check).
+- A format change updates the tests that pin the old format.
 
 ## Definition of done
 
