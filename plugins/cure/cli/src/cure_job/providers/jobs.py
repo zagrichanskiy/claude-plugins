@@ -287,7 +287,7 @@ class JobsProvider:
         """End the short hold of ``job_id`` on ``name``. Returns when the job does not hold it.
 
         Reads only this job. A repository is held until the job ends.
-        An abandoned job holds nothing and gets no write: its log mtime is its retention start.
+        An abandoned job holds nothing, so a release has nothing to end and gets no write.
         """
         if not resource_names.is_short_hold(name):
             raise CureJobError(f"{name} is a repository; it is held until the job ends")
