@@ -106,7 +106,7 @@ def test_config_get_reads_a_nested_top_level_scalar_by_its_name(h):
 
 def test_config_get_of_the_removed_base_key_exits_one(h, capsys):
     assert h.run("config", "get", REMOVED_KEY) == 1
-    assert 'handoff: "base" is removed' in capsys.readouterr().err
+    assert f"error: {REMOVED_MESSAGE}" in capsys.readouterr().err
 
 
 def test_config_get_with_an_unknown_key_exits_one(h, capsys):
