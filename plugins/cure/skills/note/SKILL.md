@@ -115,7 +115,13 @@ committed document.
 - **Exists, and covers everything the note held** — delete it. Say what went and what holds it now.
 - **Exists, but part of the note never made it** — name that part, and offer to promote it or keep
   the note. Never delete an open question because most of the file is settled.
-- **Design note** — covered only when every row of Decisions, Rejected and Open decisions is in the artifact. A row that is not there is the part that never made it.
+- **Design note** — a note with both a `## Decisions` and a `## Rejected` heading. It has no
+  `kind:` key. Other notes follow the rules above.
+  - Covered by a document: every Decisions row, Rejected row and open decision is in the document.
+  - Covered by a merged pull request: every Decisions row is in the diff, body or commits. Every
+    Rejected row and open decision is in the body or a committed document.
+  - A row or open decision that is not there is the part that never made it. Keep the note and
+    list the missing rows.
 - **Does not exist** — leave it, and report the age.
 
 **Report ages.** A working note older than thirty days whose artifact never appeared is usually
