@@ -277,6 +277,12 @@ Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and 
 user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
 reaches it takes the failure exit instead of growing.
 
+- Measure the cap with untracked files included: `git add -N <paths>` before `git diff --shortstat <base>`, or `wc -l` over `git ls-files --others --exclude-standard`.
+- Estimate tests apart from code. A state-machine change estimates tests at 2x its code, a validator counts once per key, and a legacy parser is estimated separately.
+- The test-author brief states a line budget beside the coverage list.
+- Check the cut line (the changed-line cap) after the implementer and before the test-author.
+- A cut line that splits a change rewords the ticket to the delivered part and opens a new ticket for the rest. Each ticket has one PR per repository, and the PR does not reference the split.
+
 Size a goal from `~/.claude/retros/stats.md`: `grep '| <repo> |' ~/.claude/retros/stats.md` lists
 the earlier goals of the repository with their turns, tokens and lines. Do not read the retrospectives for this.
 

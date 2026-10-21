@@ -100,6 +100,16 @@ Part handoffs:
 | `branch` | `delivery: pr`: `<ticket>_<slug>`, or `<slug>` without a ticket. `delivery: commit`: one branch, the same explicit `branch:` value in every part; the parts stack as commits on it. |
 | Slug | `<slug>-part<k>`. |
 
+Part spec rules. Each part's `## Work`, `## Done when`, the ticket body and any Events or Scope list follow them:
+
+1. List only the items this part owns. Mark each item an earlier part delivered as "delivered by part j" and do not list it as work.
+2. For each config key the spec cites, say whether it exists at the base of this part. A key that a later part adds is marked "not yet".
+3. Name each line a downstream reader parses, with its exact form: the file, the line text and the parser.
+4. A part that creates a file format includes the format's frontmatter block in the spec.
+5. A state whose action a later part adds gets an interim procedure in this part: what the user or dispatcher does meanwhile.
+6. A "no references" check excludes migration code. Name the paths it excludes.
+7. Name fields as they are in the file: handoff `repos`, not the row field `resources`.
+
 Writing a split: queue as one job writes the unsplit handoff with the Estimate line. Split creates the tickets, then runs `cure-job new` for each part in order, each with `after` set as in the table above.
 
 Tickets, only with the effective `delivery: pr` and only after the user chose split. `<owner/repo>` comes from an `owner/repo#N` or URL ticket, else from the remote of the delivering repository. Pass it as `--repo` to every `gh` command:

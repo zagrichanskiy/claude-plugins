@@ -177,7 +177,7 @@ Exits, in the template's exits slot:
 
 ```markdown
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
-<review cause>, or the diff passes <lines> lines (per repository, `git -C <repo> diff --shortstat <base commit>`, the commit work item 1 recorded), or `git fetch` or
+<review cause>, or the diff passes <lines> lines (per repository, `git -C <repo> diff --shortstat <base commit>`, the commit work item 1 recorded; untracked files counted as in "Sizing a goal"), or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice, or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
 transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
