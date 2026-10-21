@@ -105,7 +105,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 - Tier: <Solo, Light or Full>. <Agent plan: steps, agents, parallel work, advisor.>
 - Stops: this goal overrides the user's "run one step and stop" rule; it stops only at its exits.
-- Waiting: <job mode: the mode file's Waiting line. Direct mode: what the session does while it waits on the user>.
+- Waiting: <job mode: the mode file's Waiting line. Direct mode: takes the `waiting:` exit of direct.md>.
 ```
 
 ## Writing the done-when list

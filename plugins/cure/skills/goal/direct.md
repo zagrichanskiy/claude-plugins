@@ -31,6 +31,12 @@ asked question was dismissed or left unanswered; and (b) the retrospective's sum
 cause, is in the transcript and the `stats.md` row is appended with outcome `failed`; and (c) the final message starts with `failed:`.
 ```
 
+Wait exit, when the user asked the session to wait. A wait request is not a dismissed question.
+
+```markdown
+Also done when the user asked the session to wait; the final message starts with `waiting:`. `/goal @.notes/goal-<slug>.md` resumes.
+```
+
 A Solo exit has (a) without `<rounds>` and `<review cause>`, then "(b) the `stats.md` row is appended with outcome `failed`", then the final-message clause as (c).
 
 ## Launch line
