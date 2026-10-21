@@ -7,10 +7,15 @@ directory. A worker session then runs the goal and cannot reach the user.
 
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
-- Read `handoff.delivery`, `handoff.base`, `handoff.branch` and `handoff.resource-risk` with
+- Read `handoff.delivery`, `handoff.branch` and `handoff.resource-risk` with
   `<plugin-root>/bin/cure-job config get <key>` before the question round. Each prints JSON; the
   built-in default applies when `config.json` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `config.json` itself.
+- Base of a job without `after`: the `base` the handoff states. When it states none, the default
+  branch of each repository in `repos`, detected per repository with
+  `git -C <repo> symbolic-ref --short refs/remotes/origin/HEAD` (strip the `origin/` prefix). When
+  that fails, use `gh repo view --json defaultBranchRef` run in the repository. No configuration key
+  holds a base. A job with `after` follows "Base per repository".
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
@@ -24,7 +29,7 @@ directory. A worker session then runs the goal and cannot reach the user.
 ## Base per repository
 
 Applies when the row of the job in `cure-job list --json` has `after`. Without it, `base` comes
-from the handoff.
+from the handoff or the default branch (see Input).
 
 For each repository R in the handoff's `repos`, set `base` as follows. Walk the chain from the
 row's `after`. Never use the handoff's `after:`.
@@ -36,7 +41,7 @@ row's `after`. Never use the handoff's `after:`.
 | Stop, resolved | The first job that changes R. `base` is the branch named in that job's `goal.md`. |
 | Next job | The `after` of the current job's row. |
 | Stop, unresolved | A passed row has `after-state` `missing` or `invalid`. |
-| End of chain | No job changes R: `base` comes from the handoff. |
+| End of chain | No job changes R: `base` comes from the handoff or the default branch (see Input). |
 
 Ask the user for the base of each repository left unresolved, in the question round. A job on the
 chain need not be `done` when the goal is written, but it has a `goal.md`: the dispatcher drafts a

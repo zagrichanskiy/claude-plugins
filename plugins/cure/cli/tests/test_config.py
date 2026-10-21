@@ -15,10 +15,26 @@ from tests.builders import set_age
 from tests.test_cli import Harness
 
 BAD_CONFIGS = {
-    "unknown-key": ({"bogus.key": 1}, "bogus.key", None),
-    "wrong-type": ({"split.limit": "800"}, "split.limit", 800),
-    "out-of-range": ({"prune.done-days": 0}, "prune.done-days", 14),
+    "unknown-key": ({"bogus": 1}, "bogus", None),
+    "wrong-type": ({"split": {"limit": "800"}}, "split.limit", 800),
+    "out-of-range": ({"prune": {"done-days": 0}}, "prune.done-days", 14),
 }
+
+
+REMOVED_KEY = ".".join(("handoff", "base"))
+REMOVED_MESSAGE = '"base" in group "handoff" is removed'
+
+
+def nest(flat):
+    """Turn dotted lookup names into the nested form of ``config.json``."""
+    out = {}
+    for key, value in flat.items():
+        group, _, name = key.partition(".")
+        if name:
+            out.setdefault(group, {})[name] = value
+        else:
+            out[group] = value
+    return out
 
 
 @pytest.fixture
@@ -53,12 +69,13 @@ def run_silently(h, *argv):
 
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
-    assert json.loads(h.lines[0]) == DEFAULTS
-    assert len(DEFAULTS) == 13
+    assert json.loads(h.lines[0]) == nest(DEFAULTS)
+    assert len(DEFAULTS) == 12
+    assert REMOVED_KEY not in DEFAULTS
 
 
 def test_config_get_with_a_key_prints_that_value_as_json(h):
-    configure(h, {"handoff.resource-risk": [{"scope": "all", "text": "r"}], "split.limit": 900})
+    configure(h, {"handoff": {"resource-risk": [{"scope": "all", "text": "r"}]}, "split": {"limit": 900}})
     assert h.run("config", "get", "split.limit") == 0
     assert h.run("config", "get", "handoff.delivery") == 0
     assert h.lines == ["900", '"commit"']
@@ -67,6 +84,26 @@ def test_config_get_with_a_key_prints_that_value_as_json(h):
 def test_config_get_handoff_branch_without_a_file_prints_new(h):
     assert h.run("config", "get", "handoff.branch") == 0
     assert h.lines == ['"new"']
+
+
+def test_config_get_without_a_key_prints_the_nested_object_with_file_values(h):
+    configure(h, {"split": {"limit": 900}})
+    assert h.run("config", "get") == 0
+    printed = json.loads(h.lines[0])
+    assert printed["split"] == {"limit": 900}
+    assert printed["handoff"] == {"delivery": "commit", "branch": "new", "resource-risk": []}
+    assert printed["launch-grace-seconds"] == 60
+
+
+def test_config_get_reads_a_nested_top_level_scalar_by_its_name(h):
+    configure(h, {"launch-grace-seconds": 30})
+    assert h.run("config", "get", "launch-grace-seconds") == 0
+    assert h.lines == ["30"]
+
+
+def test_config_get_of_the_removed_base_key_exits_one(h, capsys):
+    assert h.run("config", "get", REMOVED_KEY) == 1
+    assert "base" in capsys.readouterr().err
 
 
 def test_config_get_with_an_unknown_key_exits_one(h, capsys):
@@ -123,9 +160,11 @@ def test_done_when_3_config_init_converts_defaults_md_and_a_second_init_exits_on
     (h.root / "defaults.md").write_text(DEFAULTS_MD, encoding="utf-8")
     assert h.run("config", "init") == 0
     written = json.loads((h.root / "config.json").read_text(encoding="utf-8"))
-    assert written["handoff.delivery"] == "pr"
-    assert written["handoff.resource-risk"] == [{"scope": "device: bench", "text": "battery may drain"}]
-    assert written["split.limit"] == DEFAULTS["split.limit"]
+    assert written["handoff"]["delivery"] == "pr"
+    assert written["handoff"]["resource-risk"] == [{"scope": "device: bench", "text": "battery may drain"}]
+    assert written["split"]["limit"] == DEFAULTS["split.limit"]
+    assert "handoff.delivery" not in written
+    assert "base" not in written["handoff"]
     assert not (h.root / "defaults.md").exists()
     assert (h.root / "defaults.md.bak").read_text(encoding="utf-8") == DEFAULTS_MD
     capsys.readouterr()
@@ -135,7 +174,7 @@ def test_done_when_3_config_init_converts_defaults_md_and_a_second_init_exits_on
 
 def test_config_init_without_defaults_md_writes_the_built_in_defaults(h):
     assert h.run("config", "init") == 0
-    assert json.loads((h.root / "config.json").read_text(encoding="utf-8")) == DEFAULTS
+    assert json.loads((h.root / "config.json").read_text(encoding="utf-8")) == nest(DEFAULTS)
 
 
 # --- Done when 4 ---------------------------------------------------------------------------------------
@@ -144,7 +183,7 @@ def test_config_init_without_defaults_md_writes_the_built_in_defaults(h):
 def test_done_when_4_prune_done_days_one_prunes_a_done_job_only_after_one_day(h, tmp_path, age, pruned):
     job_id = launched_job(h, tmp_path)
     assert h.run("finish", job_id, "--status", "done") == 0
-    configure(h, {"prune.done-days": 1})
+    configure(h, {"prune": {"done-days": 1}})
     set_age(h.root / "jobs" / job_id / "result.md", h.clock(), age)
     assert run_silently(h, "prune") == 0
     assert (h.lines == [job_id]) is pruned
@@ -155,23 +194,23 @@ def test_done_when_4_prune_done_days_one_prunes_a_done_job_only_after_one_day(h,
 
 RISK = {"scope": "all", "text": "r"}
 REJECTED = {
-    "delivery-unknown": {"handoff.delivery": "push"},
-    "base-with-whitespace": {"handoff.base": "my branch"},
-    "base-empty": {"handoff.base": ""},
-    "branch-not-a-string": {"handoff.branch": 3},
-    "tier-unknown": {"dispatcher.auto-approve-tiers": ["Solo", "Heavy"]},
-    "tier-duplicate": {"dispatcher.auto-approve-tiers": ["Solo", "Solo"]},
-    "tiers-not-a-list": {"dispatcher.auto-approve-tiers": "Solo"},
-    "risk-bad-scope": {"handoff.resource-risk": [{**RISK, "scope": "device:"}]},
-    "risk-empty-text": {"handoff.resource-risk": [{**RISK, "text": "  "}]},
-    "risk-extra-key": {"handoff.resource-risk": [{**RISK, "note": "n"}]},
-    "risk-not-a-list": {"handoff.resource-risk": RISK},
+    "delivery-unknown": {"handoff": {"delivery": "push"}},
+    "branch-not-a-string": {"handoff": {"branch": 3}},
+    "tier-unknown": {"dispatcher": {"auto-approve-tiers": ["Solo", "Heavy"]}},
+    "tier-duplicate": {"dispatcher": {"auto-approve-tiers": ["Solo", "Solo"]}},
+    "tiers-not-a-list": {"dispatcher": {"auto-approve-tiers": "Solo"}},
+    "risk-bad-scope": {"handoff": {"resource-risk": [{**RISK, "scope": "device:"}]}},
+    "risk-empty-text": {"handoff": {"resource-risk": [{**RISK, "text": "  "}]}},
+    "risk-extra-key": {"handoff": {"resource-risk": [{**RISK, "note": "n"}]}},
+    "risk-not-a-list": {"handoff": {"resource-risk": RISK}},
 }
 
 
 @pytest.mark.parametrize("data", REJECTED.values(), ids=REJECTED)
 def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewhere(h, capsys, data):
-    (key,) = data
+    ((group, inner),) = data.items()
+    (name,) = inner
+    key = f"{group}.{name}"
     configure(h, data)
     assert h.run("config", "check") == 1
     assert f"config.json: {key}: " in capsys.readouterr().err
@@ -180,13 +219,48 @@ def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewher
     assert f"using default {json.dumps(DEFAULTS[key])}" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("data", [{"handoff.delivery": "pr"}, {"handoff.branch": "feature/x"},
-                                  {"handoff.branch": "new"}, {"handoff.branch": "current"},
-                                  {"dispatcher.auto-approve-tiers": []}, {"handoff.resource-risk": [
-                                      RISK, {"scope": "repo: /work/a", "text": "t"}]}])
+@pytest.mark.parametrize("data", [
+    {"handoff": {"delivery": "pr"}}, {"handoff": {"branch": "feature/x"}},
+    {"handoff": {"branch": "new"}}, {"handoff": {"branch": "current"}},
+    {"dispatcher": {"auto-approve-tiers": []}},
+    {"handoff": {"resource-risk": [RISK, {"scope": "repo: /work/a", "text": "t"}]}},
+    {"launch-grace-seconds": 30}, {"split": {"limit": 900}}])
 def test_an_accepted_value_passes_check(h, data):
     configure(h, data)
     assert h.run("config", "check") == 0
+
+
+SHAPE_REJECTED = {
+    "flat-key": ({"handoff.delivery": "pr"}, ['"handoff.delivery" is a flat key', '{"handoff": {"delivery": ...}}']),
+    "flat-scalar-group-key": ({"split.limit": 900}, ['"split.limit" is a flat key', '{"split": {"limit": ...}}']),
+    "base-flat": ({REMOVED_KEY: "main"}, [REMOVED_MESSAGE, "the repository's default branch"]),
+    "base-nested": ({"handoff": {"base": "main"}}, [REMOVED_MESSAGE, "the base stated in the handoff"]),
+    "unknown-in-group": ({"handoff": {"foo": 1}}, ['handoff.foo']),
+    "unknown-top-level": ({"bogus": 1}, ['bogus']),
+    "group-not-an-object": ({"handoff": "pr"}, ['handoff']),
+    "group-is-a-list": ({"split": [800]}, ['split']),
+}
+
+
+@pytest.mark.parametrize("data, fragments", SHAPE_REJECTED.values(), ids=SHAPE_REJECTED)
+def test_config_check_rejects_a_misshapen_file_naming_the_key_and_the_nested_form(h, capsys, data, fragments):
+    configure(h, data)
+    assert h.run("config", "check") == 1
+    err = capsys.readouterr().err
+    for fragment in fragments:
+        assert fragment in err
+
+
+def test_a_flat_key_value_is_not_read_as_a_nested_value(h):
+    configure(h, {"split.limit": 900})
+    assert run_silently(h, "config", "get", "split.limit") == 0
+    assert h.lines == [str(DEFAULTS["split.limit"])]
+
+
+def test_a_value_beside_a_rejected_key_is_still_read(h):
+    configure(h, {"handoff": {"foo": 1, "delivery": "pr"}})
+    assert run_silently(h, "config", "get", "handoff.delivery") == 0
+    assert h.lines == ['"pr"']
 
 
 WHOLE_FILE = {
@@ -218,16 +292,16 @@ def test_an_unreadable_config_file_is_a_whole_file_error(h, capsys):
 
 
 def test_an_unknown_key_is_reported_as_ignored_by_a_lenient_command(h, capsys):
-    configure(h, {"bogus.key": 1})
+    configure(h, {"handoff": {"bogus": 1}})
     assert h.run("list") == 0
-    assert "config.json: bogus.key: unknown key; ignored" in capsys.readouterr().err
+    assert "config.json: handoff.bogus: unknown key; ignored" in capsys.readouterr().err
 
 
-def init_refused(h, capsys, defaults_md):
+def init_refused(h, capsys, defaults_md, expect="error:"):
     h.root.mkdir(parents=True)
     (h.root / "defaults.md").write_text(defaults_md, encoding="utf-8")
     assert h.run("config", "init") == 1
-    assert "error:" in capsys.readouterr().err
+    assert expect in capsys.readouterr().err
     assert not (h.root / "config.json").exists()
     assert (h.root / "defaults.md").read_text(encoding="utf-8") == defaults_md
     assert not (h.root / "defaults.md.bak").exists()
@@ -240,6 +314,7 @@ def table(*rows):
 INIT_REFUSED = {
     "delivery-scoped": "| delivery | pr | device: bench |",
     "base-scoped": "| base | develop | repo: /work/a |",
+    "base-unscoped": "| base | develop | all |",
     "branch-scoped": "| branch | feature | device: bench |",
     "invalid-value": "| delivery | push | all |",
     "escaped-pipe": "| resource risk | a \\| b | all |",
@@ -248,6 +323,11 @@ INIT_REFUSED = {
     "four-cells": "| delivery | pr | all | extra |",
     "empty-key": "|  | pr | all |",
 }
+
+
+@pytest.mark.parametrize("row", ["| base | develop | all |", "| base | develop | repo: /work/a |"])
+def test_config_init_refuses_a_base_row_with_the_removed_key_message(h, capsys, row):
+    init_refused(h, capsys, table(row), expect=REMOVED_MESSAGE)
 
 
 @pytest.mark.parametrize("row", INIT_REFUSED.values(), ids=INIT_REFUSED)
@@ -267,7 +347,8 @@ def test_prune_failed_and_abandoned_days_set_the_retention_of_that_state(h, tmp_
     else:
         assert h.run("close", job_id) == 0
         marker = h.root / "jobs" / job_id / "dispatch.jsonl"
-    configure(h, {key: 1})
+    group, _, name = key.partition(".")
+    configure(h, {group: {name: 1}})
     set_age(marker, h.clock(), age)
     assert run_silently(h, "prune") == 0
     assert (h.lines == [job_id]) is pruned
@@ -278,7 +359,7 @@ def test_prune_failed_and_abandoned_days_set_the_retention_of_that_state(h, tmp_
 
 def test_stalled_confirm_seconds_reaches_the_confirm_stalled_args_of_next(h, tmp_path):
     job_id = launched_job(h, tmp_path)
-    configure(h, {"dispatcher.stalled-confirm-seconds": 120})
+    configure(h, {"dispatcher": {"stalled-confirm-seconds": 120}})
     h.claude.statuses[job_id] = SessionStatus.IDLE
     h.clock.advance(timedelta(minutes=5))
     assert run_silently(h, "next", "--json") == 0
