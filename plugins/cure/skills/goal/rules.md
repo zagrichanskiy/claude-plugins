@@ -85,7 +85,7 @@ add one.
 - Record the turn count in the ledger after each work item.
 - `git rm` run by a subagent stages the deletion, so the orchestrator's explicit-path `git add` of the removed path fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
-- After a `designer` or `architect` consult, add the lines already changed, counted as the failure exit states, to the consult's line estimate. Compare the sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure exit.
+- After a `designer` or `architect` consult, add the lines already changed, counted as the failure exit states, to the consult's line estimate. Run this per repository: the estimate for that repository's files plus the lines already changed in it. Compare each sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure exit.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
   its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure

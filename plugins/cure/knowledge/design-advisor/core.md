@@ -108,7 +108,7 @@ to critique.
 
 - When a component replaces or re-creates a job or record, list every piece of its state and say what carries over.
 - When a rule ranks members, list every reason a member cannot act.
-- Give the file count, a line estimate per file (or per component when files are not yet known) counting changed lines (added plus deleted) with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate.
+- Give the file count, a line estimate per file (or per component when files are not yet known) counting changed lines (added plus deleted) with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate. The estimate counts only the lines still to change from the current working tree, not the diff against the base.
 
 Keep it proportional: a small component gets a few paragraphs, not a treatise.
 

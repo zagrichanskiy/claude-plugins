@@ -40,8 +40,9 @@ You are a project-agnostic agent, so never guess the command:
   entire log. For noisy output, filter to the failing tests.
 - Compare each check with the expected value in the brief. If the brief gives
   no expected value for a check, say so for that check.
-- Report the exit code of each command itself. Do not read an exit code through
-  a pipe. Run the command alone, or use `set -o pipefail` or `${PIPESTATUS[0]}`.
+- Report the exit code of each command itself. Do not read `$?` of a pipeline:
+  it is the reader's exit code. Run the command alone, or pipe it only into a reader that
+  consumes all input, such as `tail`, never `head`, and use `set -o pipefail` or `${PIPESTATUS[0]}`.
   Do not redirect output to a file; the no-write rule below holds.
 - State a single clear verdict: all passed, or N failed. Do not soften a
   failure or call a partial run a pass.
