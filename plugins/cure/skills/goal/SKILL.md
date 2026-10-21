@@ -105,7 +105,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 - Tier: <Solo, Light or Full>. <Agent plan: steps, agents, parallel work, advisor.>
 - Stops: this goal overrides the user's "run one step and stop" rule; it stops only at its exits.
-- Permission mode: <acceptEdits or default; only a goal that edits plugin code>.
+- Permission mode: <acceptEdits for a goal that edits skill, agent or other plugin files; omit otherwise>.
 - Waiting: <job mode: the mode file's Waiting line. Direct mode: takes the `waiting:` exit of direct.md>.
 ```
 
@@ -230,7 +230,7 @@ A Solo goal differs from the template as follows:
 - No retrospective work item or done-when item, no ledger, no backlog. The stats row work item and
   done-when item stay, with `<date> | <repo> | <slug>` filled in.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
-- Rules: the lines "Tier: Solo.", Stops and Waiting.
+- Rules: the lines "Tier: Solo.", Stops, Permission mode (when the goal edits plugin files) and Waiting.
 
 The review-round cap and failure cause come from this tier rule, or from the user's own statement
 in a direct run. A cap in a handoff or a design source is never copied into the goal. The failure cause in the exit text, by tier:

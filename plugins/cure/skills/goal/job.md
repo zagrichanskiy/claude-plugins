@@ -104,7 +104,7 @@ A failed check is fixed, or asked about in the dispatcher's question round, befo
 | Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
 | Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
 | Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user. See the answers below. |
-| Trust | For each work item that launches `claude` in a directory the job creates, read `projects["<dir>"].hasTrustDialogAccepted` in `~/.claude.json`. | Not `true`: create the directory under a trusted path, or ask the user to trust it. |
+| Trust | For each work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory, the work item names the directory as a literal absolute path. Read `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json` for the path and each ancestor. | No such entry is `true`: move the directory under a trusted ancestor. Ask the user to trust it only for a fixed directory that exists. |
 | Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
 
 The worker starts in the handoff's first repository. It loads these permission rules:
@@ -128,6 +128,13 @@ for a failed permission check offers these answers:
 | The user adds an allow rule | The check runs again. |
 | Drop the action | `goal.md` is edited through `cure:goal`. The check runs again. |
 | Launch anyway | The run is accepted to stop at `needs-input` when the classifier denies the action. |
+
+The question to leave auto mode (an agent's "no verdict") offers these answers:
+
+| Answer | Effect |
+|---|---|
+| Leave auto mode | `cure-job resume <id> -- --permission-mode <mode>` with the mode the user names, or `cure-job launch` with it when the session is gone. |
+| Stay in auto mode | The run is accepted to stop at `needs-input` again. |
 
 The question for a failed Repository check offers these answers:
 
@@ -196,6 +203,8 @@ with outcome `failed`", the report clause as (c) and the final-message clause as
 ## Launch line
 
 `cure-job launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session without `--agent`. The goal file does not name the agent.
+
+The dispatcher applies the goal's Rules "Permission mode" line: it runs `cure-job launch <id> -- --permission-mode <mode>`, and `cure-job resume <id> -- --permission-mode <mode>` after `needs-input`.
 
 Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
 

@@ -44,6 +44,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 | Other working note, such as a brief, that a work item names | Under `.notes/` in the repository |
 | Retrospective | `~/.claude/retros/<date>-<repo>-<slug>.md` |
 | Stats row | `~/.claude/retros/stats.md`, appended with the command in "All tiers" |
+| Script for a `!` command | `$CLAUDE_JOB_DIR/tmp/<name>.py` |
 
 - Append: `cat >> <path> <<'EOF'` then the text, then `EOF`. Quote the delimiter so the shell
   expands nothing.
@@ -100,7 +101,9 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - A command for the user to run with `!` is a script file under `$CLAUDE_JOB_DIR/tmp`, run as
-  `! python3 <path>`. Never give an inline `sed` with escapes.
+  `! python3 <absolute path>` with the variable expanded. Never give an inline `sed` with escapes.
+- A tool call or an agent that gets an auto-mode "no verdict": never route the work through a copy,
+  a patch or a shell write.
 - Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md`, with this
   command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
   Unknown value is `-`; approximate value is `~45`. `|` and `'` are stripped from every value (the
@@ -129,8 +132,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - Record a mechanical choice in the ledger as an assumption.
 - Record the turn count in the ledger after each work item.
 - Pass agents paths and ids. Ask for findings only.
-- An agent reports an auto-mode "no verdict": ask the user to leave auto mode for the goal. Never
-  route the work through a copy, a patch or a shell write.
+- An agent reports an auto-mode "no verdict": ask the user to leave auto mode for the goal.
 - Full: run `test-author` only for a behaviour change that has no test.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
   its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
