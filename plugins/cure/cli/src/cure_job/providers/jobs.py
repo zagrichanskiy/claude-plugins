@@ -423,7 +423,7 @@ class JobsProvider:
                 if now - entry.mtime > HALF_CREATED_AGE and self.store.remove_half_created(entry)]
 
     def prune(self) -> list[str]:
-        """Remove every job past its retention period that no open job names as ``after``. Return the removed ids."""
+        """Remove every :func:`expired` job that no open job names as ``after``. Return the removed ids."""
         now = self.clock()
         kept_for = retention(self.config)
         views = self.views()

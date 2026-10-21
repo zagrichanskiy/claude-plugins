@@ -8,7 +8,7 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Approved, Claim, Closed, Launched, StopIssued
+from cure_job.events import Approved, Claim, Closed, Launched, Reported, SessionsRemoved, StopIssued
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
@@ -298,8 +298,7 @@ def test_ended_at_is_none_for_open_jobs():
 
 
 def test_retention_periods():
-    assert RETENTION == {State.DONE: timedelta(days=14), State.FAILED: timedelta(days=30),
-                         State.ABANDONED: timedelta(days=30)}
+    assert RETENTION == {State.FAILED: timedelta(days=30)}
 
 
 def _expiry_view(status_kwargs, age):
@@ -307,15 +306,25 @@ def _expiry_view(status_kwargs, age):
     return derive([make_record(A, result_mtime=stamp, events_mtime=stamp, **status_kwargs)], {}, NOW, frozenset())[0]
 
 
-@pytest.mark.parametrize("kwargs, days", [
-    (dict(result=result_of(ResultStatus.DONE)), 14),
-    (dict(result=result_of(ResultStatus.FAILED)), 30),
-    (dict(events=(Closed(""),)), 30),
-])
-def test_expired_only_strictly_after_the_retention_period(kwargs, days):
-    assert not expired(_expiry_view(kwargs, timedelta(days=days)), NOW)
-    assert expired(_expiry_view(kwargs, timedelta(days=days, seconds=1)), NOW)
-    assert not expired(_expiry_view(kwargs, timedelta(days=days - 1)), NOW)
+def test_failed_expires_only_strictly_after_the_retention_period():
+    kwargs = dict(result=result_of(ResultStatus.FAILED))
+    assert not expired(_expiry_view(kwargs, timedelta(days=30)), NOW)
+    assert expired(_expiry_view(kwargs, timedelta(days=30, seconds=1)), NOW)
+    assert not expired(_expiry_view(kwargs, timedelta(days=29)), NOW)
+
+
+@pytest.mark.parametrize("reported, removed, due", [(True, True, True), (False, True, False),
+                                                    (True, False, False), (False, False, False)])
+def test_done_expires_at_once_only_when_reported_and_sessions_removed(reported, removed, due):
+    events = (launched(A),) + ((Reported(1, NOW),) if reported else ()) + ((SessionsRemoved(NOW),) if removed else ())
+    view = _expiry_view(dict(events=events, result=result_of(ResultStatus.DONE)), timedelta(0))
+    assert expired(view, NOW) is due
+
+
+@pytest.mark.parametrize("removed", [True, False])
+def test_abandoned_expires_at_once_only_when_sessions_removed(removed):
+    events = (Closed(""),) + ((SessionsRemoved(NOW),) if removed else ())
+    assert expired(_expiry_view(dict(events=events), timedelta(0)), NOW) is removed
 
 
 def test_open_job_never_expires():

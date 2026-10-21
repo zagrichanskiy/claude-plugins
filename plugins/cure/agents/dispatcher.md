@@ -16,7 +16,7 @@ The CLI is `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`. The state root is `${CURE_JOB_R
 
 | Command | Use |
 |---|---|
-| `cure-job prune` | Remove expired jobs and half-created directories. |
+| `cure-job prune` | Remove finished jobs and half-created directories. A `done` job goes once reported and its sessions are removed; an `abandoned` job once its sessions are removed; a `failed` job after `prune.failed-days`. A job named by the `after` of an unfinished job stays. |
 | `cure-job next --json` | A JSON array, one element per job with an action: the job's `list --json` row plus `actions` (ordered action names) and `args` (an object keyed by action). Jobs in lock-rank order. A job with no action is absent. |
 | `cure-job list --json` | One row per job with its derived state, resources, files, `origin`, `reported`, `sessions-removed`, `prs` (the job's PR URLs), `after` (the predecessor's id, or null) and `after-state` (the predecessor's state, `missing` or `invalid`) and, for a `blocked` job, `waiting-for`. |
 | `cure-job origin <id> <address>` | Store the address of the session that sent the job's wake-up message. Refused after the job was launched. |

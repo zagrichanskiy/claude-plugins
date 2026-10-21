@@ -7,7 +7,7 @@ import pytest
 
 from cure_job.errors import (ClaudeError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob)
 from cure_job.claude import SessionStatus
-from cure_job.events import Claim, Closed, Launched
+from cure_job.events import Claim, Closed, Launched, Reported, SessionsRemoved
 from cure_job.frontmatter import parse
 from cure_job.providers.jobs import JobsProvider
 from cure_job.resource import DEVICE_BENCH
@@ -519,14 +519,43 @@ def finish(store, job_id, status, age, now=NOW):
     set_age(path, now, age)
 
 
-def test_prune_removes_done_jobs_older_than_fourteen_days(jobs, store, clock):
-    old = new_job(jobs, clock, repos=("/work/a",))
-    new = new_job(jobs, clock, repos=("/work/b",))
-    finish(store, old, "done", timedelta(days=14, hours=1), clock.now)
-    finish(store, new, "done", timedelta(days=13), clock.now)
-    assert jobs.prune() == [old]
-    assert not store.job_dir(old).exists()
-    assert store.job_dir(new).is_dir()
+def launch_and_finish(jobs, store, clock, job_id, status, age=timedelta(0)):
+    jobs.store.append_event(job_id, Launched(1, job_id, clock.now))
+    finish(store, job_id, status, age, clock.now)
+
+
+def mark(store, clock, job_id, *, reported=False, sessions_removed=False):
+    if reported:
+        store.append_event(job_id, Reported(1, clock.now))
+    if sessions_removed:
+        store.append_event(job_id, SessionsRemoved(clock.now))
+
+
+def test_prune_removes_a_fresh_done_job_that_is_reported_and_has_its_sessions_removed(jobs, store, clock):
+    job_id = new_job(jobs, clock)
+    launch_and_finish(jobs, store, clock, job_id, "done")
+    mark(store, clock, job_id, reported=True, sessions_removed=True)
+    assert jobs.prune() == [job_id]
+    assert not store.job_dir(job_id).exists()
+
+
+@pytest.mark.parametrize("reported, sessions_removed", [(False, True), (True, False), (False, False)])
+def test_prune_keeps_a_done_job_that_is_not_reported_or_keeps_its_sessions(jobs, store, clock, reported, sessions_removed):
+    job_id = new_job(jobs, clock)
+    launch_and_finish(jobs, store, clock, job_id, "done", timedelta(days=400))
+    mark(store, clock, job_id, reported=reported, sessions_removed=sessions_removed)
+    assert jobs.prune() == []
+    assert store.job_dir(job_id).is_dir()
+
+
+def test_prune_removes_a_fresh_abandoned_job_whose_sessions_are_removed(jobs, store, clock):
+    gone = new_job(jobs, clock, repos=("/work/a",))
+    kept = new_job(jobs, clock, repos=("/work/b",))
+    for job_id in (gone, kept):
+        jobs.close(job_id)
+    mark(store, clock, gone, sessions_removed=True)
+    assert jobs.prune() == [gone]
+    assert store.job_dir(kept).is_dir()
 
 
 def test_prune_keeps_failed_jobs_for_thirty_days(jobs, store, clock):
@@ -534,15 +563,6 @@ def test_prune_keeps_failed_jobs_for_thirty_days(jobs, store, clock):
     old = new_job(jobs, clock, repos=("/work/b",))
     finish(store, young, "failed", timedelta(days=29), clock.now)
     finish(store, old, "failed", timedelta(days=31), clock.now)
-    assert jobs.prune() == [old]
-
-
-def test_prune_measures_an_abandoned_job_from_dispatch_jsonl(jobs, store, clock):
-    young = new_job(jobs, clock, repos=("/work/a",))
-    old = new_job(jobs, clock, repos=("/work/b",))
-    for job_id, age in ((young, timedelta(days=29)), (old, timedelta(days=31))):
-        jobs.close(job_id)
-        set_age(store.job_dir(job_id) / "dispatch.jsonl", clock.now, age)
     assert jobs.prune() == [old]
 
 
@@ -568,10 +588,10 @@ def test_prune_returns_ascending_ids_and_removes_the_whole_directory(jobs, store
     assert not any(store.job_dir(i).exists() for i in ids)
 
 
-def test_prune_compares_file_mtime_with_the_clock(jobs, store, clock):
+def test_prune_compares_file_mtime_of_a_failed_job_with_the_clock(jobs, store, clock):
     job_id = new_job(jobs, clock)
-    finish(store, job_id, "done", timedelta(days=1), clock.now)
-    clock.advance(timedelta(days=20))
+    finish(store, job_id, "failed", timedelta(days=1), clock.now)
+    clock.advance(timedelta(days=40))
     assert jobs.prune() == [job_id]
 
 

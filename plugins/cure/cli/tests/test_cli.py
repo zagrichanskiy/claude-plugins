@@ -433,9 +433,8 @@ def test_prune_prints_each_removed_id_one_per_line(h, tmp_path):
     ids = [h.new(tmp_path, repos=(f"/work/{n}",)) for n in "ab"]
     keep = h.new(tmp_path, repos=("/work/c",))
     for job_id in ids:
-        h.run("close", job_id)
-        stamp = (NOW - timedelta(days=60)).timestamp()
-        os.utime(h.root / "jobs" / job_id / "dispatch.jsonl", (stamp, stamp))
+        assert h.run("close", job_id) == 0
+        assert h.run("remove-sessions", job_id) == 0
     h.lines.clear()
     assert h.run("prune") == 0
     assert h.lines == ids
