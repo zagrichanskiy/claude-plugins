@@ -104,15 +104,14 @@ def test_cli_check_scenario(tmp_path, workdir, root, fake_state):
     (root / "jobs" / first / "result.md").write_text("---\nstatus: done\n---\n", encoding="utf-8")
     assert list_states(workdir) == [(first, "done"), (second, "queued")]
 
-    # Step 5: close the second job; prune keeps both, they are recent.
+    # Step 5: close the second job; prune keeps both, since the sessions of the closed one are not removed.
     assert run(workdir, "close", second).returncode == 0
     assert list_states(workdir) == [(first, "done"), (second, "abandoned")]
     pruned = run(workdir, "prune")
     assert pruned.returncode == 0 and pruned.stdout == ""
 
-    # Optional: an abandoned job older than thirty days is pruned.
-    stamp = 1_700_000_000
-    os.utime(root / "jobs" / second / "dispatch.jsonl", (stamp, stamp))
+    # Once its sessions are removed, the abandoned job is pruned at once.
+    assert run(workdir, "remove-sessions", second).returncode == 0
     pruned = run(workdir, "prune")
     assert pruned.stdout.split() == [second]
     assert list_states(workdir) == [(first, "done")]

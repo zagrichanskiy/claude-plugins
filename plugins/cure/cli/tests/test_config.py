@@ -17,11 +17,18 @@ from tests.test_cli import Harness
 BAD_CONFIGS = {
     "unknown-key": ({"bogus": 1}, "bogus", None),
     "wrong-type": ({"split": {"limit": "800"}}, "split.limit", 800),
-    "out-of-range": ({"prune": {"done-days": 0}}, "prune.done-days", 14),
+    "out-of-range": ({"prune": {"failed-days": 0}}, "prune.failed-days", 30),
 }
 
 
 REMOVED_KEY = ".".join(("handoff", "base"))
+DROPPED_PRUNE_MESSAGES = {
+    "prune.done-days": 'prune: "done-days" is removed; a done job is pruned once its finish is reported '
+                       "and its sessions are removed",
+    "prune.abandoned-days": 'prune: "abandoned-days" is removed; an abandoned job is pruned once its '
+                            "sessions are removed",
+}
+DROPPED_PRUNE_KEYS = tuple(DROPPED_PRUNE_MESSAGES)
 REMOVED_MESSAGE = ('handoff: "base" is removed; a job\'s base is the base stated in the handoff, '
                    "else the repository's default branch")
 INIT_DROPPED = ('defaults.md: handoff: "base" is removed; row dropped; a job\'s base is the base stated '
@@ -73,8 +80,9 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 12
+    assert len(DEFAULTS) == 10
     assert REMOVED_KEY not in DEFAULTS
+    assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
 
 def test_config_get_with_a_key_prints_that_value_as_json(h):
@@ -182,15 +190,27 @@ def test_config_init_without_defaults_md_writes_the_built_in_defaults(h):
 
 # --- Done when 4 ---------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("age, pruned", [(timedelta(days=1), False), (timedelta(days=1, seconds=1), True)])
-def test_done_when_4_prune_done_days_one_prunes_a_done_job_only_after_one_day(h, tmp_path, age, pruned):
-    job_id = launched_job(h, tmp_path)
-    assert h.run("finish", job_id, "--status", "done") == 0
-    configure(h, {"prune": {"done-days": 1}})
-    set_age(h.root / "jobs" / job_id / "result.md", h.clock(), age)
-    assert run_silently(h, "prune") == 0
-    assert (h.lines == [job_id]) is pruned
-    assert (h.root / "jobs" / job_id).exists() is not pruned
+@pytest.mark.parametrize("key", DROPPED_PRUNE_KEYS)
+def test_done_when_4_a_dropped_prune_key_is_reported_as_removed_and_ignored(h, capsys, key):
+    group, _, name = key.partition(".")
+    configure(h, {group: {name: 1}})
+    assert h.run("list") == 0
+    assert f"config.json: {DROPPED_PRUNE_MESSAGES[key]}; ignored" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("key", DROPPED_PRUNE_KEYS)
+def test_done_when_4_config_get_of_a_dropped_prune_key_exits_one(h, capsys, key):
+    assert h.run("config", "get", key) == 1
+    assert f"error: {DROPPED_PRUNE_MESSAGES[key]}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("argv", [("config", "check"), ("next", "--json")], ids=["check", "next"])
+def test_done_when_4_strict_mode_rejects_both_dropped_prune_keys(h, capsys, argv):
+    configure(h, {"prune": {"done-days": 7, "abandoned-days": 7}})
+    assert h.run(*argv) == 1
+    err = capsys.readouterr().err
+    for message in DROPPED_PRUNE_MESSAGES.values():
+        assert f"config.json: {message}" in err
 
 
 # --- review finding 9: rejecting branches -------------------------------------------------------------
@@ -360,18 +380,11 @@ def test_config_init_refuses_a_defaults_md_it_cannot_convert_and_writes_nothing(
 # --- prune retention by state --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("age, pruned", [(timedelta(days=1), False), (timedelta(days=1, seconds=1), True)])
-@pytest.mark.parametrize("key, state", [("prune.failed-days", "failed"), ("prune.abandoned-days", "abandoned")])
-def test_prune_failed_and_abandoned_days_set_the_retention_of_that_state(h, tmp_path, key, state, age, pruned):
-    job_id = launched_job(h, tmp_path) if state == "failed" else h.new(tmp_path)
-    if state == "failed":
-        assert h.run("finish", job_id, "--status", "failed") == 0
-        marker = h.root / "jobs" / job_id / "result.md"
-    else:
-        assert h.run("close", job_id) == 0
-        marker = h.root / "jobs" / job_id / "dispatch.jsonl"
-    group, _, name = key.partition(".")
-    configure(h, {group: {name: 1}})
-    set_age(marker, h.clock(), age)
+def test_prune_failed_days_sets_the_retention_of_a_failed_job(h, tmp_path, age, pruned):
+    job_id = launched_job(h, tmp_path)
+    assert h.run("finish", job_id, "--status", "failed") == 0
+    configure(h, {"prune": {"failed-days": 1}})
+    set_age(h.root / "jobs" / job_id / "result.md", h.clock(), age)
     assert run_silently(h, "prune") == 0
     assert (h.lines == [job_id]) is pruned
     assert (h.root / "jobs" / job_id).exists() is not pruned

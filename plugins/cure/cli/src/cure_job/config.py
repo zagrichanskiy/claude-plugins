@@ -31,9 +31,7 @@ DEFAULTS: dict[str, object] = {
     "split.limit": 800,
     "short-hold.wait-seconds": 540,
     "short-hold.wait-total-minutes": 120,
-    "prune.done-days": 14,
     "prune.failed-days": 30,
-    "prune.abandoned-days": 30,
     "launch-grace-seconds": 60,
 }
 
@@ -41,7 +39,11 @@ DEFAULTS: dict[str, object] = {
 GROUPS = tuple(dict.fromkeys(key.split(".")[0] for key in DEFAULTS if "." in key))
 
 #: Removed keys by (group, name), and why.
-REMOVED = {("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch"}
+REMOVED = {
+    ("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch",
+    ("prune", "done-days"): "a done job is pruned once its finish is reported and its sessions are removed",
+    ("prune", "abandoned-days"): "an abandoned job is pruned once its sessions are removed",
+}
 
 
 class ConfigError(CureJobError):
@@ -187,9 +189,7 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "split.limit": _int_range(100, 5000),
     "short-hold.wait-seconds": _int_range(10, 540),
     "short-hold.wait-total-minutes": _int_range(10, 1440),
-    "prune.done-days": _int_range(1, 365),
     "prune.failed-days": _int_range(1, 365),
-    "prune.abandoned-days": _int_range(1, 365),
     "launch-grace-seconds": _int_range(10, 600),
 }
 

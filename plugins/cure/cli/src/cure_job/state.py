@@ -56,8 +56,7 @@ class State(enum.Enum):
 #: within 0.255 seconds. On 2.1.301 a fresh launch still read lost at once.
 LAUNCH_GRACE = timedelta(seconds=DEFAULTS["launch-grace-seconds"])
 
-_RETENTION_KEYS = {State.DONE: "prune.done-days", State.FAILED: "prune.failed-days",
-                   State.ABANDONED: "prune.abandoned-days"}
+_RETENTION_KEYS = {State.FAILED: "prune.failed-days"}
 
 
 def retention(config: Config) -> dict[State, timedelta]:
@@ -159,6 +158,12 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], 
 
 
 def expired(view: JobView, now: datetime, kept_for: Mapping[State, timedelta] = RETENTION) -> bool:
+    """A done job expires once reported with its sessions removed, an abandoned one once its sessions are
+    removed, and a job of a state in ``kept_for`` once ended for longer than its period."""
+    if view.state is State.DONE:
+        return view.record.reported and view.record.sessions_removed
+    if view.state is State.ABANDONED:
+        return view.record.sessions_removed
     kept = kept_for.get(view.state)
     return kept is not None and view.ended_at is not None and now - view.ended_at > kept
 

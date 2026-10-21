@@ -4,16 +4,14 @@ Each test names the "Done when" item of the issue it pins."""
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from cure_job.handoff import parse_handoff
-from tests.builders import NOW, handoff_text
+from tests.builders import handoff_text
 from tests.test_approve import DONE_RESULT, NEEDS_INPUT_RESULT, _needs_input_job, goal_file, rows
 from tests.test_cli import Harness
 
@@ -164,18 +162,17 @@ def test_done_when_4_a_removed_predecessor_gives_after_state_missing(h, tmp_path
 
 # --- Done when 5 ---------------------------------------------------------------------------------------
 
-def _expire(h, job_id):
-    stamp = (NOW - timedelta(days=60)).timestamp()
-    os.utime(h.root / "jobs" / job_id / "dispatch.jsonl", (stamp, stamp))
+def _end(h, job_id):
+    assert h.run("close", job_id) == 0
+    assert h.run("remove-sessions", job_id) == 0
 
 
-def test_done_when_5_prune_keeps_an_expired_predecessor_of_an_open_job_and_prunes_an_unreferenced_one(h, tmp_path):
+def test_done_when_5_prune_keeps_the_predecessor_of_an_open_job_and_prunes_an_unreferenced_one(h, tmp_path):
     pred = h.new(tmp_path, repos=(X,))
     succ = h.new(tmp_path, repos=(Y,), after=pred)
     loose = h.new(tmp_path, repos=("/work/z",))
     for job_id in (pred, loose):
-        h.run("close", job_id)
-        _expire(h, job_id)
+        _end(h, job_id)
     h.lines.clear()
     assert h.run("prune") == 0
     assert h.lines == [loose]
@@ -183,12 +180,28 @@ def test_done_when_5_prune_keeps_an_expired_predecessor_of_an_open_job_and_prune
     assert rows(h)[succ]["after-state"] == "abandoned"
 
 
+def test_done_when_5_prune_keeps_the_predecessor_of_a_running_job(h, tmp_path):
+    pred = h.new(tmp_path, repos=(X,))
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    h.approve(pred)
+    assert h.run("launch", pred) == 0
+    result_file(h, pred).write_text(DONE_RESULT, encoding="utf-8")
+    assert h.run("reported", pred) == 0
+    assert h.run("remove-sessions", pred) == 0
+    h.approve(succ)
+    assert h.run("launch", succ) == 0
+    assert rows(h)[succ]["state"] == "running"
+    h.lines.clear()
+    assert h.run("prune") == 0
+    assert h.lines == []
+    assert (h.root / "jobs" / pred).is_dir()
+
+
 def test_done_when_5_prune_removes_the_predecessor_once_the_successor_has_ended(h, tmp_path):
     pred = h.new(tmp_path, repos=(X,))
     succ = h.new(tmp_path, repos=(Y,), after=pred)
     for job_id in (pred, succ):
-        h.run("close", job_id)
-        _expire(h, job_id)
+        _end(h, job_id)
     h.lines.clear()
     assert h.run("prune") == 0
     assert sorted(h.lines) == sorted([pred, succ])

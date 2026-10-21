@@ -14,6 +14,6 @@
   },
   "split": {"limit": 800},
   "short-hold": {"wait-seconds": 540, "wait-total-minutes": 120},
-  "prune": {"done-days": 14, "failed-days": 30, "abandoned-days": 30},
+  "prune": {"failed-days": 30},
   "launch-grace-seconds": 60
 }

@@ -287,7 +287,7 @@ class JobsProvider:
         """End the short hold of ``job_id`` on ``name``. Returns when the job does not hold it.
 
         Reads only this job. A repository is held until the job ends.
-        An abandoned job holds nothing and gets no write: its log mtime is its retention start.
+        An abandoned job holds nothing, so a release has nothing to end and gets no write.
         """
         if not resource_names.is_short_hold(name):
             raise CureJobError(f"{name} is a repository; it is held until the job ends")
@@ -423,7 +423,7 @@ class JobsProvider:
                 if now - entry.mtime > HALF_CREATED_AGE and self.store.remove_half_created(entry)]
 
     def prune(self) -> list[str]:
-        """Remove every job past its retention period that no open job names as ``after``. Return the removed ids."""
+        """Remove every :func:`expired` job that no open job names as ``after``. Return the removed ids."""
         now = self.clock()
         kept_for = retention(self.config)
         views = self.views()
