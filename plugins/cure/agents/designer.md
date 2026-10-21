@@ -68,10 +68,3 @@ review, after Findings.
 
 A `defect` finding in a `cg-*` report is not yours to rank, and neither is a finding you reclassify.
 Ground rule 5 in `core.md` holds.
-
-## CONSULT additions
-
-These items add to the CONSULT output in `core.md`.
-
-- Give the file count, a line estimate per file counting changed lines (added plus deleted) with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate.
-- When a decision puts a setting in agent frontmatter, check that the key applies to a main-session agent.

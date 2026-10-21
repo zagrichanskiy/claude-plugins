@@ -25,7 +25,7 @@ Exits, in the template's exits slot. There is no closing done-when item.
 
 ```markdown
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
-<review cause>, or the diff passes <lines> lines (insertions plus deletions of `git diff --shortstat <base>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`)), or `git fetch` or
+<review cause>, or the diff passes <lines> lines (insertions plus deletions of `git diff --shortstat <base>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`)), or a consult's line estimate plus the lines already changed passes <lines> lines, or `git fetch` or
 a tool check failed, or a Settled statement is false or the title's outcome is unachievable, or an
 asked question was dismissed or left unanswered; and (b) the retrospective's summary, naming the
 cause, is in the transcript and the `stats.md` row is appended with outcome `failed`; and (c) the final message starts with `failed:`.

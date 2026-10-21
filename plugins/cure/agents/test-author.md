@@ -42,9 +42,10 @@ Before writing a single test:
 - A lock gets one test that fails when the lock is removed from the critical
   section. Confirm the failure by removing the lock once (mutation check).
   This is the one exception to the rule against modifying the code under test.
-  Before the mutation, record `sha256sum <source file>` or copy the file aside.
-  After it, restore the lock by editing and confirm the checksum or the copy
-  matches. Never run `git checkout`, `git restore` or `git stash` on a source
+  Before the mutation, record `sha256sum <source file>` and copy the file to a
+  temp directory outside the repository. After it, restore the file by copying
+  the copy back, confirm the checksum matches, and delete the copy. Report a
+  mismatch as a blocking defect. Never run `git checkout`, `git restore` or `git stash` on a source
   file: the code under test is usually uncommitted work that these commands
   delete. Report the mutation result.
 - A format change updates the tests that pin the old format.
