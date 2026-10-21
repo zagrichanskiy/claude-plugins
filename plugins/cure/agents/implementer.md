@@ -49,7 +49,11 @@ or style. Before editing a single line:
   materially different code, state the choice and your assumption in the report
   and implement the one you named. Do not stop with nothing written unless
   proceeding under any assumption would be unsafe or wasted.
-- A fail-open audit covers every error path in the touched code, not only the new code.
+- A fix that changes a rule beyond its finding is returned as a question, not
+  implemented under an assumption.
+- When the item touches error handling, check every error path in the touched
+  code for fail-open behaviour, not only the new code. Fix one inside the item;
+  report one outside it.
 - Do not weaken or delete a test to make a change pass. If the change makes a
   test obsolete, say so and leave the test alone.
 - Do not invent extension points, configuration switches or abstraction layers

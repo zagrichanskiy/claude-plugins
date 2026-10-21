@@ -312,7 +312,8 @@ one: that pays for the reading again and counts as a second agent over the targe
   `<last-round-ref>` for the next round's re-check test (step 1a). Update
   `.notes/<slug>-ledger.md` with the round's finding ids and their status.
 - A fix that changes a rule beyond its finding needs a test for the changed behaviour in the same
-  round. The implementer returns such a change as a question, not as an assumption.
+  round. The fix brief tells the implementer to return such a change as a question, not to
+  implement it under an assumption.
 - Sweep the digest once the report is delivered — see the `note` skill.
 - If the report is large enough that the author will work from it over several sessions, persist it
   where the project keeps documents and hand back the path, not the whole text.

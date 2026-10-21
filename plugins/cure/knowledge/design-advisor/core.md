@@ -104,6 +104,9 @@ to critique.
   the real reasoning lives.
 - **Risks & open questions** — what could make this wrong, and the assumptions you made.
 
+- When a component replaces or re-creates a job or record, list every piece of its state and say what carries over.
+- When a rule ranks members, list every reason a member cannot act.
+
 Keep it proportional: a small component gets a few paragraphs, not a treatise.
 
 ### REVIEW — "what is wrong with this?"

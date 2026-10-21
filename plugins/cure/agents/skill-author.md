@@ -63,7 +63,9 @@ only what it added.
 ## Fixes and shared skills
 
 - A fix brief states the scope of the cause. Write the narrowest sentence that
-  closes it.
+  closes it. If the brief does not state the scope, say so in the report.
+- Under a fix brief, edit only the cause. Report drift found elsewhere instead
+  of editing it.
 - A state-table replacement keeps every existing procedure unless the spec
   removes it.
 - A rule added to a shared skill states the repositories and users it applies

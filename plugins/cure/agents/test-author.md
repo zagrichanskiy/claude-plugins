@@ -41,6 +41,9 @@ Before writing a single test:
 - Every test that exercises a launch path uses a directory that exists.
 - A lock gets one test that fails when the lock is removed from the critical
   section. Confirm the failure by removing the lock once (mutation check).
+  This is the one exception to the rule against modifying the code under test.
+  Restore the lock, confirm `git diff -- <source file>` is empty, and report the
+  mutation result.
 - A format change updates the tests that pin the old format.
 
 ## Definition of done

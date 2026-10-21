@@ -73,7 +73,5 @@ Ground rule 5 in `core.md` holds.
 
 These items add to the CONSULT output in `core.md`.
 
-- Give a line estimate per file and a person-day estimate next to the file count. The orchestrator compares the total with the changed-line cap before it dispatches a writing agent. The cap is defined in `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal".
-- When a component replaces or re-creates a job or record, list every piece of its state and say what carries over.
-- When a rule ranks members, list every reason a member cannot act.
+- Give the file count, a line estimate per file with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate.
 - When a decision puts a setting in agent frontmatter, check that the key applies to a main-session agent.
