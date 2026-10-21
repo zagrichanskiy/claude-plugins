@@ -28,7 +28,7 @@ after: <job id of the predecessor; omit when the job has none; part k of a split
 ## Tools
 
 - Build: the repository's build agent or command.
-- Implement: the agent that writes the change.
+- Implement: the name of the agent that writes the change. Never only "implementer".
 - Review: the repository's review agent.
 - Verify: the repository's verify agent or command.
 - PR: the repository's pull request skill.

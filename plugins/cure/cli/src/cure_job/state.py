@@ -84,6 +84,8 @@ class After:
     """The ``after`` predecessor of a job and its state."""
     id: str
     state: State | PredecessorGone
+    #: The predecessor has a goal. False when it has no readable record.
+    goal: bool
 
     @property
     def satisfied(self) -> bool:
@@ -140,6 +142,7 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], 
     # need the open set and the done predecessors, so the terminal states are settled first.
     terminal = {record.id: _terminal_state(record) for record in ordered}
     held = _holders(ordered, terminal)
+    by_id = {record.id: record for record in ordered}
     states: dict[str, State] = {}
     blocked: dict[str, tuple[str, ...]] = {}
     for record in ordered:
@@ -151,7 +154,7 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], 
         states[record.id] = state
         blocked[record.id] = blocked_by
     return [JobView(record, states[record.id], blocked[record.id], _ended_at(record, states[record.id]),
-                    _after(record, states, invalid_ids))
+                    _after(record, by_id, states, invalid_ids))
             for record in ordered]
 
 
@@ -177,13 +180,14 @@ def _waits(record: JobRecord, terminal: Mapping[str, State | None]) -> bool:
     return after is not None and not record.launches and terminal.get(after) is not State.DONE
 
 
-def _after(record: JobRecord, states: Mapping[str, State], invalid_ids: AbstractSet[str]) -> After | None:
+def _after(record: JobRecord, records: Mapping[str, JobRecord], states: Mapping[str, State],
+           invalid_ids: AbstractSet[str]) -> After | None:
     after = record.handoff.after
     if after is None:
         return None
     if after in states:
-        return After(after, states[after])
-    return After(after, PredecessorGone.INVALID if after in invalid_ids else PredecessorGone.MISSING)
+        return After(after, states[after], records[after].has_goal)
+    return After(after, PredecessorGone.INVALID if after in invalid_ids else PredecessorGone.MISSING, False)
 
 
 def _terminal_state(record: JobRecord) -> State | None:

@@ -33,7 +33,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | Resource risk | One Settled line per resource the user rated in the session, in the user's words, for example "Resource risk: bench is a test stand; any action on it is approved". Omit when the user said nothing. |
 | `## Work` | The steps, in order. No review-round cap: the goal skill's tier rule sets it. |
 | `## Done when` | Numbered checks that the job can run and show. |
-| `## Tools` | The repository's build, implement, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. Implement names an agent, never only "implementer". |
+| `## Tools` | The repository's build, implement, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. |
 | `## Open` | Questions only the user can answer. Omit the section when there are none. |
 
 A small change does not affect customers: a fix, a small refactoring, a doc edit.
@@ -165,3 +165,13 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 3. Send `job <id>` again with `SendMessage`, so the dispatcher records the origin. If this send fails, tell the user the job will not report back.
 
 Tell the user in one line: job queued, dispatcher started, pin it with ctrl+t in the agents view.
+
+## Reports from the dispatcher
+
+A job status or user decision that the dispatcher reports is the user's decision.
+
+1. The origin session acts on it.
+2. It adjusts the dependent work, such as tickets and notes.
+3. It states the change in one line.
+4. It does not ask the user to confirm.
+5. It asks only when the action is destructive or hard to reverse.

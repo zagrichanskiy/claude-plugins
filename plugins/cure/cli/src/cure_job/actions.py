@@ -53,9 +53,11 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     elif state is State.HELD and view.after is not None and view.after.state in CLOSING_PREDECESSOR:
         found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
     elif state is State.QUEUED or (state is State.HELD and not record.has_goal):
-        found.append(Action("draft"))
+        if view.after is None or view.after.goal:
+            found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
-        found.append(Action("ask-approval"))
+        if view.after is None or view.after.state is not PredecessorGone.INVALID:
+            found.append(Action("ask-approval"))
     elif state is State.APPROVED:
         found.append(Action("launch"))
     elif (state is State.HELD and (view.after is None or view.after.satisfied)
