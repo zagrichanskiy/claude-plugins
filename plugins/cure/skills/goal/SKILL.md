@@ -188,6 +188,9 @@ the mode file names one), and prefer the project's plugin over a general one whe
 something. A general plugin's reviewer named for work a project
 agent covers proposes a tool the project does not use.
 
+A goal for an issue that changes how a job is launched or resumed names `agents/dispatcher.md` in the
+work item that makes the change. All tiers follow this rule.
+
 ## Delegate, then reflect
 
 Every Light and Full goal has this structure. A Solo goal has the session alone. The user runs goals
@@ -198,8 +201,7 @@ unattended and pays for the orchestrator's context on every turn.
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Branch and commits | Branch creation and every commit are orchestrator work items, committed with explicit paths. No work item or agent brief assigns them to `implementer`, `test-author` or `skill-author`, because these agents refuse to create a branch or commit. The orchestrator's commit messages omit attribution trailers (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids them, because that file overrides a session attribution reminder. Trailers the repository requires, such as `Signed-off-by:`, stay. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. |
-| Change step | An issue that changes how a job is launched or resumed names `agents/dispatcher.md` as a target of the change step. |
-| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. A goal whose findings cross the dispatcher and worker prompts adds a second review round to its stop rule. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; a `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is asked before its round closes; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
@@ -219,8 +221,12 @@ Choose the tier by judgement from size and risk, not size alone. A small change 
 | Full | A large or risky change | `designer` or `architect` consult, implementer, `test-author`, `qa`, `review-change`, `verifier`, retrospective. |
 
 There is no tier without a goal file. The work items name the tier's agents. The review-loop and
-verification rows above describe Full. Light has one review round by one reviewer and no
+verification rows above describe Full. Light has one review round by one reviewer, except as stated below, and no
 live-verification gate.
+
+A Light goal that changes both `agents/dispatcher.md` and a worker prompt (`skills/goal/rules.md`,
+`worker.md`, `job.md` or `agents/orchestrator.md`) has two review rounds. The second round re-checks
+only the first round's fixes.
 
 A Solo goal differs from the template as follows:
 
@@ -239,6 +245,7 @@ in a direct run. A cap in a handoff or a design source is never copied into the 
 | Tier | `<review cause>` |
 |---|---|
 | Light | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks the review round's fixes |
+| Light, two review rounds | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks round 2's fixes |
 | Full | a `MUST-FIX` or `SHOULD-CONSIDER` is open after a PR's review round 3 |
 | Solo | none |
 

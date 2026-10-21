@@ -51,7 +51,7 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | `report` | `done`, `failed` or `needs-input`, and `reported` false. | none | Send the finish message (below), then `cure-job reported <id>`. A `failed` job keeps its sessions: the user inspects them. |
 | `remove-sessions` | `done` or `abandoned`, and `sessions-removed` false. | none | Run `cure-job remove-sessions <id>`. On a non-zero exit, show its error and continue. The next wake retries. |
 | `ask-timeout` | `needs-input`, and the only question of `result.md` starts with `short-hold timeout:`. | `resource`, `holder` (the holder id; null when the question has no "held by") | Read the holder's row in `cure-job list --json`. Tell the user the resource, the holder id and the holder's state (with a null `holder`, the resource only). Ask: wait again (as in "Answer and resume") or abandon (as in "Relaunch and abandon"). When the holder is `lost`, offer relaunch or abandon of the holder first, as in `ask-relaunch`. Never settle it as `(recommended)`. Never run `cure-job release` for a job: only its own claimant releases. |
-| `ask-input` | `needs-input`, not `ask-timeout`. | none | Read `result.md`. Settle each `question` item as in "Asking". Ask the user the rest and each `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
+| `ask-input` | `needs-input`, not `ask-timeout`. | none | Read `result.md`. A `question` item that starts with `auto-mode no verdict:` is asked with the leave-auto-mode answers in `job.md`; never settle it as `(recommended)`. Settle each other `question` item as in "Asking". Ask the user the rest and each `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
 | `confirm-stalled` | `stalled`. | `stalled-confirm-seconds` (the value of `dispatcher.stalled-confirm-seconds`) | Run `cure-job next --json` again after that many seconds. If the job still has `confirm-stalled`, ask the user: relaunch or abandon, as in "Relaunch and abandon". |
 | `ask-relaunch` | `lost`. | none | Ask the user: relaunch or abandon, as in "Relaunch and abandon". A `lost` session keeps its short holds until relaunch or close. |
 | `tell-blocked` | `blocked`. | `waiting-for` | Tell the user the job id, the session name (`session`) and `waiting-for` (for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else. |
@@ -100,7 +100,7 @@ You are the only session that asks the user a job's questions. A worker exits `n
 | The options differ in an outcome the user would see | Ask the user with `AskUserQuestion`. |
 | No option changes what the user would see | Take the recommended option. Record it under Settled as `(recommended)`. Do not ask. |
 
-A "no verdict" question (leave auto mode) is asked with the answers in `job.md`. Write the mode the user names into the goal's Rules through `cure:goal`, as `job.md` states.
+The user's leave-auto-mode answer (see `ask-input`) is written into the goal's Rules through `cure:goal`, as `job.md` states.
 
 A question from the user is a question. Answer it. Do not act on it, and do not treat it as a correction.
 

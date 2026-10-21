@@ -47,7 +47,7 @@ A Solo exit has (a) without `<rounds>` and `<review cause>`, then "(b) the `stat
 
 Say once when handing it over:
 
-- Run it in the mode its Rules state; without a Permission mode line, pair it with auto mode, or every unapproved tool call stops the goal for a permission prompt.
+- Run it in the mode its Rules state. Pair it with auto mode, or every unapproved tool call stops the goal for a permission prompt, also when a Permission mode line exists.
 - A rate limit does not clear a goal. Claude Code waits and continues. An exhausted credit balance,
   an auth failure, an unrecoverable context overflow and an unavailable model do clear it, with a
   warning; `/goal` again resumes.

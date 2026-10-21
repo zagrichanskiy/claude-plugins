@@ -102,9 +102,9 @@ A failed check is fixed, or asked about in the dispatcher's question round, befo
 | Check | How | On failure |
 |---|---|---|
 | Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
-| Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
+| Permissions | Auto mode: for each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. When the goal's Rules state a non-auto permission mode (for example `acceptEdits`): the same for every command prefix the work items run, each needing an allow rule. See the list below. | No rule allows the action or prefix: ask the user. |
 | Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user. See the answers below. |
-| Trust | For each work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory, the work item names the directory as a literal absolute path. Read `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json` for the path and each ancestor. | No such entry is `true`: move the directory under a trusted ancestor. Ask the user to trust it only for a fixed directory that exists. |
+| Trust | For each work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory, the work item names the directory as a literal absolute path; any other path fails the check, and the dispatcher, through `cure:goal`, rewrites the work item to a literal path under a trusted ancestor. Read `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json` for the path and each ancestor. | No such entry is `true`: move the directory under a trusted ancestor. Ask the user to trust it only for a fixed directory that exists. |
 | Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
 
 The worker starts in the handoff's first repository. It loads these permission rules:
@@ -133,8 +133,11 @@ The question to leave auto mode (an agent's "no verdict") offers these answers:
 
 | Answer | Effect |
 |---|---|
-| Leave auto mode | `cure-job resume <id> -- --permission-mode <mode>` with the mode the user names, or `cure-job launch` with it when the session is gone. Write the mode into the goal's Rules "Permission mode" line through `cure:goal`, so later runs pass it. |
+| `acceptEdits` (recommended) | File edits pass. Other tools need allow rules. |
+| `default` | Every unapproved tool call stops the job. |
 | Stay in auto mode | The run is accepted to stop at `needs-input` again. |
+
+A mode the user chooses is written into the goal's Rules "Permission mode" line, and every later launch, resume and relaunch passes it. The procedure is in `dispatcher.md` "Answer and resume" and "Relaunch and abandon".
 
 The question for a failed Repository check offers these answers:
 
@@ -204,7 +207,7 @@ with outcome `failed`", the report clause as (c) and the final-message clause as
 
 `cure-job launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session without `--agent`. The goal file does not name the agent.
 
-The dispatcher applies the goal's Rules "Permission mode" line: it runs `cure-job launch <id> -- --permission-mode <mode>`, and `cure-job resume <id> -- --permission-mode <mode>` after `needs-input`.
+The dispatcher passes the goal's Rules "Permission mode" line on every launch, resume and relaunch, as `dispatcher.md` states.
 
 Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
 
