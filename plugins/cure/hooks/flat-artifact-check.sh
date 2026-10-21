@@ -4,6 +4,7 @@
 # where a check can stop the text before anyone reads it. Code spans and fenced blocks are skipped,
 # so quoting a pattern is not a violation.
 payload=$(cat)
+commit=
 
 tool=$(printf '%s' "$payload" | jq -r '.tool_name // ""')
 
@@ -12,6 +13,7 @@ case "$tool" in
     command=$(printf '%s' "$payload" | jq -r '.tool_input.command // ""')
     printf '%s' "$command" | grep -Eq 'git([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)*[[:space:]]+commit|gh[[:space:]]+(pr|issue)[[:space:]]+(create|edit|comment)' \
       || exit 0
+    printf '%s' "$command" | grep -Eq 'git([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)*[[:space:]]+commit' && commit=1
     text=$command
     # A message passed by file: `git commit -F <file>`, `gh ... --body-file <file>`.
     for file in $(printf '%s' "$command" | perl -ne 'print "$1\n" while /(?:\s-F|--body-file|--file)[=\s]+(\S+)/g'); do
@@ -28,9 +30,14 @@ $(cat "$file")"
     ;;
 esac
 
-findings=$(printf '%s' "$text" | perl -0777 -ne '
+findings=$(printf '%s' "$text" | COMMIT=$commit perl -0777 -ne '
   s/```.*?```//gs;
   s/`[^`\n]*`//g;
+  # In a commit message, a work-item number, step number or step range is a reference.
+  if ($ENV{COMMIT}) {
+    s/\bwork\s+items?\s+#?\d+(?:\.\d+)?//gi;
+    s/\bsteps?\s+\d+(?:-\d+)?//gi;
+  }
   # An identifier with a number must carry its name in parentheses right after it.
   while (/\b((?:item|task|control|question|section|requirement|epic|milestone|step)s?\s+#?\d+(?:\.\d+)?|(?:RND|OPS|SEC)-\d+|(?:PR|issue)\s+#\d+)(?![\d.])(?!\s*\()/gi) {
     print "bare identifier: $1\n";
