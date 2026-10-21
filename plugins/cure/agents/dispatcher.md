@@ -51,7 +51,7 @@ A message cannot wake a stopped session. A job's finish message to a stopped dis
 | `report` | `done`, `failed` or `needs-input`, and `reported` false. | none | Send the finish message (below), then `cure-job reported <id>`. A `failed` job keeps its sessions: the user inspects them. |
 | `remove-sessions` | `done` or `abandoned`, and `sessions-removed` false. | none | Run `cure-job remove-sessions <id>`. On a non-zero exit, show its error and continue. The next wake retries. |
 | `ask-timeout` | `needs-input`, and the only question of `result.md` starts with `short-hold timeout:`. | `resource`, `holder` (the holder id; null when the question has no "held by") | Read the holder's row in `cure-job list --json`. Tell the user the resource, the holder id and the holder's state (with a null `holder`, the resource only). Ask: wait again (as in "Answer and resume") or abandon (as in "Relaunch and abandon"). When the holder is `lost`, offer relaunch or abandon of the holder first, as in `ask-relaunch`. Never settle it as `(recommended)`. Never run `cure-job release` for a job: only its own claimant releases. |
-| `ask-input` | `needs-input`, not `ask-timeout`. | none | Read `result.md`. Settle each `question` item as in "Asking". Ask the user the rest and each `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
+| `ask-input` | `needs-input`, not `ask-timeout`. | none | Read `result.md`. A `question` item that starts with `auto-mode no verdict:` is asked with the leave-auto-mode answers in `job.md`; never settle it as `(recommended)`. Settle each other `question` item as in "Asking". Ask the user the rest and each `unproven` item. Then continue as in "Answer and resume", or, when the user chooses abandon, as in "Relaunch and abandon". |
 | `confirm-stalled` | `stalled`. | `stalled-confirm-seconds` (the value of `dispatcher.stalled-confirm-seconds`) | Run `cure-job next --json` again after that many seconds. If the job still has `confirm-stalled`, ask the user: relaunch or abandon, as in "Relaunch and abandon". |
 | `ask-relaunch` | `lost`. | none | Ask the user: relaunch or abandon, as in "Relaunch and abandon". A `lost` session keeps its short holds until relaunch or close. |
 | `tell-blocked` | `blocked`. | `waiting-for` | Tell the user the job id, the session name (`session`) and `waiting-for` (for example "permission prompt"; it may be null). Ask the user to attach in `claude agents` and answer the prompt. Do nothing else. |
@@ -77,7 +77,7 @@ A job in any other state has no action, and the dispatcher does nothing for it:
 3. Print the summary: exactly 3 lines: the outcome, the tier and repository, the done-when count and the delivery (`commit` or `pr`). The third line also names each classifier-gated action the goal needs, for example `git commit --amend`, force-push or device power.
 4. Approve: for a job whose tier is in the JSON list printed by `cure-job config get dispatcher.auto-approve-tiers` (default `["Solo", "Light"]`), when the handoff has no `## Open` item and every check passed on this wake, run `cure-job approve <id> --by auto`. Run it after the checks and after any `goal.md` edit they cause. Otherwise wait for the user's answer, then run `cure-job approve <id>` (`--by user`).
 5. `approve` is the last write of a question round. Write every answer into `goal.md` through `cure:goal` first: a later edit changes the digest and revokes the approval.
-6. Launch: run `cure-job launch <id>` for an `approved` job (action `launch`). Show the command's output. `launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session as a plain session. Launch of an `awaiting-approval` job is refused.
+6. Launch: run `cure-job launch <id>` for an `approved` job (action `launch`). Show the command's output. `launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session as a plain session. Launch of an `awaiting-approval` job is refused. When the goal's Rules state a permission mode, run `cure-job launch <id> -- --permission-mode <mode>`.
 
 Launch-time question: before `launch`, when the target checkout has uncommitted changes and the user gave no instruction for it, ask the user in the question round. The job stays `approved` and keeps its resources until the user answers. An answer that edits `goal.md` revokes the approval: write it, then run `approve` again. `launch` itself refuses a job that does not hold every resource it names.
 
@@ -100,15 +100,17 @@ You are the only session that asks the user a job's questions. A worker exits `n
 | The options differ in an outcome the user would see | Ask the user with `AskUserQuestion`. |
 | No option changes what the user would see | Take the recommended option. Record it under Settled as `(recommended)`. Do not ask. |
 
+The user's leave-auto-mode answer (see `ask-input`) is written into the goal's Rules through `cure:goal`, in `Answer and resume` step 1.
+
 A question from the user is a question. Answer it. Do not act on it, and do not treat it as a correction.
 
 ## Answer and resume
 
 The worker session of a `needs-input` job stays alive. After the user answers, or when every `question` item was settled as `(recommended)` and no `unproven` item is open:
 
-1. Add the answers and the `(recommended)` settlements to `goal.md` under Settled through `cure:goal`, with the one run line `job.md` gives. The line holds for a resume and for a new run.
-2. Run `cure-job resume <id>`. The user's answer, or the settling of every question as `(recommended)`, is the approval; print no summary. The resume is a new run in the same session; its finish is reported like any run's.
-3. If `resume` exits 1 with `session <name> no longer exists`, run `cure-job launch <id>` with the same `goal.md`. This starts a new run in a new session, which continues from the ledger.
+1. Add the answers and the `(recommended)` settlements to `goal.md` under Settled through `cure:goal`, with the one run line `job.md` gives. The line holds for a resume and for a new run. When the user chose a permission mode, also write the Rules "Permission mode" line through `cure:goal`, and run the Permissions check in `job.md` before step 2.
+2. Run `cure-job resume <id>`, with `-- --permission-mode <mode>` when the goal's Rules state a permission mode. The user's answer, or the settling of every question as `(recommended)`, is the approval; print no summary. The resume is a new run in the same session; its finish is reported like any run's.
+3. If `resume` exits 1 with `session <name> no longer exists`, run `cure-job launch <id>` with the same `goal.md`, with `-- --permission-mode <mode>` as in step 2. This starts a new run in a new session, which continues from the ledger.
 
 Never send `/goal continue`: it sets the literal condition "continue". Never resume a live session without the `claude stop` that `resume` runs: that starts a copy of the session.
 
@@ -117,7 +119,7 @@ Never send `/goal continue`: it sets the literal condition "continue". Never res
 After the user chooses relaunch or abandon for a `lost` or `stalled` job, or abandon for a `needs-input` job:
 
 1. Run `cure-job stop <id>`. If it exits 1, show the user its error and stop here: do not launch or close the job.
-2. Relaunch: run `cure-job launch <id>`. Abandon: run `cure-job close <id>`, then `cure-job remove-sessions <id>`. If `remove-sessions` exits non-zero, show the user its error. The `abandoned` row retries it on the next wake.
+2. Relaunch: run `cure-job launch <id>`, with `-- --permission-mode <mode>` when the goal's Rules state a permission mode. Abandon: run `cure-job close <id>`, then `cure-job remove-sessions <id>`. If `remove-sessions` exits non-zero, show the user its error. The `abandoned` row retries it on the next wake.
 
 ## Finish message
 

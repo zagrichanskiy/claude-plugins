@@ -96,14 +96,15 @@ A job goal's Waiting line reads: "Waiting: never waits; takes the `needs-input:`
 
 ## Checks before launch
 
-The dispatcher runs the Repository check before writing `<job>/goal.md`, because the ledger path and the Permissions check depend on the first repository. It runs the other checks after writing it. All run again on every wake before a launch.
+The dispatcher runs the Repository check before writing `<job>/goal.md`, because the ledger path and the Permissions check depend on the first repository. It runs the other checks after writing it. All run again on every wake before a launch. The Permissions check also runs before a resume whose permission mode changed.
 A failed check is fixed, or asked about in the dispatcher's question round, before launch.
 
 | Check | How | On failure |
 |---|---|---|
 | Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
-| Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
+| Permissions | Auto mode: for each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. When the goal's Rules state a non-auto permission mode: the same for every tool the mode does not pass, each needing an allow rule. Under `acceptEdits` these are Bash command prefixes and MCP tools. Under `default` they also include Edit and Write. See the list below. | No rule allows the action or prefix: ask the user. |
 | Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user. See the answers below. |
+| Trust | For each work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory, the work item names the directory as a literal absolute path; any other path fails the check, and the dispatcher, through `cure:goal`, rewrites the work item to a literal path under a trusted ancestor. Read `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json` for the path and each ancestor. | No such entry is `true`: move the directory under a trusted ancestor. Ask the user to trust it only for a fixed directory that exists. |
 | Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
 
 The worker starts in the handoff's first repository. It loads these permission rules:
@@ -126,7 +127,17 @@ for a failed permission check offers these answers:
 |---|---|
 | The user adds an allow rule | The check runs again. |
 | Drop the action | `goal.md` is edited through `cure:goal`. The check runs again. |
-| Launch anyway | The run is accepted to stop at `needs-input` when the classifier denies the action. |
+| Launch anyway | Auto mode: the run is accepted to stop at `needs-input` when the classifier denies the action. Other modes: an unallowed tool opens a permission prompt and the job becomes `blocked` (`tell-blocked` in `dispatcher.md`). |
+
+The question to leave auto mode (an agent's "no verdict") offers these answers:
+
+| Answer | Effect |
+|---|---|
+| `acceptEdits` (recommended) | File edits pass. Other tools need allow rules. |
+| `default` | Every unapproved tool call stops the job. |
+| Stay in auto mode | The run is accepted to stop at `needs-input` again. |
+
+A mode the user chooses is written into the goal's Rules "Permission mode" line, and every later launch, resume and relaunch passes it. The dispatcher writes it in `dispatcher.md` "Answer and resume" step 1; "Relaunch and abandon" passes it.
 
 The question for a failed Repository check offers these answers:
 
@@ -196,8 +207,10 @@ with outcome `failed`", the report clause as (c) and the final-message clause as
 
 `cure-job launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session without `--agent`. The goal file does not name the agent.
 
+The dispatcher passes the goal's Rules "Permission mode" line on every launch, resume and relaunch, as `dispatcher.md` states.
+
 Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
 
 ```
-<plugin-root>/bin/cure-job launch <id>
+<plugin-root>/bin/cure-job launch <id> [-- --permission-mode <mode>]
 ```

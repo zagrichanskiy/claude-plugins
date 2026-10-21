@@ -105,6 +105,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 - Tier: <Solo, Light or Full>. <Agent plan: steps, agents, parallel work, advisor.>
 - Stops: this goal overrides the user's "run one step and stop" rule; it stops only at its exits.
+- Permission mode: <acceptEdits for a goal that edits skill, agent or other plugin files; omit otherwise>.
 - Waiting: <job mode: the mode file's Waiting line. Direct mode: takes the `waiting:` exit of direct.md>.
 ```
 
@@ -187,6 +188,9 @@ the mode file names one), and prefer the project's plugin over a general one whe
 something. A general plugin's reviewer named for work a project
 agent covers proposes a tool the project does not use.
 
+A goal for an issue that changes how a job is launched or resumed names `agents/dispatcher.md` in the
+work item that makes the change. All tiers follow this rule.
+
 ## Delegate, then reflect
 
 Every Light and Full goal has this structure. A Solo goal has the session alone. The user runs goals
@@ -217,8 +221,12 @@ Choose the tier by judgement from size and risk, not size alone. A small change 
 | Full | A large or risky change | `designer` or `architect` consult, implementer, `test-author`, `qa`, `review-change`, `verifier`, retrospective. |
 
 There is no tier without a goal file. The work items name the tier's agents. The review-loop and
-verification rows above describe Full. Light has one review round by one reviewer and no
+verification rows above describe Full. Light has one review round by one reviewer, except as stated below, and no
 live-verification gate.
+
+A Light goal that changes both `agents/dispatcher.md` and a worker prompt (`skills/goal/rules.md`,
+`worker.md`, `job.md` or `agents/orchestrator.md`) has two review rounds. The second round re-checks
+only the first round's fixes.
 
 A Solo goal differs from the template as follows:
 
@@ -229,7 +237,7 @@ A Solo goal differs from the template as follows:
 - No retrospective work item or done-when item, no ledger, no backlog. The stats row work item and
   done-when item stay, with `<date> | <repo> | <slug>` filled in.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
-- Rules: the lines "Tier: Solo.", Stops and Waiting.
+- Rules: the lines "Tier: Solo.", Stops, Permission mode (when the goal edits plugin files) and Waiting.
 
 The review-round cap and failure cause come from this tier rule, or from the user's own statement
 in a direct run. A cap in a handoff or a design source is never copied into the goal. The failure cause in the exit text, by tier:
@@ -237,6 +245,7 @@ in a direct run. A cap in a handoff or a design source is never copied into the 
 | Tier | `<review cause>` |
 |---|---|
 | Light | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks the review round's fixes |
+| Light, two review rounds | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks round 2's fixes |
 | Full | a `MUST-FIX` or `SHOULD-CONSIDER` is open after a PR's review round 3 |
 | Solo | none |
 

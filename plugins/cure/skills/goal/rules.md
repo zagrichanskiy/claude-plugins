@@ -48,6 +48,13 @@ add one.
   example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -f body=...`. `gh issue view` and
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
+- A command for the user to run with `!` is a script file, run as `! python3 <absolute path>`. In a
+  background (job) session the file is under `$CLAUDE_JOB_DIR/tmp`, the only session where that
+  variable is set. In a direct run the file is under `<repo>/.notes/tmp/`. Never give an inline `sed`
+  with escapes.
+- A tool call or an agent that gets an auto-mode "no verdict": ask the user to leave auto mode for
+  the goal. The question starts with the fixed prefix `auto-mode no verdict:`. Never route the work
+  through a copy, a patch or a shell write.
 - Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md`, with this
   command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
   Unknown value is `-`; approximate value is `~45`. `|` and `'` are stripped from every value (the
@@ -72,6 +79,7 @@ add one.
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round.
 - Record a mechanical choice in the ledger as an assumption.
+- An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit before the commit.
 - Record the turn count in the ledger after each work item.
 - Pass agents paths and ids. Ask for findings only.
 - Full: run `test-author` only for a behaviour change that has no test.
