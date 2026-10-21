@@ -365,3 +365,11 @@ def test_next_withholds_draft_from_a_successor_of_an_invalid_predecessor(h, tmp_
     succ = h.new(tmp_path, repos=(Y,), after=pred)
     corrupt(h, pred)
     assert succ not in next_actions(h)
+
+
+def test_next_gives_no_ask_approval_to_an_unapproved_goal_successor_of_an_invalid_predecessor(h, tmp_path):
+    pred = h.new(tmp_path, repos=(X,))
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    goal_file(h, succ).write_text("goal", encoding="utf-8")
+    corrupt(h, pred)
+    assert succ not in next_actions(h)

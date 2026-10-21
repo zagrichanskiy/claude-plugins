@@ -135,23 +135,21 @@ def successor(*, goal=False, approved=False, **kwargs):
     return replace(record, handoff=Handoff(record.handoff.repos, Device.NONE, after=A))
 
 
-def successor_names(record, predecessors=(), invalid=frozenset(), after_goal=False):
+def successor_names(record, predecessors=(), invalid=frozenset()):
     view = {v.record.id: v for v in derive([*predecessors, record], {}, NOW, invalid)}[B]
-    return [action.name for action in actions(view, {}, after_goal=after_goal)]
+    return [action.name for action in actions(view, {})]
 
 
-def test_job_without_after_gets_draft_whatever_after_goal_says():
+def test_job_without_after_gets_draft():
     assert names(make_record(A)) == ["draft"]
-    view = derive([make_record(A)], {}, NOW, frozenset())[0]
-    assert [a.name for a in actions(view, {}, after_goal=False)] == ["draft"]
 
 
 def test_held_job_after_a_predecessor_without_a_goal_gets_no_draft():
-    assert successor_names(successor(), [make_record(A)], after_goal=False) == []
+    assert successor_names(successor(), [make_record(A)]) == []
 
 
 def test_held_job_after_a_predecessor_with_a_goal_gets_draft():
-    assert successor_names(successor(), [make_record(A, goal=True)], after_goal=True) == ["draft"]
+    assert successor_names(successor(), [make_record(A, goal=True)]) == ["draft"]
 
 
 def test_held_job_with_an_unapproved_goal_after_a_valid_predecessor_gets_ask_approval():

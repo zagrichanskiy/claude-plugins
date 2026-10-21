@@ -33,7 +33,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | Resource risk | One Settled line per resource the user rated in the session, in the user's words, for example "Resource risk: bench is a test stand; any action on it is approved". Omit when the user said nothing. |
 | `## Work` | The steps, in order. No review-round cap: the goal skill's tier rule sets it. |
 | `## Done when` | Numbered checks that the job can run and show. |
-| `## Tools` | The repository's build, implement, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. Implement names an agent, never only "implementer". |
+| `## Tools` | The repository's build, implement, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. |
 | `## Open` | Questions only the user can answer. Omit the section when there are none. |
 
 A small change does not affect customers: a fix, a small refactoring, a doc edit.
