@@ -1,7 +1,9 @@
 """``config.json``: the key table, the built-in defaults and the validation.
 
-The file is one flat JSON object keyed by the dotted names of :data:`DEFAULTS`.
-A missing file means every default. A key in error takes its default and is
+The file is a JSON object of groups, each an object of keys:
+``{"handoff": {"delivery": "pr"}}``. Internally every key goes by its dotted
+name in :data:`DEFAULTS` (``handoff.delivery``); a key without a dot sits at the
+top level. A missing file means every default. A key in error takes its default and is
 reported as a :class:`Problem`; :class:`~cure_job.cli.Cli` decides whether a
 problem stops the command.
 """
@@ -22,7 +24,6 @@ TIERS = ("Solo", "Light", "Full")
 
 DEFAULTS: dict[str, object] = {
     "handoff.delivery": "commit",
-    "handoff.base": "main",
     "handoff.branch": "new",
     "handoff.resource-risk": [],
     "dispatcher.auto-approve-tiers": ["Solo", "Light"],
@@ -37,6 +38,12 @@ DEFAULTS: dict[str, object] = {
 }
 
 
+GROUPS = tuple(dict.fromkeys(key.split(".")[0] for key in DEFAULTS if "." in key))
+
+#: Removed keys by (group, name), and why.
+REMOVED = {("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch"}
+
+
 class ConfigError(CureJobError):
     """``config init`` cannot write ``config.json``."""
 
@@ -48,7 +55,9 @@ class Problem:
     problem: str
 
     def __str__(self) -> str:
-        return f"{FILE}: {self.key}: {self.problem}" if self.key else f"{FILE}: {self.problem}"
+        if self.key:
+            return f"{FILE}: {self.key}: {self.problem}"
+        return f"{FILE}: {self.problem}"
 
 
 @dataclass(frozen=True)
@@ -78,18 +87,53 @@ def load(root: Path) -> Config:
 
 
 def validate(data: dict) -> Config:
+    """Validate the nested form of ``config.json``."""
     values = dict(DEFAULTS)
-    problems = []
+    problems: list[Problem] = []
     for key, value in data.items():
-        if key not in DEFAULTS:
-            problems.append(Problem(key, "unknown key"))
-            continue
-        problem = _CHECKS[key](value)
-        if problem:
-            problems.append(Problem(key, problem))
+        if key in GROUPS:
+            if isinstance(value, dict):
+                for name, item in value.items():
+                    _check(f"{key}.{name}", item, values, problems)
+            else:
+                problems.append(Problem(key, f"group is not a JSON object, got {json.dumps(value)}"))
+        elif "." in key and key in DEFAULTS:
+            group, name = key.split(".", 1)
+            problems.append(Problem(key, f'flat key; write it as {{"{group}": {{"{name}": ...}}}}'))
         else:
-            values[key] = value
+            _check(key, value, values, problems)
     return Config(values, tuple(problems))
+
+
+def nest(values: dict[str, object]) -> dict[str, object]:
+    """Return the dotted ``values`` in the nested form of ``config.json``."""
+    nested: dict[str, object] = {}
+    for key, value in values.items():
+        if "." in key:
+            group, name = key.split(".", 1)
+            nested.setdefault(group, {})[name] = value
+        else:
+            nested[key] = value
+    return nested
+
+
+def _check(key: str, value: object, values: dict[str, object], problems: list[Problem]) -> None:
+    if problem := removed(key):
+        if problem not in problems:
+            problems.append(problem)
+    elif key not in DEFAULTS:
+        problems.append(Problem(key, "unknown key"))
+    elif problem := _CHECKS[key](value):
+        problems.append(Problem(key, problem))
+    else:
+        values[key] = value
+
+
+def removed(key: str) -> Problem | None:
+    """The problem for a removed dotted ``key``, reported under its group; ``None`` when ``key`` is not removed."""
+    group, _, name = key.partition(".")
+    reason = REMOVED.get((group, name))
+    return Problem(group, f'"{name}" is removed; {reason}') if reason else None
 
 
 def _int_range(low: int, high: int) -> Callable[[object], str | None]:
@@ -136,7 +180,6 @@ def _risks(value: object) -> str | None:
 
 _CHECKS: dict[str, Callable[[object], str | None]] = {
     "handoff.delivery": _delivery,
-    "handoff.base": _branch,
     "handoff.branch": _branch,
     "handoff.resource-risk": _risks,
     "dispatcher.auto-approve-tiers": _tiers,
@@ -151,17 +194,21 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
 }
 
 #: The ``defaults.md`` keys whose rows hold one scalar, and their ``config.json`` keys.
-_OLD_SCALARS = {"delivery": "handoff.delivery", "base": "handoff.base", "branch": "handoff.branch"}
+_OLD_SCALARS = {"delivery": "handoff.delivery", "branch": "handoff.branch"}
 
 
-def init(root: Path) -> Path:
-    """Write ``config.json`` from the defaults and ``defaults.md``, then rename ``defaults.md``."""
+def init(root: Path, notice: Callable[[str], None]) -> Path:
+    """Write ``config.json`` from the defaults and ``defaults.md``, then rename ``defaults.md``.
+
+    ``notice`` receives one line for each ``defaults.md`` row that is dropped.
+    """
     path, old = root / FILE, root / OLD_FILE
     if path.exists():
         raise ConfigError(f"{path} exists")
     data: dict[str, object] = dict(DEFAULTS)
     if old.exists():
-        data.update(_from_defaults_md(old))
+        data.update(_from_defaults_md(old, notice))
+    data = nest(data)
     problems = validate(data).problems
     if problems:
         raise ConfigError(f"{old}: " + "; ".join(f"{p.key}: {p.problem}" for p in problems))
@@ -176,7 +223,7 @@ def init(root: Path) -> Path:
     return path
 
 
-def _from_defaults_md(path: Path) -> dict[str, object]:
+def _from_defaults_md(path: Path, notice: Callable[[str], None]) -> dict[str, object]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError) as e:
@@ -210,6 +257,8 @@ def _from_defaults_md(path: Path) -> dict[str, object]:
         key, value, scope = cells
         if key == "resource risk":
             risks.append({"scope": scope, "text": value})
+        elif reason := REMOVED.get(("handoff", key)):
+            notice(f'{OLD_FILE}: handoff: "{key}" is removed; row dropped; {reason}')
         elif key in _OLD_SCALARS and scope == "all":
             found[_OLD_SCALARS[key]] = value
         else:

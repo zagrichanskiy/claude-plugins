@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 
 from .. import config
 from ..help import HelpFormatter, style
@@ -20,7 +21,7 @@ class ConfigCommand(Command):
         actions = parser.add_subparsers(dest="config_action", required=True)
         get = style(actions.add_parser("get", formatter_class=HelpFormatter, usage="cure-job config get [KEY]",
                                        help="print the effective configuration, or one value, as JSON"))
-        get.add_argument("key", metavar="KEY", nargs="?", help="a config.json key")
+        get.add_argument("key", metavar="KEY", nargs="?", help="a dotted config.json key, such as handoff.delivery")
         style(actions.add_parser("check", formatter_class=HelpFormatter, usage="cure-job config check",
                                  help="exit 1 when config.json has an error")).set_defaults(config_mode="strict")
         style(actions.add_parser("init", formatter_class=HelpFormatter, usage="cure-job config init",
@@ -29,13 +30,14 @@ class ConfigCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         if args.config_action == "init":
-            self.cli.out(str(config.init(jobs.store.root)))
+            self.cli.out(str(config.init(jobs.store.root, lambda line: print(line, file=sys.stderr))))
         elif args.config_action == "get":
             values = self.cli.config.values
             if args.key is None:
-                self.cli.out(json.dumps(values, separators=(",", ":")))
+                self.cli.out(json.dumps(config.nest(values), separators=(",", ":")))
             elif args.key in values:
                 self.cli.out(json.dumps(values[args.key]))
             else:
-                raise config.ConfigError(f"unknown key: {args.key}")
+                problem = config.removed(args.key)
+                raise config.ConfigError(f"{problem.key}: {problem.problem}" if problem else f"unknown key: {args.key}")
         return 0
