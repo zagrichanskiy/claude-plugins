@@ -347,3 +347,21 @@ def test_done_when_11_close_successor_replaces_draft_and_ask_approval(h, tmp_pat
     row = next_actions(h)[succ]
     assert row["state"] == "held"
     assert row["actions"] == ["close-successor"]
+
+
+def test_next_withholds_draft_from_a_successor_whose_predecessor_has_no_goal_until_it_has_one(h, tmp_path):
+    pred = h.new(tmp_path, repos=(X,))
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    found = next_actions(h)
+    assert found[pred]["actions"] == ["draft"]
+    assert succ not in found
+    goal_file(h, pred).write_text("goal", encoding="utf-8")
+    found = next_actions(h)
+    assert found[succ]["actions"] == ["draft"]
+
+
+def test_next_withholds_draft_from_a_successor_of_an_invalid_predecessor(h, tmp_path):
+    pred = h.new(tmp_path, repos=(X,))
+    succ = h.new(tmp_path, repos=(Y,), after=pred)
+    corrupt(h, pred)
+    assert succ not in next_actions(h)

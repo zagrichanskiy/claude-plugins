@@ -28,9 +28,11 @@ class NextCommand(Command):
         ranked = sorted([(lock_rank(view.record), view, job_row(view, listing.sessions)) for view in listing.views]
                         + [((False, job.id), None, invalid_row(job)) for job in listing.invalid],
                         key=lambda entry: entry[0])
+        goals = {view.record.id: view.record.has_goal for view in listing.views}
         elements = []
         for _, view, row in ranked:
-            found = actions(view, row, jobs.config)
+            after_goal = view is not None and view.after is not None and goals.get(view.after.id, False)
+            found = actions(view, row, jobs.config, after_goal)
             if found:
                 elements.append({**row, "actions": [action.name for action in found],
                                  "args": {action.name: dict(action.args) for action in found if action.args}})

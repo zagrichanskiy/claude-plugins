@@ -25,10 +25,12 @@ class Action:
     args: Mapping[str, object] = field(default_factory=dict)
 
 
-def actions(view: JobView | None, row: Mapping[str, object], config: Config = Config()) -> list[Action]:
+def actions(view: JobView | None, row: Mapping[str, object], config: Config = Config(),
+            after_goal: bool = False) -> list[Action]:
     """The actions of one job, in the order the dispatcher takes them.
 
     ``row`` is the job's ``list --json`` row. ``view`` is ``None`` for an invalid job.
+    ``after_goal`` is true when the job's ``after`` predecessor has a goal.
     """
     if view is None:
         return [Action("repair", {"problem": row["problem"]})]
@@ -53,9 +55,11 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     elif state is State.HELD and view.after is not None and view.after.state in CLOSING_PREDECESSOR:
         found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
     elif state is State.QUEUED or (state is State.HELD and not record.has_goal):
-        found.append(Action("draft"))
+        if view.after is None or after_goal:
+            found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
-        found.append(Action("ask-approval"))
+        if view.after is None or view.after.state is not PredecessorGone.INVALID:
+            found.append(Action("ask-approval"))
     elif state is State.APPROVED:
         found.append(Action("launch"))
     elif (state is State.HELD and (view.after is None or view.after.satisfied)

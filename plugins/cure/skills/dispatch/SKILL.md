@@ -165,3 +165,13 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 3. Send `job <id>` again with `SendMessage`, so the dispatcher records the origin. If this send fails, tell the user the job will not report back.
 
 Tell the user in one line: job queued, dispatcher started, pin it with ctrl+t in the agents view.
+
+## Reports from the dispatcher
+
+A job status or user decision that the dispatcher reports is the user's decision.
+
+1. The origin session acts on it.
+2. It adjusts the dependent work, such as tickets and notes.
+3. It states the change in one line.
+4. It does not ask the user to confirm.
+5. It asks only when the action is destructive or hard to reverse.

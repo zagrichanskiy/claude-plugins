@@ -1,6 +1,7 @@
 """``actions``: the dispatcher's action table, one test per row, from hand-built records."""
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -8,6 +9,7 @@ import pytest
 from cure_job.actions import STALLED_CONFIRM_SECONDS, Action, actions
 from cure_job.claude import SessionStatus
 from cure_job.events import Closed, Reported, SessionsRemoved
+from cure_job.handoff import Device, Handoff
 from cure_job.result import Result, ResultStatus
 from cure_job.state import State, derive
 from tests.builders import NOW, make_record, result_of
@@ -126,3 +128,39 @@ def test_shared_timeout_question_gets_ask_input(questions):
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), questions))
     assert names(record) == ["ask-input"]
+
+
+def successor(*, goal=False, approved=False, **kwargs):
+    record = make_record(B, goal=goal, approved=approved, **kwargs)
+    return replace(record, handoff=Handoff(record.handoff.repos, Device.NONE, after=A))
+
+
+def successor_names(record, predecessors=(), invalid=frozenset(), after_goal=False):
+    view = {v.record.id: v for v in derive([*predecessors, record], {}, NOW, invalid)}[B]
+    return [action.name for action in actions(view, {}, after_goal=after_goal)]
+
+
+def test_job_without_after_gets_draft_whatever_after_goal_says():
+    assert names(make_record(A)) == ["draft"]
+    view = derive([make_record(A)], {}, NOW, frozenset())[0]
+    assert [a.name for a in actions(view, {}, after_goal=False)] == ["draft"]
+
+
+def test_held_job_after_a_predecessor_without_a_goal_gets_no_draft():
+    assert successor_names(successor(), [make_record(A)], after_goal=False) == []
+
+
+def test_held_job_after_a_predecessor_with_a_goal_gets_draft():
+    assert successor_names(successor(), [make_record(A, goal=True)], after_goal=True) == ["draft"]
+
+
+def test_held_job_with_an_unapproved_goal_after_a_valid_predecessor_gets_ask_approval():
+    assert successor_names(successor(goal=True), [make_record(A)]) == ["ask-approval"]
+
+
+def test_held_job_with_an_unapproved_goal_after_an_invalid_predecessor_gets_no_ask_approval():
+    assert successor_names(successor(goal=True), invalid=frozenset({A})) == []
+
+
+def test_held_job_after_an_invalid_predecessor_gets_no_draft():
+    assert successor_names(successor(), invalid=frozenset({A})) == []

@@ -147,3 +147,4 @@ Never store job ids, statuses, session ids, answers, default values or lessons. 
 - Run `cure-job stop` only for the job the user chose to relaunch or abandon.
 - Never write to the job directory except `goal.md`, through `cure:goal`; the CLI owns the rest.
 - You have no `Agent` tool. Do the work through the skill and the CLI.
+- Put a rule that tells another session what to do into the message that session receives (the finish message, the `goal.md`). A rule only in this file does not reach it.
