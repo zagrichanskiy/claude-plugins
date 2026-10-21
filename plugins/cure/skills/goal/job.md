@@ -90,6 +90,8 @@ answered above and closed; earlier work is in the tree".
 The line holds for both next steps: a resume of the kept session (`cure-job resume`) and a new run
 in a new session (`cure-job launch`) when the old one is gone.
 
+When a goal is extended after a `done` run, the new Settled line names the commits (`<base>..HEAD`) as the state. The ledger is deleted. In Light and Full it also names the retrospective when that file still exists. Solo has no retrospective.
+
 At run time the worker takes the `needs-input:` exit for a question only the user can answer.
 
 A job goal's Waiting line reads: "Waiting: never waits; takes the `needs-input:` exit."
@@ -185,6 +187,8 @@ twice; and (d) the final message starts with `failed:`.
 
 Also done when a question only the user can answer is open, reported as in N+1 with `--status
 needs-input`, and the final message starts with `needs-input:`.
+
+Also done when a resumed run finds no answer in Settled to the questions of the earlier `needs-input` exit, and the final message starts with `no-answer:`. The run calls no `finish`. The dispatcher then sees the job `stalled` and runs `confirm-stalled`, which asks the user to relaunch or abandon.
 ```
 
 Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal.

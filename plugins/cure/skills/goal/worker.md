@@ -51,10 +51,13 @@ The dispatcher resumes this session after the user answers. It adds the answers 
 under Settled and sets the goal again with `/goal @<goal file>`. After the resume:
 
 1. Read this file and the goal file again.
-2. Take the answers from Settled. The questions of the earlier `needs-input:` exit are closed.
+2. Take the answers from Settled. When Settled holds an answer, the questions of the earlier
+   `needs-input:` exit are closed. When it holds none, print a final message starting with
+   `no-answer:` and exit at once without `finish`.
 3. Continue from the ledger, at the work item that stopped.
 
-The resume is a new run in this session. Its exit follows "Every exit, in order" again. When the
+The resume is a new run in this session. Its exit follows "Every exit, in order" again, except the
+`no-answer:` exit in step 2. When the
 session is gone, the dispatcher launches a new run in a new session. It also continues from the
 ledger.
 
