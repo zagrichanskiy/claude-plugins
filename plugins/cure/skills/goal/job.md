@@ -133,7 +133,7 @@ The question to leave auto mode (an agent's "no verdict") offers these answers:
 
 | Answer | Effect |
 |---|---|
-| Leave auto mode | `cure-job resume <id> -- --permission-mode <mode>` with the mode the user names, or `cure-job launch` with it when the session is gone. |
+| Leave auto mode | `cure-job resume <id> -- --permission-mode <mode>` with the mode the user names, or `cure-job launch` with it when the session is gone. Write the mode into the goal's Rules "Permission mode" line through `cure:goal`, so later runs pass it. |
 | Stay in auto mode | The run is accepted to stop at `needs-input` again. |
 
 The question for a failed Repository check offers these answers:
@@ -209,5 +209,5 @@ The dispatcher applies the goal's Rules "Permission mode" line: it runs `cure-jo
 Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
 
 ```
-<plugin-root>/bin/cure-job launch <id>
+<plugin-root>/bin/cure-job launch <id> [-- --permission-mode <mode>]
 ```

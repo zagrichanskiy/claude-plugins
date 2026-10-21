@@ -28,7 +28,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | `outcome` | One sentence. |
 | `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. A job with `after` and no `branch` inherits the predecessor's branch. |
 | `base`, `delivery` | Only when the user stated them. Otherwise omit the key; the configuration supplies it. `delivery` is `commit` or `pr`. |
-| `after` | Only when this job continues the work of an open job of the same stack (any state other than `done`, `failed` or `abandoned`): that job's id, one only. Otherwise omit the key. `cure-job new` refuses an id with no job. The successor stays `held` until the predecessor is `done`. |
+| `after` | Only when this job continues the work of an open job of the same stack (any state other than `done`, `failed` or `abandoned`): that job's id, one only. Otherwise omit the key. Set `after` only when the job builds on the predecessor's result. A job that only edits the same files gets no `after` and no stacked base, because the repository resource runs jobs one at a time. `cure-job new` refuses an id with no job. The successor stays `held` until the predecessor is `done`. |
 | `## Settled` | Decisions taken in the session, each with its reason. |
 | Resource risk | One Settled line per resource the user rated in the session, in the user's words, for example "Resource risk: bench is a test stand; any action on it is approved". Omit when the user said nothing. |
 | `## Work` | The steps, in order. No review-round cap: the goal skill's tier rule sets it. |
