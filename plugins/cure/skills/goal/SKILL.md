@@ -105,6 +105,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 
 - Tier: <Solo, Light or Full>. <Agent plan: steps, agents, parallel work, advisor.>
 - Stops: this goal overrides the user's "run one step and stop" rule; it stops only at its exits.
+- Permission mode: <acceptEdits or default; only a goal that edits plugin code>.
 - Waiting: <job mode: the mode file's Waiting line. Direct mode: takes the `waiting:` exit of direct.md>.
 ```
 

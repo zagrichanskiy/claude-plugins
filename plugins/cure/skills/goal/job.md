@@ -104,6 +104,7 @@ A failed check is fixed, or asked about in the dispatcher's question round, befo
 | Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
 | Permissions | For each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. See the list below. | No rule allows the action: ask the user. |
 | Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user. See the answers below. |
+| Trust | For each work item that launches `claude` in a directory the job creates, read `projects["<dir>"].hasTrustDialogAccepted` in `~/.claude.json`. | Not `true`: create the directory under a trusted path, or ask the user to trust it. |
 | Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
 
 The worker starts in the handoff's first repository. It loads these permission rules:
