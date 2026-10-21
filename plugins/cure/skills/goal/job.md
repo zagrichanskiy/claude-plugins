@@ -92,6 +92,8 @@ in a new session (`cure-job launch`) when the old one is gone.
 
 At run time the worker takes the `needs-input:` exit for a question only the user can answer.
 
+A job goal's Waiting line reads: "Waiting: never waits; takes the `needs-input:` exit."
+
 ## Checks before launch
 
 The dispatcher runs the Repository check before writing `<job>/goal.md`, because the ledger path and the Permissions check depend on the first repository. It runs the other checks after writing it. All run again on every wake before a launch.
