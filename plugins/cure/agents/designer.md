@@ -73,5 +73,5 @@ Ground rule 5 in `core.md` holds.
 
 These items add to the CONSULT output in `core.md`.
 
-- Give the file count, a line estimate per file with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate.
+- Give the file count, a line estimate per file counting changed lines (added plus deleted) with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate.
 - When a decision puts a setting in agent frontmatter, check that the key applies to a main-session agent.

@@ -42,8 +42,11 @@ Before writing a single test:
 - A lock gets one test that fails when the lock is removed from the critical
   section. Confirm the failure by removing the lock once (mutation check).
   This is the one exception to the rule against modifying the code under test.
-  Restore the lock, confirm `git diff -- <source file>` is empty, and report the
-  mutation result.
+  Before the mutation, record `sha256sum <source file>` or copy the file aside.
+  After it, restore the lock by editing and confirm the checksum or the copy
+  matches. Never run `git checkout`, `git restore` or `git stash` on a source
+  file: the code under test is usually uncommitted work that these commands
+  delete. Report the mutation result.
 - A format change updates the tests that pin the old format.
 
 ## Definition of done
