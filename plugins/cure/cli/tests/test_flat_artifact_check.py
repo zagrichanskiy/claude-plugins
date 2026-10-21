@@ -42,6 +42,26 @@ def test_work_item_and_step_references_are_allowed(message):
 
 
 @pytest.mark.parametrize(
+    "tool_name, tool_input",
+    [
+        ("Bash", {"command": 'gh pr create --body "Fix the parser for work item 3"'}),
+        ("Bash", {"command": 'gh pr create --body "Finish steps 3-5"'}),
+        ("mcp__claude_ai_ClickUp__clickup_create_task", {"description": "Fix the parser for work item 3"}),
+        ("mcp__claude_ai_ClickUp__clickup_create_task", {"description": "Finish steps 3-5"}),
+    ],
+)
+def test_references_are_denied_outside_commit_messages(tool_name, tool_input):
+    payload = {"tool_name": tool_name, "tool_input": tool_input}
+    result = subprocess.run(
+        ["sh", str(HOOK)], input=json.dumps(payload), capture_output=True, text=True, check=False
+    )
+
+    output = json.loads(result.stdout)["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "bare identifier: " in output["permissionDecisionReason"]
+
+
+@pytest.mark.parametrize(
     "message, identifier",
     [
         ("Fix item 4", "item 4"),
