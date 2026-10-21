@@ -60,6 +60,17 @@ exists, a renamed option, a changed default. Name in your report each stale
 claim you corrected, so the caller can see what the update repaired rather than
 only what it added.
 
+## Fixes and shared skills
+
+- A fix brief states the scope of the cause. Write the narrowest sentence that
+  closes it. If the brief does not state the scope, say so in the report.
+- Under a fix brief, edit only the cause. Report drift found elsewhere instead
+  of editing it.
+- A state-table replacement keeps every existing procedure unless the spec
+  removes it.
+- A rule added to a shared skill states the repositories and users it applies
+  to.
+
 ## Rules
 
 - Respond in formal English. Use active voice. No contractions, no emojis.

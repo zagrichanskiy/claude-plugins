@@ -87,6 +87,8 @@ Tie every point to a concrete item from your checklist or patterns file.
     spelling (`fsync`, `fdatasync`, `::sync()`, `O_SYNC`). A finding or a "sound" verdict built on
     an absence that was not searched for is an assumption; list it under *Assumptions / open
     questions* instead.
+13. **A frontmatter key is checked against the agent type.** When a decision or a finding puts a
+    setting in agent frontmatter, check that the key applies to a main-session agent.
 
 ## Tasks
 
@@ -103,6 +105,10 @@ to critique.
 - **Rejected alternatives** — at least one other approach and why you did not pick it. This is where
   the real reasoning lives.
 - **Risks & open questions** — what could make this wrong, and the assumptions you made.
+
+- When a component replaces or re-creates a job or record, list every piece of its state and say what carries over.
+- When a rule ranks members, list every reason a member cannot act.
+- Give the file count, a line estimate per file (or per component when files are not yet known) counting changed lines (added plus deleted) with test lines estimated as `${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`, section "Sizing a goal", states, the total, and a person-day estimate. The estimate counts only the lines still to change from the current working tree, not the diff against the base.
 
 Keep it proportional: a small component gets a few paragraphs, not a treatise.
 

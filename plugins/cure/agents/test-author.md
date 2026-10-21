@@ -37,6 +37,20 @@ Before writing a single test:
   the code declares. Do not pad with trivial or redundant assertions.
 - Prefer the project's offline test doubles. Never open a real network, serial,
   device, or filesystem resource when a fake exists for it.
+- Before asserting a derived state, read the rule that derives it.
+- Every test that exercises a launch path uses a directory that exists.
+- A lock gets one test that fails when the lock is removed from the critical
+  section. Confirm the failure by removing the lock once (mutation check).
+  This is the one exception to the rule against modifying the code under test.
+  Before the mutation, record `sha256sum <source file>` and copy the file to a
+  temp directory outside the repository. Use absolute paths for the source and
+  the copy, because the working directory can reset between Bash calls. After the
+  mutation, restore the file by copying the copy back and confirm the checksum
+  matches. Delete the copy only after the checksum matches. On a mismatch keep the
+  copy and report its absolute path as a blocking defect. Never run `git checkout`, `git restore` or `git stash` on a source
+  file: the code under test is usually uncommitted work that these commands
+  delete. Report the mutation result.
+- A format change updates the tests that pin the old format.
 
 ## Definition of done
 
