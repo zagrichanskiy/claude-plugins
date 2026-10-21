@@ -100,7 +100,7 @@ You are the only session that asks the user a job's questions. A worker exits `n
 | The options differ in an outcome the user would see | Ask the user with `AskUserQuestion`. |
 | No option changes what the user would see | Take the recommended option. Record it under Settled as `(recommended)`. Do not ask. |
 
-The user's leave-auto-mode answer (see `ask-input`) is written into the goal's Rules through `cure:goal`, as `job.md` states.
+The user's leave-auto-mode answer (see `ask-input`) is written into the goal's Rules through `cure:goal`, in `Answer and resume` step 1.
 
 A question from the user is a question. Answer it. Do not act on it, and do not treat it as a correction.
 
@@ -108,7 +108,7 @@ A question from the user is a question. Answer it. Do not act on it, and do not 
 
 The worker session of a `needs-input` job stays alive. After the user answers, or when every `question` item was settled as `(recommended)` and no `unproven` item is open:
 
-1. Add the answers and the `(recommended)` settlements to `goal.md` under Settled through `cure:goal`, with the one run line `job.md` gives. The line holds for a resume and for a new run.
+1. Add the answers and the `(recommended)` settlements to `goal.md` under Settled through `cure:goal`, with the one run line `job.md` gives. The line holds for a resume and for a new run. When the user chose a permission mode, also write the Rules "Permission mode" line through `cure:goal`, and run the Permissions check in `job.md` before step 2.
 2. Run `cure-job resume <id>`, with `-- --permission-mode <mode>` when the goal's Rules state a permission mode. The user's answer, or the settling of every question as `(recommended)`, is the approval; print no summary. The resume is a new run in the same session; its finish is reported like any run's.
 3. If `resume` exits 1 with `session <name> no longer exists`, run `cure-job launch <id>` with the same `goal.md`, with `-- --permission-mode <mode>` as in step 2. This starts a new run in a new session, which continues from the ledger.
 
