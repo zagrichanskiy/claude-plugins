@@ -31,7 +31,6 @@ project: /Volumes/work/rnd/workspace/docs    # where the session ran; empty if n
 started: 2026-08-29
 updated: 2026-08-29
 status: open
-captured: []          # nodes already written to ~/knowledge
 resolved_by:          # artifact that settled this, once one exists
 ---
 
@@ -48,8 +47,7 @@ Level: dropped once at node 2 — show objects, not rephrasings.
 One line: the question on the table when the session ended.
 ```
 
-`[x]` covered, `[ ]` open, `[~]` skipped. `captured` prevents the librarian being sent the same node
-twice across sessions.
+`[x]` covered, `[ ]` open, `[~]` skipped.
 
 **On skill load, list `~/.claude/explain/*.md` with `status: open` whose `project` is the current
 directory, an ancestor of it, or a descendant of it.** An explanation belongs to the work it came
@@ -62,15 +60,11 @@ by name, including one from another project.
 
 ## Open
 
-1. **Check what they already know.** Read `~/knowledge/index.md`. A concept with a note is
-   groundwork already laid — reference the note in one line rather than making it a node, and spend
-   the session on what is new. If the note is thin where this session needs depth, make the node
-   anyway and say the note will be extended.
-2. **Group their questions into nodes.** Related questions share a node; prerequisites become
+1. **Group their questions into nodes.** Related questions share a node; prerequisites become
    parents. Name a node for what it answers, not for its topic area.
-3. **Create the nodes with `TaskCreate` if the build has it**, one per node, exactly one
+2. **Create the nodes with `TaskCreate` if the build has it**, one per node, exactly one
    `in_progress`. Many builds do not — check, and fall back to the printed tree without comment.
-4. **Print the tree**, then start the first node in the same message. Do not ask permission to begin.
+3. **Print the tree**, then start the first node in the same message. Do not ask permission to begin.
 
 Only stop to ask if something would change the whole shape — the deliverable, or which of two
 unrelated systems they mean. Never ask what they already told you.
@@ -125,8 +119,7 @@ The user drives the tree with these. Bare `/explain` prints it.
 | `/explain resume <slug>` | Pick up a saved tree from an earlier session |
 | `/explain cancel` | End the session, offer the write-up |
 
-`up` and `skip` differ where it matters: `up` means the node was covered and is worth capturing,
-`skip` means it never was. Never capture a skipped node.
+`up` marks the node `[x]` covered. `skip` marks it `[~]` skipped.
 
 When every child of a node is done, print the tree and offer the parent's remaining siblings. That
 is the only moment to interrupt with a choice; do not prompt for direction at any other point.
@@ -208,48 +201,23 @@ they overturn conclusions regularly.
 - Check the local checkout before the web — the repo on disk is ground truth for what they ship.
 - State what you verified and how, so they can re-check it.
 
-## Capture
-
-Explanations are worth keeping; transcripts are not. When a subtree closes — every child of a node
-covered or skipped — dispatch the **`knowledge-librarian`** agent for that subtree. It writes to
-`~/knowledge` and does not block the conversation; carry on with the next node.
-
-Give it: the node names covered, the mechanism as explained, and — the part that matters — **what
-the user had assumed that turned out wrong**, in their words where possible. A note recording only
-the right answer duplicates a reference book. The wrong model and what broke it is not recoverable
-anywhere else.
-
-Never send it a node reached by `skip`, and never send it anything confidential; `~/knowledge`
-holds general technical knowledge only, and its `CLAUDE.md` governs.
-
-Paste the link the first time, and say
-it was updated on each run after that. Record captured nodes in the saved tree's `captured:` list and the
-pull request URL in `capture_pr:`, and hand both to the librarian, so a later session extends the
-same pull request and never sends the same node twice.
-
 ## Close
 
 When the questions run out:
 
-1. **Confirm the capture** — say which notes went in and paste the pull request link.
-2. **Offer to write the findings down** for the project too, and ask where. This is separate from
-   the library: the library holds how a mechanism works, the project holds what was decided.
-3. **If they approve a decision, record it as instructions**, not narrative — what to do, in what
+1. **Offer to write the findings down** for the project, and ask where.
+2. **If they approve a decision, record it as instructions**, not narrative — what to do, in what
    order, with the numbers. Cut the reasoning unless they ask.
-4. **Back up any file you overwrite** to the scratchpad first, especially if untracked in git.
-5. **Remove the saved tree** if its capture pull request is merged and nothing is open. See below.
+3. **Back up any file you overwrite** to the scratchpad first, especially if untracked in git.
+4. **Remove the saved tree** when every node is covered or skipped. See below.
 
 ## Removing a saved tree
 
-A saved tree exists to resume an unfinished explanation. Once its content is in the knowledge base
-it has no reader — the notes are better organised, linked and searchable than the tree ever was.
+A saved tree exists to resume an unfinished explanation.
 
-**Delete `~/.claude/explain/<slug>.md` when every covered node is in `captured:` and the capture
-pull request is merged.** Say which file went and name the pull request that replaced it.
+**Delete `~/.claude/explain/<slug>.md` when every node is covered or skipped.** Say which file went.
 
-Keep it while any node is still open, even if the rest is captured — that is exactly the state
-resuming exists for. If the pull request is still open, keep it too; an unmerged pull request is not
-yet a permanent home.
+Keep it while any node is open.
 
 **Sweep on load.** When listing saved trees, name any `status: open` file untouched for more than
 thirty days and ask whether it is finished, abandoned, or still live. A tree nobody has returned to

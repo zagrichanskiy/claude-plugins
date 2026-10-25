@@ -51,7 +51,6 @@ discipline.
 | `security-expert` | Security architecture and protocol review for networked embedded systems: trust boundaries, authenticated key exchange, replay protection, key lifecycle for field-deployed devices. |
 | `ui-reviewer` | Visual-design review of web UI: typography, spacing, colour, contrast, hierarchy, density, responsive behaviour. Reviews; never edits. |
 | `ux-reviewer` | Interaction and accessibility review: task flow, discoverability, feedback, error and empty states, keyboard and screen-reader support. Reviews; never edits. |
-| `knowledge-librarian` | Maintains a personal `~/knowledge` note library — one concept per file, wikilinked — and delivers changes as a pull request. |
 
 `architect` and `designer` share `plugins/cure/knowledge/design-advisor/`. Each reads `core.md`,
 its own mode's checklist and pattern catalogue, and — once the target is known — only its own
@@ -221,7 +220,7 @@ Every agent states its own `model` and `effort`, by role:
 |---|---|---|---|
 | Judgement | `architect`, `designer`, `security-expert`, `reviewer`, `ui-reviewer`, `ux-reviewer` | `opus` | `high` |
 | Production | `implementer` | `opus` | `medium` |
-| Production | `test-author`, `skill-author`, `knowledge-librarian` | `sonnet` | `medium` |
+| Production | `test-author`, `skill-author` | `sonnet` | `medium` |
 | Mechanical | `collector`, `verifier` | `sonnet` | `medium` |
 | Rule check | `cg-interfaces`, `cg-classes`, `cg-resources`, `cg-statements`, `cg-generic`, `cg-concurrency`, `cg-philosophy` | `sonnet` | `medium` |
 | Mechanical | `qa` | `sonnet` | `low` |
