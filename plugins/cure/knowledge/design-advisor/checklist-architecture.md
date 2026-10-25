@@ -62,9 +62,11 @@ supplement for the target's language.
 - **A binding between an internal definition and an external component is explicit.** Name the
   artifact that owns the binding and what validates it. Flag a binding that exists only as a naming
   convention.
-- **A call from an agent to an external system has a tool contract:** name, request, result, time
-  limit and locked resource. Flag a step (typed input and output, one record entry) described as a
-  tool call, or a tool call (many per step) described as a step.
+- **Where agents call external systems, each call has a tool contract.** A step is one unit of
+  work with typed input and output and one record entry. A tool call is one request to an
+  external system. The contract states name, request, result, time limit and locked
+  resource. Flag a step described as a tool call, or a tool call (many per step) described as a
+  step.
 - **The environment tools inventory is complete.** Map every existing tool or CLI the team uses to
   a component or a tool, or exclude it with a reason. Flag a tool in use that the document does not
   mention.
@@ -122,7 +124,7 @@ obligation. Flag a document that mixes them into one list.
   distinguishable from working normally.
 - **Configuration errors fail at startup, never at frame 4000.** On something that flies, validate
   the whole binding once at construction. Flag lazy or per-item validation of static configuration.
-- **Failure-behaviour goals state exact semantics.** Example: resume repeats the in-progress step,
+- **Failure-behaviour goals state exact semantics** (where work runs in steps). Example: resume repeats the in-progress step,
   skips none, and redoes at most one step. Flag a goal such as "recovers gracefully" or "resumes
   where it stopped".
 - **Say what happens on restart mid-flight** — whether it is possible, how long it takes, and what
@@ -199,21 +201,23 @@ attachment points still get named.
   adding one means, and what stays unchanged. Flag a blanket claim such as "the system is
   extensible".
 - **Term coverage works both ways.** Every term, abbreviation and named entity used after §2
-  (Concepts) is defined there before use. Abbreviations are expanded at first use. Every defined
-  concept is used later. Flag an unexpanded abbreviation, a workflow name used before its
+  (Concepts) is defined there before use. Abbreviations are expanded at first use. When the document is
+  complete, every defined concept is used. Flag an unexpanded abbreviation, a workflow name used before its
   definition, an undefined "pipeline", "plugin pin" or "worker", and lifecycle stages that are
   defined and never used.
 - **Each glossary entry states the term's kind and what it is not,** where a reader could confuse
   it: message and prompt, ledger and log, telemetry (raw data) and statistics (aggregates),
-  workflow (concept) and CI pipeline (its implementation), step, tool, service and actor. A
-  "definition" is a data file: the entry says where it lives and how it changes.
+  workflow (concept) and CI pipeline (its implementation), step, tool, service and actor. Where a
+  term such as "workflow definition" names a data file, the entry says where it lives and how it
+  changes.
 - **A term that names something in the user's environment names that exact thing,** such as a
   specific repository or setup. Flag a generic notion in its place (concrete over abstract).
 - **Concept diagrams cover the whole glossary:** one overview model plus one relation page per
   concept cluster, each in its own file with its own diagram. Flag a glossary concept that appears
   in no concept diagram.
 - **Section and term names are checked against the glossary for collisions.** Example: build-order
-  "stages" collided with lifecycle stages and were renamed "increments".
+  "stages" collided with lifecycle stages and were renamed "increments". §8 (Stages) of the document skeleton may be renamed, for example to
+  "Increments", when the glossary already uses the term.
 - **Configuration becomes a framework if unattended.** State the ceiling explicitly — a typed
   structure and a graph description, not a DSL, not a plugin loader — or it will drift into one.
 - **A diagram's line styles must mean one thing each** (core rules). Flag a diagram where dotted
@@ -243,7 +247,8 @@ attachment points still get named.
   contract, a cutover that cannot be staged or reverted.
 - **SHOULD-CONSIDER** — a real cost that one component can absorb later: missing observability, a
   pattern half-applied where a degraded path still exists, an unstated but non-critical attribute.
-- **NITPICK** — document hygiene.
+- **NITPICK** — document hygiene, except the glossary, term, name-collision, concept-diagram and
+  extensibility items of §11, which rank SHOULD-CONSIDER.
 
 ## Review skeleton — architecture mode
 
