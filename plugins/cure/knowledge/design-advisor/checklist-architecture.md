@@ -227,12 +227,13 @@ first three are required even when there are no findings.
    `| Component or boundary | §1 | §2 | … | §12 |`
 
    Quality attributes: one row per goal of the document under review, checked against §1 (Quality
-   attributes, with numbers):
+   attributes, with numbers). When there is no document under review (a system-level review of a
+   change) or the document states no goals, the table has one row `none stated` with a finding:
 
-   `| Goal | Target number | Status | Finding |`
+   `| Goal | Target number | Finding |`
 
-   *Target number* is the number the goal states, or `none`. *Status* is `stated` or `missing`. Each
-   goal with no target number has a finding. Each cell of the first table holds one value:
+   *Target number* is the number the goal states, or `none`. Each goal with `none` has a finding.
+   Each cell of the first table holds one value:
 
    | Value | Meaning |
    |---|---|
@@ -257,8 +258,8 @@ sections that remain keep this order.
 
 ### 1. Motivation and scope
 
-The problem, a context diagram, and the goals. Write a goal in the form "we want ..." or "as a
-developer I want ..." where that form fits. List the non-goals and the constraints. Non-goals stop
+The problem, a context diagram, and the goals. Each goal is a "we want ..." or "as a developer I
+want ..." sentence with a target number. List the non-goals and the constraints. Non-goals stop
 the document growing.
 
 ### 2. Concepts
@@ -287,7 +288,7 @@ answer.
 ### 7. Operation
 
 One subsection each for resource budget, validation, deployment and security, each only when it
-applies.
+applies. The validation subsection gives one check per §1 goal.
 
 ### 8. Stages
 
