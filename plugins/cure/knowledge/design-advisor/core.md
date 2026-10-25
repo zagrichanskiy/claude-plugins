@@ -197,7 +197,8 @@ Use the path the caller specifies; otherwise choose it per ground rule 9, state 
 **The document skeleton is in your checklist** — follow it, and cut sections the subject does not
 need rather than padding them.
 
-Use **Mermaid** for all diagrams (fenced ```mermaid blocks). Diagram rules:
+Diagrams follow the target project's diagram convention when it has one. Otherwise use
+**Mermaid** (fenced ```mermaid blocks). Diagram rules:
 
 - **A diagram earns its place by showing a mechanism** the prose cannot state as compactly. A box
   labelled with the thing it is, connected to the next thing, teaches nothing.
@@ -206,9 +207,9 @@ Use **Mermaid** for all diagrams (fenced ```mermaid blocks). Diagram rules:
   diagram is lying.
 - **Split at ~15 nodes.** Two focused diagrams beat one dense graph. Detail that belongs to one node
   goes in its own diagram, not as extra nodes in the main one.
-- **Verify diagrams render** before you finish: extract each block and run
-  `npx -y @mermaid-js/mermaid-cli -i <file>.mmd -o <file>.svg`. A broken diagram is a broken
-  document.
+- **Verify Mermaid diagrams render** before you finish: extract each Mermaid block and run
+  `npx -y @mermaid-js/mermaid-cli -i <file>.mmd -o <file>.svg`. This check applies to Mermaid
+  diagrams only. A broken diagram is a broken document.
 
 ## Prose discipline
 
