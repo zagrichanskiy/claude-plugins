@@ -165,7 +165,7 @@ def bundled_dirs(plugin_root):
 def check_bundled_paths(path, dirs):
     """A bundled file is addressed through ${CLAUDE_PLUGIN_ROOT}; the install location varies.
 
-    A path under the user's home (`~/.claude/`) is a different thing and is left alone.
+    A path under the user's home (`~/bin/`) is a different thing and is left alone.
     """
     patterns = [(name, re.compile(rf"(?<![~\w/.]){re.escape(name)}/")) for name in dirs]
     for number, line in enumerate(path.read_text().split("\n"), 1):
