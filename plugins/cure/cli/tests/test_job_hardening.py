@@ -9,6 +9,8 @@ import pytest
 
 from cure_job.claude import SessionStatus
 from cure_job.cli import Cli, main
+from cure_job.worker import WorkerSettings
+from tests.builders import settings_args
 from tests.test_cli import Harness
 
 PR = "https://github.com/acme/video-core/pull/7"
@@ -127,15 +129,33 @@ def test_launch_and_resume_pass_settings_that_allow_finish_claim_and_release(roo
     h = Harness(root)
     h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
     job_id = launched(h, tmp_path)
-    allow = [f"Bash({plugin}/bin/cure-job {command}:*)" for command in ("finish", "claim", "release")]
-    expected = {"permissions": {"allow": allow}}
-    args = h.claude.started[0][3]
-    assert json.loads(args[args.index("--settings") + 1]) == expected
+    expected = settings_args(job_id, plugin)
+    assert h.claude.started[0][3] == expected
     (root / "jobs" / job_id / "result.md").write_text("---\nstatus: needs-input\nquestion: q\n---\n", encoding="utf-8")
     h.claude.statuses[job_id] = SessionStatus.IDLE
     assert h.run("resume", job_id) == 0
-    args = h.claude.resumed[0][4]
-    assert json.loads(args[args.index("--settings") + 1]) == expected
+    assert h.claude.resumed[0][4] == expected
+
+
+def test_launch_refuses_a_goal_naming_a_missing_file_under_the_plugin_root(root, tmp_path, capsys):
+    plugin = tmp_path / "plugin"
+    (plugin / "skills" / "goal").mkdir(parents=True)
+    (plugin / "skills" / "goal" / "rules.md").write_text("## Rules\n", encoding="utf-8")
+    h = Harness(root)
+    h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
+    job_id = h.new(tmp_path)
+    missing = plugin / "skills" / "goal" / "worker.md"
+    (root / "jobs" / job_id / "goal.md").write_text(f"# Goal\n\nRead {missing}\n", encoding="utf-8")
+    assert h.run("approve", job_id, "--by", "user") == 0
+    assert h.run("launch", job_id) == 1
+    assert str(missing) in capsys.readouterr().err
+    assert h.claude.started == []
+
+
+def test_worker_rules_allow_finish_claim_and_release_for_their_own_job_only(tmp_path):
+    rules = "\n".join(WorkerSettings(tmp_path, "job-a").rules())
+    assert "finish job-a *" in rules
+    assert "job-b" not in rules
 
 
 def test_launch_of_an_unapproved_job_names_the_approve_command_with_by_user(h, tmp_path, capsys):
@@ -163,6 +183,13 @@ def test_approve_refuses_a_goal_with_items_under_open(h, tmp_path, capsys):
     assert h.run("approve", job_id, "--by", "user") == 1
     assert "## Open" in capsys.readouterr().err
     assert not (h.root / "jobs" / job_id / "dispatch.jsonl").exists()
+
+
+@pytest.mark.parametrize("goal", ["# Goal\n\n## Open\n\n* item\n", "# Goal\n\n## Open questions\n\n1. item\n"])
+def test_approve_refuses_a_star_item_or_a_numbered_item_under_an_open_heading(h, tmp_path, goal):
+    job_id = h.new(tmp_path)
+    (h.root / "jobs" / job_id / "goal.md").write_text(goal, encoding="utf-8")
+    assert h.run("approve", job_id, "--by", "user") == 1
 
 
 @pytest.mark.parametrize("goal", ["# Goal\n\n## Open\n\n## Rules\n\n- Tier: Solo.\n", "# Goal\n\n## Rules\n- Tier: Solo.\n"])

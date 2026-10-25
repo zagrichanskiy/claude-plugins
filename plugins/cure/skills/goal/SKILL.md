@@ -75,6 +75,8 @@ the reasoning that would otherwise be re-litigated.
 
 <Where the work happens. Settled: the decisions and facts.>
 
+<Job mode only, after Settled: `## Open`, one `- ` item per fork (see `job.md` "Questions").>
+
 ## Work
 
 Before work item 1, read `<plugin-root>/skills/goal/rules.md` and follow it. Read it again after a

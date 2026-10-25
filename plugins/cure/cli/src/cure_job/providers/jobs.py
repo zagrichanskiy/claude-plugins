@@ -28,7 +28,7 @@ from ..config import Config
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
 from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
-from ..goal import PLUGIN_ROOT, RULES, retarget, tier
+from ..goal import PLUGIN_ROOT, RULES, missing_paths, retarget, tier
 from ..handoff import parse_submitted, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
@@ -135,7 +135,7 @@ class JobsProvider:
                 raise JobStateError(f"job {job_id} is {view.state.value} and its session {name} is live; "
                                     f"continue it: cure-job resume {job_id}")
         prompt = self._prepare_run(listing, view, "launch")
-        claude_args = [*WorkerSettings(self.plugin_root).arguments(), *claude_args]
+        claude_args = [*WorkerSettings(self.plugin_root, job_id).arguments(), *claude_args]
         if tier(self.store.read_goal(job_id)) in ORCHESTRATED_TIERS:
             claude_args = ["--agent", ORCHESTRATOR, *claude_args]
         run = record.run + 1
@@ -164,7 +164,7 @@ class JobsProvider:
             raise SessionGone(f"job {job_id}: session {name} no longer exists; "
                               f"start a new run: cure-job launch {job_id}")
         prompt = self._prepare_run(listing, view, "resume")
-        claude_args = [*WorkerSettings(self.plugin_root).arguments(), *claude_args]
+        claude_args = [*WorkerSettings(self.plugin_root, job_id).arguments(), *claude_args]
         # Resuming a live session starts a copy, so it is stopped first.
         self._stop_session(name, session)
         self._record_run(record, record.run + 1, name,
@@ -184,6 +184,10 @@ class JobsProvider:
         rules = self.plugin_root / RULES
         if not rules.is_file():
             raise PluginError(f"{operation} refused: {rules} does not exist; the goal file names it")
+        missing = missing_paths(retarget(self.store.read_goal(job_id), self.plugin_root), self.plugin_root)
+        if missing:
+            raise PluginError(f"{operation} refused: the goal file names {', '.join(missing)}, which does not exist; "
+                              "write the goal again with cure:goal")
         self.store.rewrite_goal(job_id, lambda text: retarget(text, self.plugin_root))
         return f"/goal @{goal}"
 

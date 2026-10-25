@@ -18,9 +18,11 @@ REPO = "/work/video-core"
 GOAL_DIGEST = digest(b"goal")
 
 
-def settings_args(plugin_root: Path = PLUGIN_ROOT) -> tuple[str, ...]:
-    """The ``--settings`` pair ``launch`` and ``resume`` add: allow rules for the worker's three commands."""
-    allow = [f"Bash({plugin_root}/bin/cure-job {command}:*)" for command in ("finish", "claim", "release")]
+def settings_args(job_id: str, plugin_root: Path = PLUGIN_ROOT) -> tuple[str, ...]:
+    """The ``--settings`` pair ``launch`` and ``resume`` add: allow rules for the worker's job and the read commands."""
+    cure_job = f"{plugin_root}/bin/cure-job"
+    allow = [f"Bash({cure_job} {command} {job_id} *)" for command in ("finish", "claim", "release")]
+    allow += [f"Bash({cure_job} {command} *)" for command in ("config get", "list")]
     return ("--settings", json.dumps({"permissions": {"allow": allow}}, separators=(",", ":")))
 
 

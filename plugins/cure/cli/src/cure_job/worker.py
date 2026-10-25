@@ -12,7 +12,6 @@ from typing import Sequence
 
 from .errors import CureJobError
 
-#: ``bin/cure-job`` relative to the plugin root.
 CURE_JOB = Path("bin", "cure-job")
 
 
@@ -44,15 +43,18 @@ class RunArguments:
 
 
 class WorkerSettings:
-    """The ``--settings`` that allow a worker to run ``cure-job finish``, ``claim`` and ``release``."""
+    """The ``--settings`` that allow a worker to run ``cure-job finish``, ``claim`` and ``release`` on its job."""
 
     COMMANDS = ("finish", "claim", "release")
+    READS = ("config get", "list")
 
-    def __init__(self, plugin_root: Path):
+    def __init__(self, plugin_root: Path, job_id: str):
         self.cure_job = Path(plugin_root) / CURE_JOB
+        self.job_id = job_id
 
     def rules(self) -> list[str]:
-        return [f"Bash({self.cure_job} {command}:*)" for command in self.COMMANDS]
+        return ([f"Bash({self.cure_job} {command} {self.job_id} *)" for command in self.COMMANDS]
+                + [f"Bash({self.cure_job} {command} *)" for command in self.READS])
 
     def arguments(self) -> list[str]:
         return ["--settings", json.dumps({"permissions": {"allow": self.rules()}}, separators=(",", ":"))]

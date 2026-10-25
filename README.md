@@ -109,7 +109,7 @@ the project's conventions, test command and run command from the repo.
 Start the dispatcher once per machine:
 
 ```sh
-claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000,"permissions":{"allow":["Bash(claude --bg:*)","Bash(cure-job:*)"]}}'
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000,"permissions":{"allow":["Bash(*/plugins/cache/zagrichanskiy/cure/*/bin/cure-job *)"],"deny":["Bash(claude *)"]}}'
 ```
 
 | Part | Reason |
@@ -117,7 +117,7 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 | `--agent cure:dispatcher` | Claude Code 2.1.300 loads a plugin agent under its prefixed name. |
 | `crossSessionInbound` | Without `accept`, the session ignores messages from other sessions. |
 | `autoCompactWindow` | Compacts the main session at 200000 tokens. The key has no effect in the agent's frontmatter, so it is set here. |
-| `permissions.allow` | The dispatcher's own rules for `claude --bg` and `cure-job`. The job does not edit `~/.claude/settings.json`. |
+| `permissions` | Allows the plugin's `bin/cure-job` by path and denies `claude`; `cure-job launch` starts the job session as a subprocess. The job does not edit `~/.claude/settings.json`. |
 | `--name dispatcher` | Handoffs and job sessions address the dispatcher by this name. |
 | `"env":{"CURE_JOB_ROOT":"<path>"}` | Passes a non-default state root. It goes inside the `--settings` JSON, because a background session does not inherit the caller's environment. |
 

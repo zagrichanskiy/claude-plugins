@@ -58,7 +58,7 @@ def test_resume_continues_the_needs_input_session_as_the_next_run(h, tmp_path):
     assert h.lines == [session]
     assert h.claude.stopped == [fake_id(session)]
     goal = h.root / "jobs" / job_id / "goal.md"
-    assert h.claude.resumed == [(session, fake_uuid(session), "/work/video-core", f"/goal @{goal}", settings_args())]
+    assert h.claude.resumed == [(session, fake_uuid(session), "/work/video-core", f"/goal @{goal}", settings_args(job_id))]
     assert len(h.claude.started) == 1
     assert [(entry["run"], entry["session"]) for entry in launches(h, job_id)] == [(1, session), (2, session)]
     assert (h.root / "jobs" / job_id / "result-1.md").is_file()
@@ -77,7 +77,7 @@ def test_resume_of_a_stopped_session_stops_nothing(h, tmp_path):
 def test_resume_passes_claude_arguments_after_double_dash(h, tmp_path):
     job_id, _ = needs_input(h, tmp_path)
     assert h.run("resume", job_id, "--", "--permission-mode", "auto") == 0
-    assert h.claude.resumed[0][4] == (*settings_args(), "--permission-mode", "auto")
+    assert h.claude.resumed[0][4] == (*settings_args(job_id), "--permission-mode", "auto")
 
 
 def test_resume_of_a_gone_session_exits_one_and_changes_nothing(h, tmp_path, capsys):

@@ -393,7 +393,6 @@ def _open_items_or_zero(path: Path) -> int:
 
 
 def _write_new(path: Path, text: str) -> None:
-    """Write ``text`` to the new file ``path``, mode 0600."""
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _FILE_MODE)
     with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
         sink.write(text)

@@ -88,8 +88,8 @@ directory belongs to the CLI: the goal never deletes it.
 
 The skill never asks the user in this mode. It records each fork in `<job>/goal.md`.
 
-- A fork whose options differ in something the user would see is one `- ` item under a `## Open`
-  heading in `goal.md`. The item states the situation, the options, the consequence of each and a
+- A fork whose options differ in something the user would see is one `- ` item under a heading spelled exactly `## Open`
+  in `goal.md`. The item states the situation, the options, the consequence of each and a
   recommendation, on one line.
 - The handoff's `## Open` items, a base left unresolved and a fork `config get` does not answer are
   such forks.
@@ -130,8 +130,9 @@ Closing done-when item, after the template's last item:
 
 ```markdown
 N+1. Reported: `<plugin-root>/bin/cure-job finish <id> --status done` exited 0 and the `notify:` line
-   it printed was sent with `SendMessage`, or its error is shown. A `finish` that exits non-zero is
-   run once more.
+   it printed was sent with `SendMessage`, or its error is shown. A `finish` that exits 1 naming `--pr` or
+   `--retro` is run again with the value fixed (not counted as a failure); exit 2: fix the arguments;
+   any other non-zero exit is run once more.
 
 Met when items 1-N are each demonstrated or listed in the shown `finish --unproven` with a reason
 in the final message, and N+1 is demonstrated. Unproven only when the worker cannot obtain the
@@ -152,10 +153,10 @@ for each. Keep the goal file, the retrospective and the backlog; list the retros
 
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
 <review cause>, or the diff passes <lines> lines (per repository, in <repo>: insertions plus deletions of `git diff --shortstat <base commit>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`); the base commit is the one work item 1 recorded), or a consult's line estimate for a repository's files plus the lines already changed in it passes <lines> lines, or `git fetch` or
-a tool check failed, or `finish` exited non-zero twice, or a Settled statement is false or the
+a tool check failed, or `finish` exited non-zero twice (not counting an exit 1 that names `--pr` or `--retro`), or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
-transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
-twice; and (d) the final message starts with `failed:`.
+transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` failed
+twice as counted in (a); and (d) the final message starts with `failed:`.
 
 Also done when a question only the user can answer is open, with no clean-up: the ledger and the
 working files stay, the session stays alive, and `finish` runs with `--status needs-input`, one

@@ -195,6 +195,8 @@ def plugin_with_rules(path):
     """A plugin root that holds the goal rules file, which ``launch`` requires."""
     (path / "skills" / "goal").mkdir(parents=True)
     (path / "skills" / "goal" / "rules.md").write_text("rules", encoding="utf-8")
+    (path / "bin").mkdir()
+    (path / "bin" / "cure-job").write_text("", encoding="utf-8")
     return path
 
 

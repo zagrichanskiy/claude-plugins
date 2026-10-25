@@ -26,7 +26,9 @@ What each option records:
   --kept PATH                       one per file left in the repository; repeatable
 
 Each text value is one line. Separate the parts of a long question with "; ".
-Exit 2 means wrong arguments: fix them, do not repeat the same command."""
+Exit 2 means wrong arguments: fix them, do not repeat the same command.
+Exit 1 with an error naming --pr or --retro means the value is refused: fix the value,
+then run finish again; do not repeat the same command."""
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")

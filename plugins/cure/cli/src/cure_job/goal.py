@@ -26,8 +26,8 @@ RULES = Path("skills", "goal", "rules.md")
 _CACHED_ROOT = re.compile(r"[/~][^\s\"'`<>()\[\]]*?/plugins/cache/[^/\s]+/cure/[^/\s]+/")
 
 _RULES_HEADING = re.compile(r"^## Rules[ \t]*$", re.MULTILINE)
-_OPEN_HEADING = re.compile(r"^## Open[ \t]*$", re.MULTILINE)
-_OPEN_ITEM = re.compile(r"^- ", re.MULTILINE)
+_OPEN_HEADING = re.compile(r"^## Open.*$", re.MULTILINE)
+_OPEN_ITEM = re.compile(r"^[ \t]*\S", re.MULTILINE)
 _NEXT_HEADING = re.compile(r"^#{1,2} ", re.MULTILINE)
 _TIER_LINE = re.compile(r"^(?:[-*] )?Tier: (\w+)\b", re.MULTILINE)
 
@@ -45,7 +45,7 @@ def tier(text: str) -> str | None:
 
 
 def open_items(text: str) -> int:
-    """The number of ``- `` lines under the first ``## Open`` heading, up to the next ``#`` or ``##`` heading."""
+    """The number of non-blank lines under the first ``## Open...`` heading, up to the next ``#`` or ``##`` heading."""
     heading = _OPEN_HEADING.search(text)
     if heading is None:
         return 0
@@ -57,6 +57,13 @@ def retarget(text: str, plugin_root: Path) -> str:
     """``text`` with each cached cure plugin root replaced by ``plugin_root``."""
     replacement = str(plugin_root).rstrip("/") + "/"
     return _CACHED_ROOT.sub(lambda match: replacement, text)
+
+
+def missing_paths(text: str, plugin_root: Path) -> list[str]:
+    """The paths under ``plugin_root`` that ``text`` names and that do not exist."""
+    root = str(plugin_root).rstrip("/") + "/"
+    named = re.findall(re.escape(root) + r"[^\s\"'`<>()\[\]]+", text)
+    return sorted({path.rstrip(".,;:") for path in named if not Path(path.rstrip(".,;:")).exists()})
 
 
 def digest(data: bytes) -> str:
