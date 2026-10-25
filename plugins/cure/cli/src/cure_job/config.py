@@ -59,8 +59,12 @@ class Problem:
     #: ``None`` when the whole file is in error.
     key: str | None
     problem: str
+    #: ``problem`` is the whole line, without the file name.
+    bare: bool = False
 
     def __str__(self) -> str:
+        if self.bare:
+            return self.problem
         if self.key:
             return f"{FILE}: {self.key}: {self.problem}"
         return f"{FILE}: {self.problem}"
@@ -93,10 +97,14 @@ def plugin_version(plugin_root: Path) -> str | None:
     return version if isinstance(version, str) else None
 
 
-def load(path: Path, version: str | None) -> Config:
+def load(path: Path, root: Path, version: str | None) -> Config:
+    """Load ``path``; a ``config.json`` left in the state ``root`` while ``path`` is missing is an error."""
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
+        if (root / FILE).exists():
+            return Config(problems=(Problem(None, f"{FILE} found at the old location {root / FILE}; "
+                                                  "run cure-job config init", bare=True),))
         return Config()
     except (OSError, UnicodeDecodeError) as e:
         return Config(problems=(Problem(None, f"cannot read {path}: {e}"),))

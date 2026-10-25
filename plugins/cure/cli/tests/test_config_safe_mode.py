@@ -183,3 +183,22 @@ def test_config_error_is_the_last_element_of_next_json_when_jobs_exist(h, tmp_pa
     assert len(entries) > 1
     assert entries[-1]["id"] is None and entries[-1]["actions"] == ["config-error"]
     assert all(e["actions"] != ["config-error"] for e in entries[:-1])
+
+
+def test_old_location_config_json_fails_check_and_is_safe_mode_for_next(root, tmp_path, capsys):
+    h = Harness(root)
+    new = tmp_path / "xdg" / "cure" / "config.json"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "config.json").write_text("{}", encoding="utf-8")
+    h.cli = Cli(root=root, config_path=new, claude=h.claude, clock=h.clock, out=h.lines.append)
+    line = f"config.json found at the old location {root / 'config.json'}; run cure-job config init"
+
+    assert h.run("config", "check") == 1
+    captured = capsys.readouterr()
+    assert line in captured.err + captured.out + "\n".join(h.lines)
+
+    h.lines.clear()
+    assert h.run("next", "--json") == 0
+    entry = json.loads(h.lines[-1])[-1]
+    assert entry["id"] is None and entry["actions"] == ["config-error"]
+    assert line in entry["args"]["errors"]

@@ -43,7 +43,7 @@ built-in defaults. Read a value with `<plugin-root>/bin/cure-job config get <key
 Never read the file. The defaults live only in the key table of `config.py`.
 `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json` is generated from that table and is never read at runtime.
 
-On a config error (parse error, bad value, unknown key, removed key) the CLI is in safe mode: a bad key takes its default, an unparseable file gives all defaults, `prune` removes no job and exits 1, `approve --by auto` exits 1, and `next` exits 0 with a `config-error` element.
+On a config error (parse error, bad value, unknown key, removed key, or a `config.json` at the old location `${CURE_JOB_ROOT:-~/.claude/cure}/config.json` while the new path is missing; `cure-job config init` moves it) the CLI is in safe mode: a bad key takes its default, an unparseable file gives all defaults, `prune` removes no job and exits 1, `approve --by auto` exits 1, and `next` exits 0 with a `config-error` element.
 
 | Key | Used for |
 |---|---|

@@ -59,7 +59,7 @@ class Cli:
         self.out = out
         self.config_path = config_path
         self.version = config.plugin_version(plugin_root)
-        self.config = config.load(config_path, self.version)
+        self.config = config.load(config_path, root, self.version)
         self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config)
         self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
                           LaunchCommand(self), ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self),
