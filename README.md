@@ -142,6 +142,7 @@ every job that finished while it was stopped.
 | `retro` | `/cure:retro` | Turns the retrospectives in `~/.claude/retros/` into GitHub issues: merges equal proposals, checks them against the target file and the existing issues, shows one table for review, creates the accepted issues and deletes each retrospective once all its proposals have a decision. Appends `stats.md` rows for legacy retrospectives that have a Measurements section. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
 | `review-change` | `/cure:review-change` | Runs a multi-agent review as a pipeline: the collector once, then the reviewing agents in parallel against its digest, then one merged report triaged into MUST-FIX, SHOULD-CONSIDER, NITPICK and `enhancement`. A round passes when no MUST-FIX or SHOULD-CONSIDER is open. A re-check mode skips the collector on a small diff. |
+| `architecture-doc` | `/cure:architecture-doc` | Writes an architecture document with the user one section at a time, in the layout of `checklist-architecture.md`. Drafts and reviews each section with the `architect` agent. |
 
 **Output style** — `Flat` (`plugins/cure/output-styles/flat.md`), shown as `cure:Flat`. It sets
 `force-for-plugin: true`, so it applies whenever `cure` is enabled and overrides the user's
