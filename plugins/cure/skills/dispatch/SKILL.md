@@ -159,7 +159,7 @@ A message does not reach a stopped session. When `SendMessage` fails:
 2. Otherwise start the dispatcher in the working directory of this session:
 
 ```sh
-claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000,"permissions":{"allow":["Bash(*/plugins/cache/zagrichanskiy/cure/*/bin/cure-job *)"],"deny":["Bash(claude *)"]}}'
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000,"permissions":{"allow":["Bash(cure-job *)"],"deny":["Bash(claude *)"]}}'
 ```
 
 3. Send the `notify:` line that `cure-job new` printed again with `SendMessage`. If this send fails, tell the user the job is queued and the dispatcher may not wake until its next start.

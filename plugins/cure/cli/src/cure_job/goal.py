@@ -26,7 +26,7 @@ RULES = Path("skills", "goal", "rules.md")
 _CACHED_ROOT = re.compile(r"[/~][^\s\"'`<>()\[\]]*?/plugins/cache/[^/\s]+/cure/[^/\s]+/")
 
 _RULES_HEADING = re.compile(r"^## Rules[ \t]*$", re.MULTILINE)
-_OPEN_HEADING = re.compile(r"^## Open.*$", re.MULTILINE)
+_OPEN_HEADING = re.compile(r"^## Open\b.*$", re.MULTILINE)
 _OPEN_ITEM = re.compile(r"^[ \t]*\S", re.MULTILINE)
 _NEXT_HEADING = re.compile(r"^#{1,2} ", re.MULTILINE)
 _TIER_LINE = re.compile(r"^(?:[-*] )?Tier: (\w+)\b", re.MULTILINE)
@@ -45,12 +45,12 @@ def tier(text: str) -> str | None:
 
 
 def open_items(text: str) -> int:
-    """The number of non-blank lines under the first ``## Open...`` heading, up to the next ``#`` or ``##`` heading."""
-    heading = _OPEN_HEADING.search(text)
-    if heading is None:
-        return 0
-    following = _NEXT_HEADING.search(text, heading.end())
-    return len(_OPEN_ITEM.findall(text, heading.end(), following.start() if following else len(text)))
+    """The number of non-blank lines under every ``## Open`` heading, each up to the next ``#`` or ``##`` heading."""
+    count = 0
+    for heading in _OPEN_HEADING.finditer(text):
+        following = _NEXT_HEADING.search(text, heading.end())
+        count += len(_OPEN_ITEM.findall(text, heading.end(), following.start() if following else len(text)))
+    return count
 
 
 def retarget(text: str, plugin_root: Path) -> str:
@@ -63,7 +63,7 @@ def missing_paths(text: str, plugin_root: Path) -> list[str]:
     """The paths under ``plugin_root`` that ``text`` names and that do not exist."""
     root = str(plugin_root).rstrip("/") + "/"
     named = re.findall(re.escape(root) + r"[^\s\"'`<>()\[\]]+", text)
-    return sorted({path.rstrip(".,;:") for path in named if not Path(path.rstrip(".,;:")).exists()})
+    return sorted({path.rstrip(".,;:*") for path in named if not Path(path.rstrip(".,;:*")).exists()})
 
 
 def digest(data: bytes) -> str:

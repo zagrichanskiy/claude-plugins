@@ -23,6 +23,7 @@ def settings_args(job_id: str, plugin_root: Path = PLUGIN_ROOT) -> tuple[str, ..
     cure_job = f"{plugin_root}/bin/cure-job"
     allow = [f"Bash({cure_job} {command} {job_id} *)" for command in ("finish", "claim", "release")]
     allow += [f"Bash({cure_job} {command} *)" for command in ("config get", "list")]
+    allow.append(f"Bash({cure_job} finish --help)")
     return ("--settings", json.dumps({"permissions": {"allow": allow}}, separators=(",", ":")))
 
 

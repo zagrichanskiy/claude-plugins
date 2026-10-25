@@ -54,7 +54,8 @@ class WorkerSettings:
 
     def rules(self) -> list[str]:
         return ([f"Bash({self.cure_job} {command} {self.job_id} *)" for command in self.COMMANDS]
-                + [f"Bash({self.cure_job} {command} *)" for command in self.READS])
+                + [f"Bash({self.cure_job} {command} *)" for command in self.READS]
+                + [f"Bash({self.cure_job} finish --help)"])
 
     def arguments(self) -> list[str]:
         return ["--settings", json.dumps({"permissions": {"allow": self.rules()}}, separators=(",", ":"))]

@@ -130,8 +130,8 @@ Closing done-when item, after the template's last item:
 
 ```markdown
 N+1. Reported: `<plugin-root>/bin/cure-job finish <id> --status done` exited 0 and the `notify:` line
-   it printed was sent with `SendMessage`, or its error is shown. A `finish` that exits 1 naming `--pr` or
-   `--retro` is run again with the value fixed (not counted as a failure); exit 2: fix the arguments;
+   it printed was sent with `SendMessage`, or its error is shown. A `finish` that exits 1 with an error that names pr or
+   retro is run again with the value fixed (not counted as a failure); exit 2: fix the arguments;
    any other non-zero exit is run once more.
 
 Met when items 1-N are each demonstrated or listed in the shown `finish --unproven` with a reason
@@ -143,7 +143,7 @@ Exits, in the template's exits slot. Every tier carries the exit protocol:
 
 ```markdown
 Every exit runs in this order: (1) `<plugin-root>/bin/cure-job finish <id> --status <status>`
-(`cure-job finish --help` lists the options; never write `result.md` yourself); (2) `SendMessage`
+(`<plugin-root>/bin/cure-job finish --help` lists the options; never write `result.md` yourself); (2) `SendMessage`
 with the `notify:` line `finish` printed; (3) the final message. The `finish` command, its output
 and the `SendMessage` or its error are in the transcript before the final message. The final message
 restates each done-when item with its evidence. An item is unproven only when its proof is
