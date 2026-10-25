@@ -13,9 +13,9 @@ description: >-
   judged against established practice and architectural patterns (fits,
   missing, misapplied, half-applied, re-implemented), with a per-component and
   per-boundary assessment; or (3) DOCUMENT an architecture as a markdown file
-  with Mermaid diagrams, a resource budget, a staging plan and separate
-  open-decision and risk tables. It loads a C++ or Python supplement only for
-  the languages the system is written in.
+  with diagrams in the project's convention (Mermaid otherwise), a resource
+  budget, a staging plan and separate open-decision and risk tables. It loads a
+  C++ or Python supplement only for the languages the system is written in.
   For how one component is factored into classes and interfaces, use the
   `designer` agent instead. It advises and writes documents only; it never
   writes or edits implementation code.

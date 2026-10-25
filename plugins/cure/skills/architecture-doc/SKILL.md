@@ -1,0 +1,93 @@
+---
+description: Write an architecture document section by section with the user, using the cure:architect agent to draft and review each section and a handoff file to resume across sessions. Use when the user says "write an architecture document", "architecture doc", "draft the architecture of <subject>", or "/cure:architecture-doc".
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent, AskUserQuestion
+---
+
+# Architecture document
+
+This skill runs in the main session, because each section needs decisions from the user. The
+`cure:architect` agent drafts and reviews; the session asks, decides and records.
+
+## Inputs
+
+| Input | Source |
+|---|---|
+| Layout | `${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/checklist-architecture.md`, section "Document skeleton — architecture document" |
+| Handoff file | A path the user names. Ask for it when not given. |
+| Document path | The user names it. Record it in the handoff file. |
+| Diagram convention | The target project's, when one exists. Mermaid otherwise. |
+
+Every section of the layout is optional. This skill does not repeat the section list; read it from the
+layout file on each run.
+
+## Handoff file
+
+The handoff file is the only state. Create it in step 1; update it at the end of every step.
+
+| Field | Content |
+|---|---|
+| Document path | Path of the document being written |
+| Layout | Path of `checklist-architecture.md` and the section title above |
+| Diagram convention | The project's convention, or Mermaid |
+| Sections chosen | Ordered list, each with a status: `pending`, `drafted`, `agreed`, `done` |
+| Decisions | One row per decision: section, decision, reason |
+| Open items | One row per item: section, item, where it is recorded in the document |
+
+## Steps
+
+1. Start or resume.
+   - Handoff file exists: read it, report the status of each section, and continue at the first
+     section that is not `done`.
+   - No handoff file: read the layout, find the project's diagram convention, ask the user for the
+     subject, the document path and the handoff path, then create the handoff file.
+2. Choose the sections. Propose which layout sections the subject needs and which it does not, with
+   one line of reason each. The user confirms or changes the list. Record it.
+3. Work on one section at a time, in layout order.
+   1. Ask the user the questions the section needs. Ask them in one round.
+   2. Dispatch `cure:architect` in DOCUMENT mode with paths only: the layout file, the document
+      path, the handoff path, the section title and the project's diagram convention. Pass no
+      pasted content. State the user's answers by writing them to the handoff file first.
+   3. Present the draft. Agree changes with the user. Record each decision in the handoff file.
+   4. Run the exit check (below). Dispatch `cure:architect` in REVIEW mode with paths when the
+      section holds a decision or a diagram.
+   5. Write the retrospective (below).
+   6. Set the section to `done`, report it in a few lines and stop.
+4. Continue to the next section only when the user says so.
+
+## Exit check
+
+A section is `done` when all of these hold:
+
+| Check | Pass condition |
+|---|---|
+| Description | The section meets its description in the layout |
+| Open items | Every open item is in the open-decisions and risks tables of the document, or the section states there are none |
+| Diagrams | Each one renders and follows the project's convention. Mermaid: extract each block and run `npx -y @mermaid-js/mermaid-cli -i <file>.mmd -o <file>.svg` |
+| Consistency | Names and terms match the sections already `done` |
+| Decisions | Each decision made in the session appears in the document or in the handoff file |
+
+A failed check returns the section to step 3.3. Report the failed check to the user.
+
+## Retrospective
+
+Each section ends with a retrospective. Its format is "The retrospective" in
+`${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`: sections Outcome, Where it went wrong, Proposed
+changes, in that order. `/cure:retro` turns its proposals into issues and deletes the file.
+
+| Item | Rule |
+|---|---|
+| Path | `~/.claude/retros/<date>-<repo>-<slug>.md`. `<date>` is `YYYY-MM-DD`, `<repo>` is the repository of the document, `<slug>` is `architecture-doc-<section>`. |
+| Outcome | `met`, or `failed: <cause>, what is left` |
+| Where it went wrong | Rows `W1…Wn` with evidence: rework, a failed exit check, a question the user answered that the skill should have asked earlier, a layout section that did not fit |
+| Proposed changes | `Target / Change / Evidence (Wn) / Expected effect`. Targets: `cure:skills/architecture-doc/SKILL.md`, `cure:` path of the layout file, `repo:<path>`. |
+
+A proposal with no `Wn` evidence is not made. Write the file even when the table is empty. Never
+edit the skill or the layout from this skill.
+
+## Rules
+
+- Draft and review through `cure:architect`. The session does not write section text itself.
+- Read the layout file on each run. Do not rely on a remembered section list.
+- Stop after each section. A user's earlier "continue" does not cover the next section.
+- A document names only what the user supplied or the sources show. Do not invent names.
+- Record every unresolved question as an open item, not as prose in the section.

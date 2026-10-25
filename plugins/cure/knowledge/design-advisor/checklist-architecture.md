@@ -40,7 +40,7 @@ review: stated with a scenario, missing (a finding), or not applicable with a re
 |---|---|---|
 | Functional suitability | completeness, correctness, appropriateness | Each stated mission task maps to a component that performs it; detection, tracking or telemetry output has an accuracy target and a way to measure it. |
 | Performance efficiency | time behaviour, resource utilisation, capacity | End-to-end latency, sustained frame or message rate, CPU, NPU, memory and power per stage against the budget in §4 (Resource reality on fixed hardware). |
-| Compatibility | co-existence, interoperability | Components sharing a board, a bus, a camera or a radio channel; wire protocols (MAVLink, RTSP, the IPC schema) and their versions across mixed releases. |
+| Compatibility | co-existence, interoperability | Two components sharing a board, a bus, a camera or a radio channel; wire protocols (MAVLink, RTSP, the IPC schema) and their versions across mixed releases. |
 | Interaction capability (usability) | appropriateness recognisability, learnability, operability, user error protection, user engagement, inclusivity, user assistance, self-descriptiveness | What the operator sees when the link degrades or a stage stops; whether a ground-station action can put the device in an unsafe or unrecoverable state. |
 | Reliability | faultlessness (maturity), availability, fault tolerance, recoverability | Behaviour under overload, link loss and partial failure per §5 (Failure, degradation and the link); restart time and state lost; weeks of uptime without a leak. |
 | Security | confidentiality, integrity, non-repudiation, accountability, authenticity, resistance | Trust boundaries per §10 (Trust boundaries): the link, the update path, model artifacts, removable media. |
@@ -235,7 +235,7 @@ first three are required even when there are no findings.
    to.
 3. **Coverage** — two tables.
 
-   Components and boundaries: one row per component and one per boundary in the digest, or in the
+   Per component and boundary: one row per component and one per boundary in the digest, or in the
    reviewed scope when there is no digest. One column per numbered section of this checklist, §1
    to §12:
 
@@ -262,32 +262,55 @@ first three are required even when there are no findings.
    the failure scenario and whether it is confirmed in the source or a hypothesis.
 6. **Out of altitude** — one line each, unranked: how a component is factored into classes (for
    `designer`) and correctness bugs (for `reviewer`), with `path:line`.
-7. **Open decisions and risks** — the two tables from §3 (Classify every fork) and §9 (Risks).
+7. **Unresolved forks and risks** — the two tables from §3 (Classify every fork) and §9 (Risks).
 8. **Overall assessment** — two lines, as in `core.md`.
 
 ## Document skeleton — architecture document
 
-This ordering answers a reader's questions in the order they occur to them.
+Every section is optional. A document includes a section only when the subject needs it. The
+sections that remain keep this order.
 
-1. **Motivation & scope** — the problem, the goal, why now, what is in and out. Non-goals are load
-   bearing: they are how you stop the document growing.
-2. **High-level structure** — the component diagram, a legend directly under it, the properties of
-   the structure that a reader would otherwise get wrong, and the shared state if there is one.
-   Detail belonging to one component goes in its own subsection with its own diagram.
-3. **Component responsibilities** — one subsection each: responsibility, inputs, outputs, and the
-   data contract at every boundary.
-4. **Strategy sections** — whatever the subject turns on (model strategy, protocol design,
-   partitioning between MCU and Linux). Usually one or two.
-5. **Constraints & assumptions** — one line each with a link to the catalog or evaluation document
-   that holds the detail.
-6. **Performance & resource budget** — the target, the per-stage line items, the main lever.
-7. **Evaluation / validation** — how a claim in this document gets measured, what is recorded, and
-   what makes two runs comparable.
-8. **Configuration & deployment** — process/thread model, what is configurable, and the ceiling on
-   how configurable it becomes.
-9. **Milestone stages** — the build order, with what each stage proves.
-10. **Security considerations** — trust boundaries and where the work attaches, even when deferred.
-11. **Open decisions & risks** — the two tables. Never one list.
+### 1. Motivation and scope
+
+The problem, a context diagram, and the goals. Write a goal in the form "we want ..." or "as a
+developer I want ..." where that form fits. List the non-goals and the constraints. Non-goals stop
+the document growing.
+
+### 2. Concepts
+
+A glossary with one meaning per term, and a diagram of how the concepts relate.
+
+### 3. Structure
+
+The main component diagram, a legend under it, and how the components relate. Detail that belongs
+to one component goes in that component's subsection.
+
+### 4. Components
+
+One subsection per component: its responsibility, its requirements, and the contract at each
+boundary it crosses.
+
+### 5. Decisions
+
+A list with one line per decision and its answer.
+
+### 6. Decision explanations
+
+One subsection per decision that needs explaining: the forces, the options and the reason for the
+answer.
+
+### 7. Operation
+
+One subsection each for resource budget, validation, deployment and security, each only when it
+applies.
+
+### 8. Stages
+
+A table with one row per stage: what it delivers, what it proves, and the signal that it is done.
+
+### 9. Open decisions and risks
+
+Two tables, one for open decisions and one for risks. Never one list.
 
 A protocol specification, an interface contract or a board-partitioning note is the same
 discipline at a smaller size.
