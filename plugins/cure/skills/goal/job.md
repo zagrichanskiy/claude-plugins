@@ -9,7 +9,7 @@ in this mode. A worker session then runs the goal and cannot reach the user.
 - Read the handoff file as the conversation.
 - Read the `CLAUDE.md` of each repository in `repos`.
 - Read `handoff.delivery`, `handoff.branch` and `handoff.resource-risk` with
-  `<plugin-root>/bin/cure-job config get <key>` before writing the goal. Each prints JSON; the
+  `cure-job config get <key>` before writing the goal. Each prints JSON; the
   built-in default applies when `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself.
 - Base of a job without `after`: the `base` the handoff states. When it states none, the default
