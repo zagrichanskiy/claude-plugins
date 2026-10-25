@@ -10,7 +10,7 @@ FAKE_CLAUDE = Path(__file__).resolve().parent / "fake_claude.py"
 
 @pytest.fixture(autouse=True)
 def isolated_environment(tmp_path, monkeypatch):
-    """Point the four environment seams at temporary paths so even a stray ``main`` call is harmless."""
+    """Point the environment seams at temporary paths so even a stray ``main`` call is harmless."""
     home = tmp_path / "home"
     home.mkdir()
     state = tmp_path / "fake-claude-state"
@@ -18,6 +18,7 @@ def isolated_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("CURE_JOB_ROOT", str(tmp_path / "cure"))
     monkeypatch.setenv("CURE_JOB_CLAUDE", str(FAKE_CLAUDE))
+    monkeypatch.setenv("CURE_JOB_CONFIG", str(tmp_path / "config" / "config.json"))
     monkeypatch.setenv("FAKE_CLAUDE_STATE", str(state))
     monkeypatch.delenv("PYTHONPATH", raising=False)
 

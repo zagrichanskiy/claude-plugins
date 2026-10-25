@@ -25,7 +25,8 @@ class Harness:
         self.claude = claude or FakeClaude()
         self.clock = FakeClock(NOW)
         self.lines: list[str] = []
-        self.cli = Cli(root=root, claude=self.claude, clock=self.clock, out=self.lines.append, **kwargs)
+        self.cli = Cli(root=root, config_path=root / "config.json",
+                       claude=self.claude, clock=self.clock, out=self.lines.append, **kwargs)
 
     def run(self, *argv) -> int:
         self.lines.clear()

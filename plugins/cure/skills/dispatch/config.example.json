@@ -2,18 +2,24 @@
   "handoff": {
     "delivery": "commit",
     "branch": "new",
-    "resource-risk": [
-      {"scope": "device: bench", "text": "bench is a test stand; any action on it is approved"},
-      {"scope": "repo: /home/user/src/video-core", "text": "main is shared; never force-push it"},
-      {"scope": "all", "text": "no action on a production system is approved"}
-    ]
+    "resource-risk": []
   },
   "dispatcher": {
-    "auto-approve-tiers": ["Solo", "Light"],
+    "auto-approve-tiers": [
+      "Solo",
+      "Light"
+    ],
     "stalled-confirm-seconds": 60
   },
-  "split": {"limit": 800},
-  "short-hold": {"wait-seconds": 540, "wait-total-minutes": 120},
-  "prune": {"failed-days": 30},
+  "split": {
+    "limit": 800
+  },
+  "short-hold": {
+    "wait-seconds": 540,
+    "wait-total-minutes": 120
+  },
+  "prune": {
+    "failed-days": 30
+  },
   "launch-grace-seconds": 60
 }

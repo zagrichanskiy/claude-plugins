@@ -29,7 +29,7 @@ Each row is a rule the implementation follows, with the reason for it.
 | The dispatcher drafts the goal and asks for approval while a job is `held`. An approved job launches when its resources free. | The user approves once; the job runs later without the user present. |
 | `after: <id>` in the handoff. The job waits until the predecessor is `done` and bases its branch on it. | A stacked change needs the predecessor's commits in the tree. They exist only after `done`. |
 | `cure-job next --json` returns the action each job needs. It is the only place scheduling decisions are made. The dispatcher maps actions to procedures. | Conditions become tested code; the dispatcher prompt shrinks. |
-| Settings live in a validated `config.json`. A config error stops only `config check` and `next`. Other commands use defaults and warn. | A typo never stops a running job. |
+| Settings live in a validated `config.json`. A config error makes every key with an error take its default; a file that does not parse makes every key take its default. `config check` exits 1. `next` exits 0 with a `config-error` element. `prune` removes no job and exits 1. `approve --by auto` exits 1. Other commands use defaults and warn. | A typo never stops a running job. |
 | `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. Above `split.limit` (default 800) it proposes parts. The user may keep one job. | The working session holds the code context and the user. |
 | The goal caps the diff at twice the estimate. | The estimate can be 2x low. |
 | Parts are ordinary jobs chained with `after:`. | Reuses stacking; no new job type. |

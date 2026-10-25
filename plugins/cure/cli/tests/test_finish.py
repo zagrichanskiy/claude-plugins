@@ -127,7 +127,8 @@ class Harness:
         self.clock = FakeClock(LOCAL)
         self.lines: list[str] = []
         self.claude = FakeClaude()
-        self.cli = Cli(root=root, claude=self.claude, clock=self.clock, out=self.lines.append)
+        self.cli = Cli(root=root, config_path=root / "config.json",
+                       claude=self.claude, clock=self.clock, out=self.lines.append)
 
     def run(self, *argv):
         return self.cli.run(list(argv))
