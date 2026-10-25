@@ -144,7 +144,7 @@ def test_launch_refuses_a_goal_naming_a_missing_file_under_the_plugin_root(root,
     h = Harness(root)
     h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
     job_id = h.new(tmp_path)
-    missing = plugin / "skills" / "goal" / "worker.md"
+    missing = plugin / "skills" / "goal" / "gone.md"
     (root / "jobs" / job_id / "goal.md").write_text(f"# Goal\n\nRead {missing}\n", encoding="utf-8")
     assert h.run("approve", job_id, "--by", "user") == 0
     assert h.run("launch", job_id) == 1
