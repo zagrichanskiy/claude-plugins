@@ -3,14 +3,14 @@
 :class:`Cli` owns the output sink and the :class:`~cure_job.providers.jobs.JobsProvider`,
 assembles the root parser by asking each command to register itself, and drives
 dispatch. :func:`main` is the composition root and the only reader of the
-environment: a test builds a :class:`Cli` with its own root and its own
-``claude``, and can reach neither ``~/.claude`` nor the real binary by default.
+environment: a test builds a :class:`Cli` with its own root, its own
+``config.json`` path and its own ``claude``, and can reach neither ``~/.claude``,
+``~/.config`` nor the real binary.
 """
 from __future__ import annotations
 
 import argparse
 import functools
-import json
 import os
 import sys
 import time
@@ -44,6 +44,7 @@ from .store import JobStore
 
 ROOT_ENV = "CURE_JOB_ROOT"
 CLAUDE_ENV = "CURE_JOB_CLAUDE"
+CONFIG_ENV = "CURE_JOB_CONFIG"
 DEFAULT_ROOT = "~/.claude/cure"
 DEFAULT_CLAUDE = "claude"
 
@@ -52,11 +53,13 @@ _flush_print = functools.partial(print, flush=True)
 
 
 class Cli:
-    def __init__(self, *, root: Path, claude: Claude, clock: Clock = local_now,
+    def __init__(self, *, root: Path, config_path: Path, claude: Claude, clock: Clock = local_now,
                  out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT,
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
         self.out = out
-        self.config = config.load(root)
+        self.config_path = config_path
+        self.version = config.plugin_version(plugin_root)
+        self.config = config.load(config_path, root, self.version)
         self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config)
         self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
                           LaunchCommand(self), ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self),
@@ -88,7 +91,7 @@ class Cli:
             return 1
         if mode == "lenient":
             for problem in self.config.problems:
-                print(_fallback(problem), file=sys.stderr)
+                print(config.fallback(problem), file=sys.stderr)
         try:
             return args.handler(args, self.jobs)
         except CureJobError as e:  # expected operational failure; a real bug propagates
@@ -96,24 +99,19 @@ class Cli:
             return 1
 
 
-def _fallback(problem: config.Problem) -> str:
-    if problem.key is None:
-        return f"{problem}; using every default"
-    if problem.key not in config.DEFAULTS:
-        return f"{problem}; ignored"
-    return f"{problem}; using default {json.dumps(config.DEFAULTS[problem.key])}"
-
-
 def main(argv: list[str] | None = None) -> int:
     # The environment is read on each call, never at import, so that a test
     # which sets it after the import is still isolated.
     root = Path(os.path.abspath(os.path.expanduser(os.environ.get(ROOT_ENV) or DEFAULT_ROOT)))
+    config_path = os.environ.get(CONFIG_ENV) or os.path.join(
+        os.environ.get("XDG_CONFIG_HOME") or "~/.config", "cure", config.FILE)
+    config_path = Path(os.path.abspath(os.path.expanduser(config_path)))
     binary = os.environ.get(CLAUDE_ENV) or DEFAULT_CLAUDE
     # A relative path would break in `start`, which runs with another cwd. A
     # bare name is left to the PATH lookup.
     if os.sep in binary:
         binary = os.path.abspath(binary)
-    return Cli(root=root, claude=ClaudeCli(binary)).run(argv)
+    return Cli(root=root, config_path=config_path, claude=ClaudeCli(binary)).run(argv)
 
 
 if __name__ == "__main__":

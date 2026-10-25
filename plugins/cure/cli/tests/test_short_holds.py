@@ -46,7 +46,8 @@ class Harness:
         self.clock = FakeClock(NOW)
         self.time = FakeTime()
         self.lines: list[str] = []
-        self.cli = Cli(root=root, claude=self.claude, clock=self.clock, out=self.lines.append,
+        self.cli = Cli(root=root, config_path=root / "config.json",
+                       claude=self.claude, clock=self.clock, out=self.lines.append,
                        sleep=self.time.sleep, monotonic=self.time.monotonic)
         self.jobs = self.cli.jobs
 

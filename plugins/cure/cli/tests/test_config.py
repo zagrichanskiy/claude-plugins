@@ -60,7 +60,7 @@ def configure(h, data):
 
 
 def reload(h):
-    h.cli = Cli(root=h.root, claude=h.claude, clock=h.clock, out=h.lines.append)
+    h.cli = Cli(root=h.root, config_path=h.root / "config.json", claude=h.claude, clock=h.clock, out=h.lines.append)
 
 
 def launched_job(h, tmp_path):
@@ -126,11 +126,17 @@ def test_config_get_with_an_unknown_key_exits_one(h, capsys):
 
 @pytest.mark.parametrize("command", ["check", "next"])
 @pytest.mark.parametrize("data, key, _default", BAD_CONFIGS.values(), ids=BAD_CONFIGS)
-def test_done_when_2_config_check_and_next_exit_one_naming_the_key(h, capsys, command, data, key, _default):
+def test_done_when_2_config_check_exits_one_and_next_reports_a_config_error_naming_the_key(
+        h, capsys, command, data, key, _default):
     configure(h, data)
-    argv = ("config", "check") if command == "check" else ("next", "--json")
-    assert h.run(*argv) == 1
-    assert f"config.json: {key}: " in capsys.readouterr().err
+    if command == "check":
+        assert h.run("config", "check") == 1
+        assert f"config.json: {key}: " in capsys.readouterr().err
+    else:
+        assert h.run("next", "--json") == 0
+        element = json.loads(h.lines[-1])[-1]
+        assert element["id"] is None and element["actions"] == ["config-error"]
+        assert any(error.startswith(f"config.json: {key}: ") for error in element["args"]["errors"])
 
 
 def test_config_check_without_a_file_exits_zero(h):
@@ -205,12 +211,16 @@ def test_done_when_4_config_get_of_a_dropped_prune_key_exits_one(h, capsys, key)
 
 
 @pytest.mark.parametrize("argv", [("config", "check"), ("next", "--json")], ids=["check", "next"])
-def test_done_when_4_strict_mode_rejects_both_dropped_prune_keys(h, capsys, argv):
+def test_done_when_4_check_and_next_report_both_dropped_prune_keys(h, capsys, argv):
     configure(h, {"prune": {"done-days": 7, "abandoned-days": 7}})
-    assert h.run(*argv) == 1
-    err = capsys.readouterr().err
+    if argv[0] == "next":
+        assert h.run(*argv) == 0
+        reported = "\n".join(json.loads(h.lines[-1])[-1]["args"]["errors"])
+    else:
+        assert h.run(*argv) == 1
+        reported = capsys.readouterr().err
     for message in DROPPED_PRUNE_MESSAGES.values():
-        assert f"config.json: {message}" in err
+        assert f"config.json: {message}" in reported
 
 
 # --- review finding 9: rejecting branches -------------------------------------------------------------
@@ -319,7 +329,8 @@ def test_an_unreadable_config_file_is_a_whole_file_error(h, capsys):
 def test_an_unknown_key_is_reported_as_ignored_by_a_lenient_command(h, capsys):
     configure(h, {"handoff": {"bogus": 1}})
     assert h.run("list") == 0
-    assert "config.json: handoff.bogus: unknown key; ignored" in capsys.readouterr().err
+    assert ("config.json: handoff.bogus: unknown to cure 0.52.0; restart the dispatcher after an update; ignored"
+            in capsys.readouterr().err)
 
 
 def test_a_file_with_flat_and_nested_base_prints_the_removed_line_once(h, capsys):

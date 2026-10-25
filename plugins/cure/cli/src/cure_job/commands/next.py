@@ -16,11 +16,12 @@ class NextCommand(Command):
     usage = "cure-job next --json"
     help = "list the actions the dispatcher takes for each job"
     description = ("Print one compact JSON array: the list --json row of each job that has an action, "
-                   "with its ordered actions and their args, in lock order")
+                   "with its ordered actions and their args, in lock order. While config.json has an error, "
+                   "end it with a config-error element whose args list the errors")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--json", action="store_true", required=True, help="print JSON; the only format")
-        parser.set_defaults(config_mode="strict")
+        parser.set_defaults(config_mode="none")
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
@@ -34,5 +35,8 @@ class NextCommand(Command):
             if found:
                 elements.append({**row, "actions": [action.name for action in found],
                                  "args": {action.name: dict(action.args) for action in found if action.args}})
+        if self.cli.config.problems:
+            elements.append({"id": None, "actions": ["config-error"],
+                             "args": {"errors": [str(problem) for problem in self.cli.config.problems]}})
         self.cli.out(json.dumps(elements, separators=(",", ":")))
         return 0

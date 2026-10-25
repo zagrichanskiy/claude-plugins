@@ -25,7 +25,8 @@ class Harness:
         self.claude = FakeClaude()
         self.clock = FakeClock(NOW)
         self.lines: list[str] = []
-        self.cli = Cli(root=root, claude=self.claude, clock=self.clock, out=self.lines.append)
+        self.cli = Cli(root=root, config_path=root / "config.json",
+                       claude=self.claude, clock=self.clock, out=self.lines.append)
 
     def run(self, *argv: str) -> int:
         return self.cli.run(list(argv))
@@ -523,7 +524,8 @@ def test_launch_without_the_goal_rules_file_exits_one_and_changes_nothing(root, 
     plugin = tmp_path / "plugin-without-rules"
     (plugin / "skills" / "goal").mkdir(parents=True)
     h = Harness(root)
-    h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
+    h.cli = Cli(root=root, config_path=root / "config.json",
+                claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
     job_id = h.new(tmp_path)
     h.approve(job_id)
     job_dir = root / "jobs" / job_id
@@ -544,7 +546,8 @@ def test_launch_with_the_goal_rules_file_present_succeeds(root, tmp_path):
     (plugin / "skills" / "goal").mkdir(parents=True)
     (plugin / "skills" / "goal" / "rules.md").write_text("rules", encoding="utf-8")
     h = Harness(root)
-    h.cli = Cli(root=root, claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
+    h.cli = Cli(root=root, config_path=root / "config.json",
+                claude=h.claude, clock=h.clock, out=h.lines.append, plugin_root=plugin)
     job_id = h.new(tmp_path)
     h.approve(job_id)
     assert h.run("launch", job_id) == 0
