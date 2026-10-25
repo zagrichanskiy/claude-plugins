@@ -93,6 +93,8 @@ The skill never asks the user in this mode. It records each fork in `<job>/goal.
   recommendation, on one line.
 - The handoff's `## Open` items, a base left unresolved and a fork `config get` does not answer are
   such forks.
+- A fork that a policy in `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md` covers: record
+  the policy's `Do` under Settled as `(policy)`. Do not list it under `## Open`.
 - A fork with no user-visible effect: record its recommended option under Settled as
   `(recommended)`. Do not list it under `## Open`.
 - When the caller passes answers, each answered item moves under Settled with its answer. When no

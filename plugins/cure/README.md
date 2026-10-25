@@ -6,6 +6,8 @@ Design and architecture advisors, review agents, and a job loop (`cure-job`) tha
 
 Config file: `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}`. One file serves all jobs. Without it, every key has its built-in default.
 
+Question policies: `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md`, beside `config.json`. The dispatcher reads it before each question round and appends a policy when the user calls a question not needed. The CLI does not read it.
+
 - The defaults live only in the key table of `config.py`.
 - `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `short-hold`, `prune`; `launch-grace-seconds` is top-level).
 - Lookup names stay dotted: `cure-job config get handoff.delivery`.
