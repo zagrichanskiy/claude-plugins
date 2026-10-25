@@ -4,12 +4,14 @@ Each test names the "Done when" item of the issue it pins."""
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from cure_job import config
 from cure_job.cli import Cli, main
+from tests.builders import set_age
 from tests.test_cli import Harness, _launched, _write_result
 from tests.test_config import configure, nest, reload
 
@@ -138,3 +140,46 @@ def test_done_when_7_config_init_leaves_both_files_when_the_new_path_exists(root
     assert h.run("config", "init") == 1
     assert (root / "config.json").read_text(encoding="utf-8") == "old"
     assert new.read_text(encoding="utf-8") == "new"
+
+
+def test_safe_mode_prune_removes_a_half_created_directory_but_no_finished_job(h, tmp_path, capsys):
+    job_id = finished_job(h, tmp_path)
+    stale = h.root / "jobs" / ".new-abc"
+    stale.mkdir()
+    set_age(stale, h.clock.now, timedelta(days=1, minutes=1))
+    write_raw(h, BAD_VALUE)
+    h.lines.clear()
+    assert h.run("prune") == 1
+    assert not stale.exists()
+    assert (h.root / "jobs" / job_id).is_dir()
+    assert h.lines == [str(stale)]
+    assert "no job removed" in capsys.readouterr().err
+
+
+def test_safe_mode_approve_by_user_approves_an_awaiting_job(h, tmp_path):
+    job_id = h.new(tmp_path)
+    (h.root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+    write_raw(h, BAD_VALUE)
+    assert h.run("approve", job_id, "--by", "user") == 0
+    h.lines.clear()
+    assert h.run("list") == 0
+    assert not h.lines[0].endswith("awaiting-approval")
+
+
+def test_config_init_without_an_old_file_writes_the_defaults_to_the_config_path_only(root, tmp_path):
+    h = Harness(root)
+    new = tmp_path / "xdg" / "cure" / "config.json"
+    h.cli = Cli(root=root, config_path=new, claude=h.claude, out=h.lines.append)
+    assert h.run("config", "init") == 0
+    assert json.loads(new.read_text(encoding="utf-8")) == nest(config.DEFAULTS)
+    assert not (root / "config.json").exists()
+
+
+def test_config_error_is_the_last_element_of_next_json_when_jobs_exist(h, tmp_path):
+    h.new(tmp_path)
+    write_raw(h, BAD_VALUE)
+    assert h.run("next", "--json") == 0
+    entries = json.loads(h.lines[-1])
+    assert len(entries) > 1
+    assert entries[-1]["id"] is None and entries[-1]["actions"] == ["config-error"]
+    assert all(e["actions"] != ["config-error"] for e in entries[:-1])
