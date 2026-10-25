@@ -56,6 +56,19 @@ supplement for the target's language.
   policy the replacement silently drops — a component the old policy kept stopped may now run
   everywhere.
 
+- **Every arrow has a stated mechanism** that matches the component contract tables. Data from
+  outside enters only through the boundary components. Flag an arrow with no mechanism, such as an
+  arrow from an outside system straight to an internal store.
+- **A binding between an internal definition and an external component is explicit.** Name the
+  artifact that owns the binding and what validates it. Flag a binding that exists only as a naming
+  convention.
+- **A call from an agent to an external system has a tool contract:** name, request, result, time
+  limit and locked resource. Flag a step (typed input and output, one record entry) described as a
+  tool call, or a tool call (many per step) described as a step.
+- **The environment tools inventory is complete.** Map every existing tool or CLI the team uses to
+  a component or a tool, or exclude it with a reason. Flag a tool in use that the document does not
+  mention.
+
 ## 3. Classify every fork
 
 Every unsettled thing in the document is exactly one of three kinds, and each has a different
@@ -87,6 +100,10 @@ obligation. Flag a document that mixes them into one list.
   board's own hardware definition (machine config, device tree, partition or UBI layout) and check
   the variant against it. List the boards that select nothing. A selection that exists is not a
   selection that is right: a NAND board given the eMMC profile passes every build.
+- **Check physical and environment facts against the environment documentation.** A constraint such
+  as a device interface, a connector or a power source is read from the documentation of that
+  environment, not from memory. Flag an unchecked fact, such as a device interface listed as USB
+  only when it is USB and UART.
 - **Aggregate specs hide per-instance limits.** "6 TOPS" may be three cores at 2 TOPS, one per
   model. "Four cores" is not four cores once the kernel, the network stack and the encoder are on
   them.
@@ -105,6 +122,9 @@ obligation. Flag a document that mixes them into one list.
   distinguishable from working normally.
 - **Configuration errors fail at startup, never at frame 4000.** On something that flies, validate
   the whole binding once at construction. Flag lazy or per-item validation of static configuration.
+- **Failure-behaviour goals state exact semantics.** Example: resume repeats the in-progress step,
+  skips none, and redoes at most one step. Flag a goal such as "recovers gracefully" or "resumes
+  where it stopped".
 - **Say what happens on restart mid-flight** — whether it is possible, how long it takes, and what
   state is lost.
 
@@ -175,6 +195,25 @@ attachment points still get named.
   enough" should not carry twelve sections of design for the version after next.
 - **Speculative extension points are the standard failure.** Every plug point costs indirection.
   Demand a *currently required* second implementation for each one; flag the rest as YAGNI.
+- **Extensibility is stated per extensible element.** Name which elements are open sets, what
+  adding one means, and what stays unchanged. Flag a blanket claim such as "the system is
+  extensible".
+- **Term coverage works both ways.** Every term, abbreviation and named entity used after §2
+  (Concepts) is defined there before use. Abbreviations are expanded at first use. Every defined
+  concept is used later. Flag an unexpanded abbreviation, a workflow name used before its
+  definition, an undefined "pipeline", "plugin pin" or "worker", and lifecycle stages that are
+  defined and never used.
+- **Each glossary entry states the term's kind and what it is not,** where a reader could confuse
+  it: message and prompt, ledger and log, telemetry (raw data) and statistics (aggregates),
+  workflow (concept) and CI pipeline (its implementation), step, tool, service and actor. A
+  "definition" is a data file: the entry says where it lives and how it changes.
+- **A term that names something in the user's environment names that exact thing,** such as a
+  specific repository or setup. Flag a generic notion in its place (concrete over abstract).
+- **Concept diagrams cover the whole glossary:** one overview model plus one relation page per
+  concept cluster, each in its own file with its own diagram. Flag a glossary concept that appears
+  in no concept diagram.
+- **Section and term names are checked against the glossary for collisions.** Example: build-order
+  "stages" collided with lifecycle stages and were renamed "increments".
 - **Configuration becomes a framework if unattended.** State the ceiling explicitly — a typed
   structure and a graph description, not a DSL, not a plugin loader — or it will drift into one.
 - **A diagram's line styles must mean one thing each** (core rules). Flag a diagram where dotted
@@ -190,6 +229,9 @@ attachment points still get named.
 - **A departure from established practice needs its reason written down.** Hand-rolled
   supervision, reconnection, configuration layering or update schemes beside the platform's own
   are findings unless the document says why the platform's mechanism does not fit.
+- **A reference design, when one exists, gets a coverage table.** One row per element of the
+  reference, with the result `covered`, `rejected` (with the reason) or `gap`. Flag a reference
+  design that is cited without the table.
 - **Flag anti-patterns by name** — a distributed monolith, a big-bang cutover, hidden coupling
   through files or timing.
 
@@ -264,7 +306,8 @@ the document growing.
 
 ### 2. Concepts
 
-A glossary with one meaning per term, and a diagram of how the concepts relate.
+A glossary with one meaning per term, each entry stating the term's kind and what it is not, and
+concept diagrams: one overview model plus one relation page per concept cluster.
 
 ### 3. Structure
 

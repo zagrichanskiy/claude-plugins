@@ -52,10 +52,17 @@ The handoff file is the only state. Create it in step 1; update it at the end of
    3. Present the draft. Agree changes with the user. Record each decision and each agreed change
       in the handoff file. Dispatch `cure:architect` in DOCUMENT mode again with the same brief,
       so that it applies the agreed changes. Repeat until the user accepts the draft.
-   4. Run the exit check (below). Run the table checks first. Then dispatch `cure:architect` in
-      REVIEW mode with paths and the section title.
-   5. Write the retrospective (below).
-   6. Set the section to `done`, report it in a few lines and stop.
+   4. Run the newcomer-reader pass. Dispatch an agent with paths only: the document path and the
+      section title. The agent reads the document up to and including the section, as a newcomer.
+      It lists every term, arrow or claim it cannot explain from the text so far. Fix the gaps
+      through `cure:architect` in DOCUMENT mode before the user sees the section again.
+   5. Run the exit check (below). Run the table checks first. Then run the prose review as a loop:
+      dispatch `cure:architect` in REVIEW mode with paths and the section title, fix the findings
+      through DOCUMENT mode, and review again. Stop when a round has no blocking or major finding
+      (no `MUST-FIX` or `SHOULD-CONSIDER`), or after 5 rounds. After 5 rounds, report the open
+      findings to the user.
+   6. Write the retrospective (below).
+   7. Set the section to `done`, report it in a few lines and stop.
 4. Continue to the next section only when the user says so.
 
 ## Exit check

@@ -51,3 +51,28 @@ than silently working without it.
 ## Document mode additions
 
 Before writing, grep the whole target directory for every term whose meaning the change alters. List the hits in the reply.
+
+Drafting rules for an architecture document. The matching review items are in
+`checklist-architecture.md`, §2 (Boundaries and contracts), §5 (Failure, degradation and the link)
+and §11 (Hygiene of the document itself).
+
+- **Term coverage both ways.** Define every term, abbreviation and named entity in §2 (Concepts)
+  before the first section that uses it. Expand each abbreviation at first use. Use every defined
+  concept later, or delete it.
+- **Kind and non-meaning in each glossary entry.** State what kind of thing the term is, and what
+  it is not where a reader could confuse it: message and prompt, ledger and log, telemetry (raw
+  data) and statistics (aggregates), workflow (concept) and CI pipeline (its implementation), step,
+  tool, service and actor. A definition is a data file: state where it lives and how it changes.
+- **Concrete over abstract.** A term that names something in the user's environment names that
+  exact thing, such as a specific repository or setup, not a generic notion.
+- **Concept diagrams cover the whole glossary.** Draw one overview model. Draw one relation page
+  per concept cluster, each in its own file with its own diagram.
+- **Extensibility per element.** For each extensible element, state that it is an open set, what
+  adding a member means, and what stays unchanged.
+- **Explicit bindings.** Where an internal definition binds to an external component, name the
+  artifact that owns the binding and what validates it.
+- **Tool contract for each agent call to an external system.** State name, request, result, time
+  limit and locked resource. A step has typed input and output and one record entry. A tool call is
+  not a step: a step makes many.
+- **Exact failure semantics.** A failure-behaviour goal states what is repeated, skipped and
+  redone. Example: resume repeats the in-progress step, skips none, and redoes at most one step.
