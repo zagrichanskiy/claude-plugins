@@ -15,8 +15,8 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 1. Read `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/template.md`.
 2. Fill the template from the session's context (table below).
 3. Estimate and split (section "Estimate and split"). It yields drafts and the user's choice: one handoff, or one per part.
-4. Create the tickets of a split (section "Estimate and split"). Write each handoff with `cure-job new` (below), the parts in order. Keep the printed job id.
-5. Send the dispatcher each job id (below).
+4. Create the tickets of a split (section "Estimate and split"). Write each handoff with `cure-job new` (below), the parts in order. Keep the printed job id and `notify:` line.
+5. Send the dispatcher the `notify:` line of each job (below).
 6. Tell the user the job ids, the tickets of a split, and whether the dispatcher was reached or started.
 
 ## Fields
@@ -147,10 +147,9 @@ the command fails, show its error to the user and stop. Do not retry with a chan
 
 ## Waking the dispatcher
 
-Send one cross-session message per job with `SendMessage` to the session named `dispatcher`. The text is
-`job <id>` and nothing else. A split sends one message per part, in order.
+Send the `notify:` line that `cure-job new` prints for each job: `notify: SendMessage dispatcher "job <id>"`. It names the session `dispatcher` and the text `job <id>`, and nothing else. A split sends one message per part, in order.
 
-The dispatcher takes the sender address from the message and records it as the job's origin. The handoff carries no `origin`.
+`cure-job new` binds the job's origin from the sending session. The handoff carries no `origin`; a handoff that does is refused.
 
 When `SendMessage` succeeds, do nothing more. Do not start a dispatcher.
 
@@ -160,10 +159,10 @@ A message does not reach a stopped session. When `SendMessage` fails:
 2. Otherwise start the dispatcher in the working directory of this session:
 
 ```sh
-claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000,"permissions":{"allow":["Bash(claude --bg:*)","Bash(cure-job:*)"]}}'
 ```
 
-3. Send `job <id>` again with `SendMessage`, so the dispatcher records the origin. If this send fails, tell the user the job will not report back.
+3. Send the `notify:` line that `cure-job new` printed again with `SendMessage`. If this send fails, tell the user the job is queued and the dispatcher may not wake until its next start.
 
 Tell the user in one line: job queued, dispatcher started, pin it with ctrl+t in the agents view.
 

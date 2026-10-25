@@ -9,6 +9,7 @@ import pytest
 from cure_job.claude import ClaudeCli, Session, SessionStatus
 from cure_job.state import LAUNCH_GRACE
 from tests.conftest import FAKE_CLAUDE
+from tests.builders import settings_args
 from tests.fakes import fake_id, fake_uuid
 from tests.test_review_round1 import Harness
 
@@ -57,7 +58,7 @@ def test_resume_continues_the_needs_input_session_as_the_next_run(h, tmp_path):
     assert h.lines == [session]
     assert h.claude.stopped == [fake_id(session)]
     goal = h.root / "jobs" / job_id / "goal.md"
-    assert h.claude.resumed == [(session, fake_uuid(session), "/work/video-core", f"/goal @{goal}", ())]
+    assert h.claude.resumed == [(session, fake_uuid(session), "/work/video-core", f"/goal @{goal}", settings_args())]
     assert len(h.claude.started) == 1
     assert [(entry["run"], entry["session"]) for entry in launches(h, job_id)] == [(1, session), (2, session)]
     assert (h.root / "jobs" / job_id / "result-1.md").is_file()
@@ -75,8 +76,8 @@ def test_resume_of_a_stopped_session_stops_nothing(h, tmp_path):
 
 def test_resume_passes_claude_arguments_after_double_dash(h, tmp_path):
     job_id, _ = needs_input(h, tmp_path)
-    assert h.run("resume", job_id, "--", "--model", "opus") == 0
-    assert h.claude.resumed[0][4] == ("--model", "opus")
+    assert h.run("resume", job_id, "--", "--permission-mode", "auto") == 0
+    assert h.claude.resumed[0][4] == (*settings_args(), "--permission-mode", "auto")
 
 
 def test_resume_of_a_gone_session_exits_one_and_changes_nothing(h, tmp_path, capsys):

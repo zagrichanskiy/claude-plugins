@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 
 from ..providers.jobs import JobsProvider
+from ..worker import RunArguments
 from .base import Command, job_id_arg
 
 _SEPARATOR = "--"
@@ -11,14 +12,15 @@ _SEPARATOR = "--"
 
 class LaunchCommand(Command):
     name = "launch"
-    usage = "cure-job launch ID [-- CLAUDE_ARG ...]"
+    usage = "cure-job launch ID [-- --permission-mode MODE]"
     help = "start the next run of a job"
     description = "Start the next run of a job in a background session and print the session name"
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")
         parser.add_argument("claude_args", metavar="CLAUDE_ARG", nargs=argparse.REMAINDER,
-                            help="arguments after -- are passed to claude before the prompt")
+                            help="after --, only --permission-mode " + "|".join(RunArguments.MODES)
+                                 + "; passed to claude before the prompt")
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         self.cli.out(jobs.launch(args.id, claude_args(args)))
@@ -26,9 +28,9 @@ class LaunchCommand(Command):
 
 
 def claude_args(args: argparse.Namespace) -> list[str]:
-    """The arguments after ``--``, without the separator."""
+    """The arguments after ``--``, without the separator. Anything but a permission mode raises."""
     found = list(args.claude_args)
     # argparse keeps the separator in a REMAINDER value.
     if found[:1] == [_SEPARATOR]:
         del found[0]
-    return found
+    return RunArguments(found).arguments()

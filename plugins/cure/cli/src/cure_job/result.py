@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import enum
+import os
 import re
 from dataclasses import dataclass
 
+from .errors import ReportError
 from .frontmatter import FrontmatterError, Value, as_list, is_writable, parse, render
 
 STATUS = "status"
@@ -15,6 +17,8 @@ PR = "pr"
 KEPT = "kept"
 
 _DONE_WHEN_NUMBER = re.compile(r"[1-9][0-9]*")
+#: ``https://<host>/<owner>/<repo>/pull/<n>``. No part may hold a shell metacharacter.
+PR_URL = re.compile(r"https://[A-Za-z0-9.-]+(?::[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[1-9][0-9]*")
 
 #: The question a worker reports when its short-hold wait budget is spent.
 SHORT_HOLD_TIMEOUT = "short-hold timeout:"
@@ -59,7 +63,11 @@ def short_hold_timeout(result: Result) -> ShortHoldTimeout | None:
 
 @dataclass(frozen=True)
 class Report:
-    """What a job session reports through ``cure-job finish``. Valid by construction."""
+    """What a job session reports through ``cure-job finish``. Valid by construction.
+
+    A wrong count or a value that is not one line raises ``ValueError``. A ``pr`` that is not
+    a :data:`PR_URL` or a ``retro`` that is not absolute raises :class:`ReportError`.
+    """
     status: ResultStatus
     unproven: tuple[str, ...] = ()
     #: Written under the key ``question``.
@@ -80,6 +88,11 @@ class Report:
         for field, values in texts:
             if not all(is_writable(value) for value in values if value is not None):
                 raise ValueError(f"{field}: empty or more than one line")
+        for pr in self.prs:
+            if not PR_URL.fullmatch(pr):
+                raise ReportError(f"pr {pr!r} is not https://<host>/<owner>/<repo>/pull/<n>")
+        if self.retro is not None and not os.path.isabs(self.retro):
+            raise ReportError(f"retro {self.retro!r} is not an absolute path")
 
 
 def render_result(report: Report) -> str:

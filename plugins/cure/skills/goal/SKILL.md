@@ -1,5 +1,5 @@
 ---
-description: Write the goal file that `/goal @<file>` runs from — a self-contained brief a fresh session can execute unattended, either for a direct run in the current session or for a job run launched by the dispatcher from a handoff file. Chooses an agent tier from size and risk, asks every open question in one round, then writes the orchestrator-led work items with an agent per step and a closing retrospective, the measurable done-when list and the standing rules. Use when the user says "write a goal", "create a goal md", "capture this as a goal", or "/cure:goal", or when the dispatcher passes a handoff path or a job directory.
+description: Write the goal file that `/goal @<file>` runs from — a self-contained brief a fresh session can execute unattended, either for a direct run in the current session or for a job run from a handoff file. Chooses an agent tier from size and risk, asks every open question in one round in a direct run (a job run records open forks under `## Open` and never asks), then writes the orchestrator-led work items with an agent per step and a closing retrospective, the measurable done-when list and the standing rules. Use when the user says "write a goal", "create a goal md", "capture this as a goal", or "/cure:goal", or when a caller passes a handoff path or a job directory.
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, AskUserQuestion
 ---
 
@@ -29,7 +29,7 @@ apply to both modes. The mode file adds what is specific to its mode.
 
 ## The question round comes first
 
-**Ask every open question before writing the file, in one round.** The mode file says how. This is
+**Ask every open question before writing the file, in one round.** The mode file says how; in job mode the skill never asks and records each fork under `## Open` in the goal (see `job.md` "Questions"). This is
 the point of the whole skill. The user answers once, then leaves; a goal that stops on turn six to
 ask which subnet to use has wasted the time it was meant to save.
 
@@ -109,7 +109,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 - Waiting: <job mode: the mode file's Waiting line. Direct mode: takes the `waiting:` exit of direct.md>.
 ```
 
-A goal runs in auto mode. Its Rules get a "Permission mode" line only when the user chose a mode in the leave-auto-mode question (job runs: `job.md` "Checks before launch"; direct runs: `rules.md` "All tiers").
+A goal runs in auto mode. Its Rules get a "Permission mode" line only when the user chose a mode in the leave-auto-mode question (job runs: the caller passes the mode; direct runs: `rules.md` "All tiers").
 
 ## Writing the done-when list
 
@@ -170,7 +170,6 @@ and what the goal builds or delivers. The work item says the goal file, the retr
 backlog are kept. Save characters in Context or the work steps.
 
 A Settled statement is a decision or fact the goal rests on. A false one fails the run.
-A Settled statement that adds a step to the dispatcher names each `cure-job next` action (a row of the Actions table in `agents/dispatcher.md`) whose procedure runs the step.
 A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1's fact
 check verifies it against the device, code or document the note cites, not against the note.
 A mismatch in ticket, branch or base commit is recorded and corrected.
@@ -191,9 +190,6 @@ Take the names from the session's own agent and skill list (a handoff's `## Tool
 the mode file names one), and prefer the project's plugin over a general one wherever both offer
 something. A general plugin's reviewer named for work a project
 agent covers proposes a tool the project does not use.
-
-A goal for an issue that changes how a job is launched or resumed names `agents/dispatcher.md` in the
-work item that makes the change. A goal that changes a format a run session follows names `rules.md` or `worker.md`, and its copy in `agents/orchestrator.md`, in the work item that makes the change. All tiers follow these rules.
 
 ## Delegate, then reflect
 
@@ -225,12 +221,8 @@ Choose the tier by judgement from size and risk, not size alone. A small change 
 | Full | A large or risky change | `designer` or `architect` consult, implementer, `test-author`, `qa`, `review-change`, `verifier`, retrospective. |
 
 There is no tier without a goal file. The work items name the tier's agents. The review-loop and
-verification rows above describe Full. Light has one review round by one reviewer, except as stated below, and no
+verification rows above describe Full. Light has one review round by one reviewer, except as the repository's `CLAUDE.md` states, and no
 live-verification gate.
-
-A Light goal that changes both `agents/dispatcher.md` and a worker prompt (`skills/goal/rules.md`,
-`worker.md`, `job.md` or `agents/orchestrator.md`) has two review rounds. The second round re-checks
-only the first round's fixes.
 
 A Solo goal differs from the template as follows:
 
@@ -292,7 +284,7 @@ the earlier goals of the repository with their turns, tokens and lines. Do not r
 
 ## Running it
 
-Report the launch line the mode file gives. A job run of tier Light or Full starts with `--agent cure:orchestrator`, which carries `rules.md` and `worker.md` in its system prompt. A Solo job run and a direct run start as plain sessions.
+Report the launch line the mode file gives. A job run of tier Light or Full starts with `--agent cure:orchestrator`, which carries `rules.md` and `short-holds.md` in its system prompt. A Solo job run and a direct run start as plain sessions.
 
 ## Notes
 

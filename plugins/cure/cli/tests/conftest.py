@@ -21,6 +21,7 @@ def isolated_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("CURE_JOB_CONFIG", str(tmp_path / "config" / "config.json"))
     monkeypatch.setenv("FAKE_CLAUDE_STATE", str(state))
     monkeypatch.delenv("PYTHONPATH", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_MESSAGING_SOCKET", raising=False)
 
 
 @pytest.fixture

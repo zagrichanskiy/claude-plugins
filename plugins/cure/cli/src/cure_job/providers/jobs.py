@@ -29,13 +29,14 @@ from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffEr
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
 from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
 from ..goal import PLUGIN_ROOT, RULES, retarget, tier
-from ..handoff import parse_handoff, stamp
+from ..handoff import parse_submitted, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
 from ..job import JobRecord
 from ..state import (HALF_CREATED_AGE, JobView, State, derive, expired, holders, is_open, is_ready, lock_rank,
                      needs_sessions, retention)
 from ..store import InvalidJob, JobStore, Snapshot
+from ..worker import WorkerSettings
 
 
 class Listing(NamedTuple):
@@ -80,9 +81,9 @@ class JobsProvider:
         self.sleep = sleep
         self.monotonic = monotonic
 
-    def new(self, text: str, slug: str) -> str:
-        """Queue the handoff ``text`` as a new job and return the job id."""
-        handoff = parse_handoff(text)
+    def new(self, text: str, slug: str, origin: str | None = None) -> str:
+        """Queue the handoff ``text`` as a new job reporting back to ``origin`` and return the job id."""
+        handoff = parse_submitted(text)
         if handoff.after is not None:
             snapshot = self.store.snapshot()
             if handoff.after not in {job.id for job in [*snapshot.records, *snapshot.invalid]}:
@@ -93,7 +94,7 @@ class JobsProvider:
             base = make_id(created, os.path.basename(handoff.launch_dir), slug)
         except ValueError as e:
             raise HandoffError(f"cannot build a job id: {e}") from e
-        return self.store.create(base, lambda job_id: stamp(text, job_id, created))
+        return self.store.create(base, lambda job_id: stamp(text, job_id, created, origin))
 
     def views(self) -> list[JobView]:
         return self.listing().views
@@ -119,7 +120,7 @@ class JobsProvider:
         record = view.record
         if view.state is State.AWAITING_APPROVAL:
             raise JobStateError(f"job {job_id} is {view.state.value}; approve its goal first: "
-                                f"cure-job approve {job_id}")
+                                f"cure-job approve {job_id} --by user")
         if view.state is State.HELD and view.after is not None and not view.after.satisfied:
             raise JobStateError(f"after {view.after.id} is {view.after.state.value}")
         if view.state is State.HELD and view.blocked_by and is_ready(record):
@@ -134,6 +135,7 @@ class JobsProvider:
                 raise JobStateError(f"job {job_id} is {view.state.value} and its session {name} is live; "
                                     f"continue it: cure-job resume {job_id}")
         prompt = self._prepare_run(listing, view, "launch")
+        claude_args = [*WorkerSettings(self.plugin_root).arguments(), *claude_args]
         if tier(self.store.read_goal(job_id)) in ORCHESTRATED_TIERS:
             claude_args = ["--agent", ORCHESTRATOR, *claude_args]
         run = record.run + 1
@@ -162,6 +164,7 @@ class JobsProvider:
             raise SessionGone(f"job {job_id}: session {name} no longer exists; "
                               f"start a new run: cure-job launch {job_id}")
         prompt = self._prepare_run(listing, view, "resume")
+        claude_args = [*WorkerSettings(self.plugin_root).arguments(), *claude_args]
         # Resuming a live session starts a copy, so it is stopped first.
         self._stop_session(name, session)
         self._record_run(record, record.run + 1, name,
@@ -212,7 +215,7 @@ class JobsProvider:
                                        "list shows it launched, then running or lost") from unknown
 
     def approve(self, job_id: str, by: str = "user") -> None:
-        """Record the approval of the current ``goal.md`` of an unlaunched job.
+        """Record the approval of the current ``goal.md`` of an unlaunched job without open items.
 
         Reads only this job. A second call for the same goal writes nothing.
         """
@@ -225,6 +228,9 @@ class JobsProvider:
             raise JobStateError(f"job {job_id} has a result; approve needs a job without one")
         if not record.has_goal:
             raise JobStateError(f"job {job_id} has no goal file: {self.store.goal_path(job_id)} does not exist")
+        if record.open_items:
+            raise JobStateError(f"job {job_id}: {self.store.goal_path(job_id)} has {record.open_items} item(s) "
+                                "under ## Open; settle them before approve")
         if record.approved:
             return
         self.store.append_event(job_id, Approved(record.goal_digest, by, self.clock()))
@@ -306,11 +312,13 @@ class JobsProvider:
         self.store.append_event(job_id, Closed(reason))
 
     def set_origin(self, job_id: str, address: str) -> None:
-        """Record ``address`` as the session ``job_id`` reports back to. The latest one wins.
+        """Record ``address`` as the session ``job_id`` reports back to.
 
-        Refused once the job has a launched run: the run reads its origin at start.
+        Refused once the job has an origin, and once it has a launched run: the run reads its origin at start.
         """
         view = self._find(self.listing(), job_id)
+        if view.record.origin is not None:
+            raise JobStateError(f"job {job_id} already has origin {view.record.origin}; an origin is never replaced")
         if view.record.launches:
             raise JobStateError(f"job {job_id} has a launched run; origin is recorded only before the first launch")
         self.store.append_event(job_id, Origin(address, self.clock()))

@@ -1,21 +1,22 @@
 # Job run
 
-The session running the skill is the dispatcher. It invokes the skill with a handoff file and a job
-directory. A worker session then runs the goal and cannot reach the user.
+The caller invokes the skill with a handoff file and a job directory. The skill never asks the user
+in this mode. A worker session then runs the goal and cannot reach the user.
 
 ## Input
 
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
+- Read the `CLAUDE.md` of each repository in `repos`.
 - Read `handoff.delivery`, `handoff.branch` and `handoff.resource-risk` with
-  `<plugin-root>/bin/cure-job config get <key>` before the question round. Each prints JSON; the
+  `<plugin-root>/bin/cure-job config get <key>` before writing the goal. Each prints JSON; the
   built-in default applies when `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself.
 - Base of a job without `after`: the `base` the handoff states. When it states none, the default
   branch of each repository in `repos`, detected per repository with
   `git -C <repo> symbolic-ref --short refs/remotes/origin/HEAD` (strip the `origin/` prefix). When
   that fails, use `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` run in the repository.
-  When both fail, ask the user for the base in the question round, as the chain rule does. No configuration key
+  When both fail, write the base as an `## Open` item, as the chain rule does. No configuration key
   holds a base. A job with `after` follows "Base per repository".
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
@@ -44,8 +45,8 @@ row's `after`. Never use the handoff's `after:`.
 | Stop, unresolved | A passed row has `after-state` `missing` or `invalid`. |
 | End of chain | No job changes R: `base` comes from the handoff or the default branch (see Input). |
 
-Ask the user for the base of each repository left unresolved, in the question round. A job on the
-chain need not be `done` when the goal is written, but it has a `goal.md`: the dispatcher drafts a
+Write the base of each repository left unresolved as an `## Open` item. A job on the
+chain need not be `done` when the goal is written, but it has a `goal.md`: the caller drafts a
 successor's goal only after the predecessor's row has `goal` true. Every job on the chain is `done`
 when the successor launches, and the work item 1 base check tests the branch then.
 
@@ -56,6 +57,8 @@ fact check is the one in `rules.md`, not `<base>` equals `origin/<base>`.
 
 - Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts
   in the first repository, so a path relative to the origin session's directory does not resolve.
+- A work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory names
+  the directory as a literal absolute path under a trusted ancestor.
 
 ## Short holds in the goal
 
@@ -64,7 +67,7 @@ resources. The claimant claims it per step. The goal tells the claimant the foll
 
 - Claim `device:bench` before each step that uses the bench, and `build:<absolute path>` before each
   step that runs `bitbake`, `devtool` or `kas`. Release at the end of the step.
-- The rules are in `<plugin-root>/skills/goal/worker.md` "Short holds". The goal repeats none of
+- The rules are in `<plugin-root>/skills/goal/short-holds.md`. The goal repeats none of
   them and names the build directory of each build step.
 - Verify steps that use the bench carry their own claim and release in the work items.
 
@@ -83,18 +86,25 @@ directory belongs to the CLI: the goal never deletes it.
 
 ## Questions
 
-The dispatcher asks the user in the question round. The questions are the handoff's `## Open` items
-plus any fork `config get` does not answer, except a fork with no user-visible effect: record its
-recommended option under Settled as `(recommended)` and do not ask it. Ask them with
-`AskUserQuestion`, record the answers under Settled, then write `<job>/goal.md`.
+The skill never asks the user in this mode. It records each fork in `<job>/goal.md`.
+
+- A fork whose options differ in something the user would see is one `- ` item under a `## Open`
+  heading in `goal.md`. The item states the situation, the options, the consequence of each and a
+  recommendation, on one line.
+- The handoff's `## Open` items, a base left unresolved and a fork `config get` does not answer are
+  such forks.
+- A fork with no user-visible effect: record its recommended option under Settled as
+  `(recommended)`. Do not list it under `## Open`.
+- When the caller passes answers, each answered item moves under Settled with its answer. When no
+  item is left, remove the `## Open` heading.
 
 After `needs-input`, add the user's answers under Settled the same way. Then add one line under
 Settled: "Run <n>: the questions of the earlier `needs-input` exit are answered above and closed;
 continue from `<ledger path>`". Solo: "Run <n>: the questions of the earlier `needs-input` exit are
 answered above and closed; earlier work is in the tree".
 
-The line holds for both next steps: a resume of the kept session (`cure-job resume`) and a new run
-in a new session (`cure-job launch`) when the old one is gone.
+The line holds for both next steps: a resume of the kept session and a new run in a new session when
+the old one is gone.
 
 When a goal is extended after a `done` run, the new Settled line names the commits (`<base>..HEAD`) as the state. The ledger is deleted. In Light and Full it also names the retrospective when that file still exists. Solo has no retrospective.
 
@@ -102,88 +112,44 @@ At run time the worker takes the `needs-input:` exit for a question only the use
 
 A job goal's Waiting line reads: "Waiting: never waits; takes the `needs-input:` exit."
 
-## Checks before launch
-
-The dispatcher runs the Repository check before writing `<job>/goal.md`, because the ledger path and the Permissions check depend on the first repository. It runs the other checks after writing it. All run again on every wake before a launch. The Permissions check also runs before a resume whose permission mode changed.
-A failed check is fixed, or asked about in the dispatcher's question round, before launch.
-
-| Check | How | On failure |
-|---|---|---|
-| Tools | Run each executable that work item 1's tool check names, with the check's command, for example `devicectl --help`. | Install or fix it, or ask the user. After the user installs it, run the check again. |
-| Permissions | Auto mode: for each classifier-gated action the goal needs (for example `git commit --amend`, a force-push, device power), read the permission rules the worker loads. When the goal's Rules state a non-auto permission mode: the same for every tool the mode does not pass, each needing an allow rule. Under `acceptEdits` these are Bash command prefixes and MCP tools. Under `default` they also include Edit and Write. See the list below. | No rule allows the action or prefix: ask the user. |
-| Repository | Compare the handoff's first `repos` entry with the repositories the Work items edit. | The first repository holds none of the Work's edits: ask the user. See the answers below. |
-| Trust | For each work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory, the work item names the directory as a literal absolute path; any other path fails the check, and the dispatcher, through `cure:goal`, rewrites the work item to a literal path under a trusted ancestor. Read `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json` for the path and each ancestor. | No such entry is `true`: move the directory under a trusted ancestor. Ask the user to trust it only for a fixed directory that exists. |
-| Length | Run `wc -c <job>/goal.md`. | None. Report the count with the launch line. |
-
-The worker starts in the handoff's first repository. It loads these permission rules:
-
-- `~/.claude/settings.json`.
-- The managed settings file. Linux: `/etc/claude-code/managed-settings.json`. macOS:
-  `/Library/Application Support/ClaudeCode/managed-settings.json`.
-- `.claude/settings.json` and `.claude/settings.local.json` of the handoff's first repository.
-- The arguments given to `cure-job launch` after `--`, such as `--allowedTools` or `--settings`.
-
-An action counts as allowed only when an `allow` rule matches it and no `deny` or `ask` rule
-matches it. `Bash(<command prefix>:*)` matches a command by prefix. An MCP tool rule is
-`mcp__<server>__<tool>`.
-
-Approval of an action written in `goal.md` does not reach the auto-mode classifier. An approval the
-user gives in the dispatcher session does not either, so it does not pass the check. The question
-for a failed permission check offers these answers:
-
-| Answer | Effect |
-|---|---|
-| The user adds an allow rule | The check runs again. |
-| Drop the action | `goal.md` is edited through `cure:goal`. The check runs again. |
-| Launch anyway | Auto mode: the run is accepted to stop at `needs-input` when the classifier denies the action. Other modes: an unallowed tool opens a permission prompt and the job becomes `blocked` (`tell-blocked` in `dispatcher.md`). |
-
-The question to leave auto mode (an agent's "no verdict") offers these answers:
-
-| Answer | Effect |
-|---|---|
-| `acceptEdits` (recommended) | File edits pass. Other tools need allow rules. |
-| `default` | Every unapproved tool call stops the job. |
-| Stay in auto mode | The run is accepted to stop at `needs-input` again. |
-
-A mode the user chooses is written into the goal's Rules "Permission mode" line, and every later launch, resume and relaunch passes it. The dispatcher writes it in `dispatcher.md` "Answer and resume" step 1; "Relaunch and abandon" passes it.
-
-The question for a failed Repository check offers these answers:
-
-| Answer | Effect |
-|---|---|
-| Re-dispatch | The dispatcher runs `cure-job close <id>`. It sends the row's `origin` one line with `SendMessage`: the job id and "closed: re-dispatch with <repository> first in `repos`". When the `SendMessage` fails or the row has no `origin`, it prints the line in its own session. The origin session queues a new handoff with that repository first. |
-| Start in the first repository anyway | The decision is recorded under Settled in `goal.md`. The check passes on later wakes. |
-
-The dispatcher never adds a permission rule and never passes `--allowedTools` itself.
-
 ## Template text
 
 The worker sees only the goal file. Fill these slots when writing it: `<plugin-root>` with the
-plugin root from `SKILL.md`, `<id>` with the job id, `<dispatcher>` with the name of the session
-running the skill. If the session cannot determine its name, ask the user for it in the question round.
+plugin root from `SKILL.md`, `<id>` with the job id.
 
 The template's read-first line becomes:
 
 ```markdown
-Before work item 1, read `<plugin-root>/skills/goal/rules.md` and
-`<plugin-root>/skills/goal/worker.md` and follow them. Read them again after a context compaction
-and before an exit.
+Before work item 1, read `<plugin-root>/skills/goal/rules.md` and follow it. Read it again after a
+context compaction and before an exit.
 ```
+
+When the goal claims short holds, the line also names `<plugin-root>/skills/goal/short-holds.md`.
 
 Closing done-when item, after the template's last item:
 
 ```markdown
-N+1. Reported: `finish <id> --status done` exited 0 and the `job <id>` `SendMessage` to
-   `<dispatcher>`, or its error, are shown. A `finish` that exits non-zero is run once more.
+N+1. Reported: `<plugin-root>/bin/cure-job finish <id> --status done` exited 0 and the `notify:` line
+   it printed was sent with `SendMessage`, or its error is shown. A `finish` that exits non-zero is
+   run once more.
 
 Met when items 1-N are each demonstrated or listed in the shown `finish --unproven` with a reason
 in the final message, and N+1 is demonstrated. Unproven only when the worker cannot obtain the
 proof, never when its check ran and failed.
 ```
 
-Exits, in the template's exits slot:
+Exits, in the template's exits slot. Every tier carries the exit protocol:
 
 ```markdown
+Every exit runs in this order: (1) `<plugin-root>/bin/cure-job finish <id> --status <status>`
+(`cure-job finish --help` lists the options; never write `result.md` yourself); (2) `SendMessage`
+with the `notify:` line `finish` printed; (3) the final message. The `finish` command, its output
+and the `SendMessage` or its error are in the transcript before the final message. The final message
+restates each done-when item with its evidence. An item is unproven only when its proof is
+unavailable (a device, a login, a manual check), never when its check ran and failed; give a reason
+for each. Keep the goal file, the retrospective and the backlog; list the retrospective with
+`--retro`. Never touch the job directory.
+
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
 <review cause>, or the diff passes <lines> lines (per repository, in <repo>: insertions plus deletions of `git diff --shortstat <base commit>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`); the base commit is the one work item 1 recorded), or a consult's line estimate for a repository's files plus the lines already changed in it passes <lines> lines, or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice, or a Settled statement is false or the
@@ -191,10 +157,13 @@ title's outcome is unachievable; and (b) the retrospective's summary, naming the
 transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` exited non-zero
 twice; and (d) the final message starts with `failed:`.
 
-Also done when a question only the user can answer is open, reported as in N+1 with `--status
-needs-input`, and the final message starts with `needs-input:`.
-
-Also done when a resumed run finds no answer in Settled to the questions of the earlier `needs-input` exit, and the final message starts with `no-answer:`. The run calls no `finish`. The dispatcher then sees the job `stalled` and runs `confirm-stalled`, which asks the user to relaunch or abandon.
+Also done when a question only the user can answer is open, with no clean-up: the ledger and the
+working files stay, the session stays alive, and `finish` runs with `--status needs-input`, one
+`--question` per question and one `--kept` per kept file; the final message starts with
+`needs-input:`. A resumed run reads Settled: when it holds an answer, the questions of the earlier
+`needs-input:` exit are closed and the run continues from the ledger at the work item that stopped.
+When it holds none, the final message starts with `no-answer:`, the run calls no `finish`, and the
+run exits at once.
 ```
 
 Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal.
@@ -215,12 +184,4 @@ with outcome `failed`", the report clause as (c) and the final-message clause as
 
 ## Launch line
 
-`cure-job launch` starts a Light or Full job session with `--agent cure:orchestrator` and a Solo job session without `--agent`. The goal file does not name the agent.
-
-The dispatcher passes the goal's Rules "Permission mode" line on every launch, resume and relaunch, as `dispatcher.md` states.
-
-Report the absolute line, with no `claude --bg` form, and the `wc -c` count of `<job>/goal.md`. The dispatcher runs `cure-job approve <id>` first; a run-1 launch of a job that is not `approved` is refused:
-
-```
-<plugin-root>/bin/cure-job launch <id> [-- --permission-mode <mode>]
-```
+Report the absolute path of `<job>/goal.md` and its `wc -c` count.

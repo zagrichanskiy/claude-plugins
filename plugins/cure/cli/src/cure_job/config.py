@@ -13,6 +13,7 @@ regenerate it with ``PYTHONPATH=src python3 -m cure_job.config > ../skills/dispa
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -257,8 +258,8 @@ def init(path: Path, root: Path, version: str | None, notice: Callable[[str], No
     if problems:
         raise ConfigError(f"{old}: " + "; ".join(f"{p.key}: {p.problem}" for p in problems))
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "x", encoding="utf-8") as f:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf-8") as f:
             f.write(json.dumps(data, indent=2) + "\n")
         if old.exists():
             old.rename(old.with_name(OLD_FILE + ".bak"))

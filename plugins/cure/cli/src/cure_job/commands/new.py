@@ -6,7 +6,7 @@ import sys
 
 from .. import job_id
 from ..providers.jobs import JobsProvider
-from .base import Command
+from .base import Command, notify_line
 
 _STDIN = "-"
 
@@ -15,7 +15,8 @@ class NewCommand(Command):
     name = "new"
     usage = "cure-job new --slug SLUG [FILE]"
     help = "queue a handoff as a new job"
-    description = "Queue a handoff as a new job and print the job id"
+    description = ("Queue a handoff as a new job and print the job id and the message to send. The origin is "
+                   "the session of $CLAUDE_CODE_MESSAGING_SOCKET; a handoff that names an origin is refused")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("file", metavar="FILE", nargs="?", default=_STDIN,
@@ -26,7 +27,9 @@ class NewCommand(Command):
         self._parser = parser
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
-        self.cli.out(jobs.new(self._read(args.file), args.slug))
+        job_id = jobs.new(self._read(args.file), args.slug, self.cli.origin())
+        self.cli.out(job_id)
+        self.cli.out(notify_line(job_id))
         return 0
 
     def _read(self, path: str) -> str:

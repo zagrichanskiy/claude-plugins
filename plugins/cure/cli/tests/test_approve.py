@@ -369,7 +369,7 @@ def test_done_when_10_next_json_reports_the_actions_through_the_command(h, tmp_p
 def test_done_when_12_approve_writes_one_approved_event_with_the_goal_digest(h, tmp_path):
     job_id = h.new(tmp_path)
     goal_file(h, job_id).write_text("goal", encoding="utf-8")
-    assert h.run("approve", job_id) == 0
+    assert h.run("approve", job_id, "--by", "user") == 0
     events = [json.loads(line) for line in event_lines(h, job_id)]
     assert len(events) == 1
     assert events[0]["event"] == "approved"
@@ -381,9 +381,9 @@ def test_done_when_12_approve_writes_one_approved_event_with_the_goal_digest(h, 
 def test_done_when_12_the_same_digest_again_writes_nothing(h, tmp_path):
     job_id = h.new(tmp_path)
     goal_file(h, job_id).write_text("goal", encoding="utf-8")
-    assert h.run("approve", job_id) == 0
+    assert h.run("approve", job_id, "--by", "user") == 0
     before = event_lines(h, job_id)
-    assert h.run("approve", job_id) == 0
+    assert h.run("approve", job_id, "--by", "user") == 0
     assert h.run("approve", job_id, "--by", "auto") == 0
     assert event_lines(h, job_id) == before
 
@@ -391,9 +391,9 @@ def test_done_when_12_the_same_digest_again_writes_nothing(h, tmp_path):
 def test_done_when_12_a_changed_goal_gets_a_new_approved_event(h, tmp_path):
     job_id = h.new(tmp_path)
     goal_file(h, job_id).write_text("goal", encoding="utf-8")
-    h.run("approve", job_id)
+    h.run("approve", job_id, "--by", "user")
     goal_file(h, job_id).write_text("goal, edited", encoding="utf-8")
-    assert h.run("approve", job_id) == 0
+    assert h.run("approve", job_id, "--by", "user") == 0
     digests = [json.loads(line)["goal"] for line in event_lines(h, job_id)]
     assert len(digests) == 2 and digests[0] != digests[1]
     assert rows(h)[job_id]["state"] == "approved"
@@ -417,7 +417,7 @@ def test_done_when_12_by_rejects_an_unknown_approver(h, tmp_path):
 
 def test_done_when_12_approve_without_a_goal_exits_one_and_writes_nothing(h, tmp_path, capsys):
     job_id = h.new(tmp_path)
-    assert h.run("approve", job_id) == 1
+    assert h.run("approve", job_id, "--by", "user") == 1
     assert "goal" in capsys.readouterr().err
     assert event_lines(h, job_id) == []
 
@@ -431,7 +431,7 @@ def test_done_when_12_approve_of_a_launched_closed_or_finished_job_exits_one(h, 
     h.run("close", closed_id)
     for job_id in (launched_id, closed_id):
         before = event_lines(h, job_id)
-        assert h.run("approve", job_id) == 1
+        assert h.run("approve", job_id, "--by", "user") == 1
         assert event_lines(h, job_id) == before
 
 

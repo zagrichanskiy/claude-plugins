@@ -110,6 +110,18 @@ C++ supplement named the pitfall. Each of these guards addresses one miss; keep 
 The earlier findings are deliberately not given to the agents. That would be a topic brief, which
 `review-change` step 3 forbids; the carry-over check belongs to the merge.
 
+## Goals that edit cure's own prompts
+
+These rules apply to a goal written for this repository (`cure:goal` reads this file) whose work
+changes a prompt under `plugins/cure/`. All tiers follow them.
+
+| Change | Rule |
+|---|---|
+| How a job is launched or resumed | The goal names `agents/dispatcher.md` in the work item that makes the change. |
+| A format a run session follows | The goal names `skills/goal/rules.md` or `skills/goal/short-holds.md`, and its copy in `agents/orchestrator.md`, in the work item that makes the change. |
+| A step added to the dispatcher | A Settled statement names each `cure-job next` action (a row of the Actions table in `agents/dispatcher.md`) whose procedure runs the step. |
+| Both `agents/dispatcher.md` and a worker prompt (`skills/goal/rules.md`, `skills/goal/short-holds.md`, `skills/goal/job.md` or `agents/orchestrator.md`) | A Light goal has two review rounds. The second round re-checks only the first round's fixes. |
+
 ## Marketplace names resembling official ones are rejected
 
 `claude plugin marketplace add` refuses a manifest whose `name` looks like an official

@@ -3,7 +3,8 @@
 ``JobStore`` is the state-root seam: production code builds it on
 ``~/.claude/cure`` and a test builds it on a temporary directory. The layout is
 ``<root>/jobs/<id>/`` with ``handoff.md``, ``goal.md``, ``dispatch.jsonl``,
-``result.md`` and ``result-<run>.md``.
+``result.md`` and ``result-<run>.md``. The root and ``jobs/`` are private to
+the user (0700), and every file the store writes is 0600.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ from typing import Callable, Iterator, NamedTuple, Sequence
 from . import job_id as ids
 from .errors import HandoffError, StoreError, UnknownJob
 from .events import Event, decode, encode
-from .goal import digest
+from .goal import digest, open_items
 from .handoff import Handoff, parse_handoff
 from .job import JobRecord
 from .result import parse_result
@@ -35,6 +36,8 @@ _RESULT = "result.md"
 _ENCODING = "utf-8"
 _NEW_PREFIX = ".new-"
 _ARCHIVED = re.compile(r"result-([1-9][0-9]*)\.md")
+_DIR_MODE = 0o700
+_FILE_MODE = 0o600
 
 
 class HalfCreated(NamedTuple):
@@ -50,6 +53,8 @@ class InvalidJob(NamedTuple):
     dir: Path
     #: The error. It names the file.
     problem: str
+    #: The ``## Open`` items of its ``goal.md``; 0 when that does not read.
+    open_items: int = 0
 
 
 class Snapshot(NamedTuple):
@@ -61,6 +66,14 @@ class JobStore:
     def __init__(self, root: Path):
         self.root = Path(root)
         self._jobs = self.root / _JOBS
+        # A root an earlier version created keeps its wider mode until here.
+        for directory in (self.root, self._jobs):
+            try:
+                with _store_errors(directory):
+                    os.chmod(directory, _DIR_MODE)
+            except StoreError as e:
+                if not isinstance(e.__cause__, FileNotFoundError):
+                    raise
 
     def job_dir(self, job_id: str) -> Path:
         if not ids.is_valid(job_id):
@@ -75,15 +88,15 @@ class JobStore:
 
     def create(self, base_id: str, render: Callable[[str], str]) -> str:
         """Reserve the first free id from ``base_id`` on, write ``render(id)`` as its handoff."""
-        with _store_errors(self._jobs):
-            os.makedirs(self._jobs, exist_ok=True)
+        self._make_jobs()
         job_id = self._reserve(base_id)
         reserved = self.job_dir(job_id)
         staging = None
         try:
             with _store_errors(reserved):
+                # mkdtemp creates the directory 0700.
                 staging = tempfile.mkdtemp(prefix=_NEW_PREFIX, dir=self._jobs)
-                Path(staging, _HANDOFF).write_text(render(job_id), encoding=_ENCODING)
+                _write_new(Path(staging, _HANDOFF), render(job_id))
                 # POSIX rename replaces the empty reserved directory in one
                 # step, so a job directory never appears without handoff.md.
                 os.rename(staging, reserved)
@@ -122,7 +135,8 @@ class JobStore:
             try:
                 record = self._read(name)
             except (HandoffError, StoreError) as e:
-                invalid.append(InvalidJob(name, self._jobs / name, str(e)))
+                directory = self._jobs / name
+                invalid.append(InvalidJob(name, directory, str(e), _open_items_or_zero(directory / _GOAL)))
                 continue
             if record is not None:
                 records.append(record)
@@ -131,8 +145,8 @@ class JobStore:
     @contextlib.contextmanager
     def locked(self) -> Iterator[None]:
         """Hold an exclusive ``flock`` on the ``jobs/`` directory. Creates no lock file."""
+        self._make_jobs()
         with _store_errors(self._jobs):
-            os.makedirs(self._jobs, exist_ok=True)
             descriptor = os.open(self._jobs, os.O_RDONLY | os.O_DIRECTORY)
         try:
             with _store_errors(self._jobs):
@@ -152,7 +166,7 @@ class JobStore:
         path = self.job_dir(job_id) / _EVENTS
         line = "".join(encode(event) + "\n" for event in events).encode(_ENCODING)
         with _store_errors(path):
-            descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+            descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, _FILE_MODE)
             try:
                 # One write call on an O_APPEND descriptor: a concurrent
                 # command cannot interleave inside the lines.
@@ -216,7 +230,7 @@ class JobStore:
             try:
                 with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
                     sink.write(changed)
-                os.chmod(temp, stat.S_IMODE(os.stat(target).st_mode))
+                os.chmod(temp, _FILE_MODE)
                 os.replace(temp, target)
             except BaseException:
                 with contextlib.suppress(FileNotFoundError):
@@ -290,7 +304,7 @@ class JobStore:
             try:
                 with _store_errors(path):
                     # No parents and no exist_ok: the failure is how a collision is detected.
-                    os.mkdir(path)
+                    os.mkdir(path, _DIR_MODE)
             except StoreError as e:
                 if isinstance(e.__cause__, FileExistsError):
                     continue
@@ -298,6 +312,12 @@ class JobStore:
             return candidate
         raise StoreError(f"no free job id: {self.job_dir(base_id)} and its suffixes up to "
                          f"-{ids.MAX_SUFFIX} exist")
+
+    def _make_jobs(self) -> None:
+        # makedirs gives only the leaf its mode argument, so the root is made first.
+        with _store_errors(self._jobs):
+            os.makedirs(self.root, _DIR_MODE, exist_ok=True)
+            os.makedirs(self._jobs, _DIR_MODE, exist_ok=True)
 
     def _read(self, job_id: str) -> JobRecord | None:
         """The record of ``job_id``, or ``None`` when it has no ``handoff.md``."""
@@ -307,16 +327,18 @@ class JobStore:
             return None
         events, events_mtime = self._read_events(directory / _EVENTS)
         result_text, result_mtime = _read_text(directory / _RESULT)
+        goal_digest, goal_open_items = _read_goal(directory / _GOAL)
         return JobRecord(
             id=job_id,
             dir=directory,
             handoff=_parse_stored_handoff(directory / _HANDOFF, handoff_text),
-            goal_digest=_goal_digest(directory / _GOAL),
+            goal_digest=goal_digest,
             events=events,
             result=None if result_text is None else parse_result(result_text),
             result_mtime=result_mtime,
             events_mtime=events_mtime,
-            archived_runs=_archived_runs(directory))
+            archived_runs=_archived_runs(directory),
+            open_items=goal_open_items)
 
     def _read_events(self, path: Path) -> tuple[tuple[Event, ...], datetime | None]:
         text, mtime = _read_text(path)
@@ -349,15 +371,32 @@ def _archived_runs(directory: Path) -> frozenset[int]:
     return frozenset(int(match.group(1)) for match in map(_ARCHIVED.fullmatch, names) if match)
 
 
-def _goal_digest(path: Path) -> str | None:
+def _read_goal(path: Path) -> tuple[str | None, int]:
+    """The digest and the ``## Open`` item count of ``goal.md`` from one read, or ``(None, 0)`` when it is absent."""
     try:
         with _store_errors(path):
             with open(path, "rb") as source:
-                return digest(source.read())
+                data = source.read()
     except StoreError as e:
         if isinstance(e.__cause__, (FileNotFoundError, NotADirectoryError)):
-            return None
+            return None, 0
         raise
+    # A goal that is not UTF-8 does not make the job invalid.
+    return digest(data), open_items(data.decode(_ENCODING, errors="replace"))
+
+
+def _open_items_or_zero(path: Path) -> int:
+    try:
+        return _read_goal(path)[1]
+    except StoreError:
+        return 0
+
+
+def _write_new(path: Path, text: str) -> None:
+    """Write ``text`` to the new file ``path``, mode 0600."""
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _FILE_MODE)
+    with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+        sink.write(text)
 
 
 def _parse_stored_handoff(path: Path, text: str) -> Handoff:

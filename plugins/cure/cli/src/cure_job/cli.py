@@ -2,10 +2,11 @@
 
 :class:`Cli` owns the output sink and the :class:`~cure_job.providers.jobs.JobsProvider`,
 assembles the root parser by asking each command to register itself, and drives
-dispatch. :func:`main` is the composition root and the only reader of the
-environment: a test builds a :class:`Cli` with its own root, its own
-``config.json`` path and its own ``claude``, and can reach neither ``~/.claude``,
-``~/.config`` nor the real binary.
+dispatch. :func:`main` is the composition root and reads the root, the
+``config.json`` path and the binary from the environment: a test builds a
+:class:`Cli` with its own root, its own ``config.json`` path and its own
+``claude``, and can reach neither ``~/.claude``, ``~/.config`` nor the real
+binary. :meth:`Cli.origin` reads the messaging socket of the calling session.
 """
 from __future__ import annotations
 
@@ -47,6 +48,7 @@ CLAUDE_ENV = "CURE_JOB_CLAUDE"
 CONFIG_ENV = "CURE_JOB_CONFIG"
 DEFAULT_ROOT = "~/.claude/cure"
 DEFAULT_CLAUDE = "claude"
+MESSAGING_SOCKET_ENV = "CLAUDE_CODE_MESSAGING_SOCKET"
 
 #: Flush every line so a caller that reads a pipe sees the output at once.
 _flush_print = functools.partial(print, flush=True)
@@ -66,6 +68,11 @@ class Cli:
                           StopCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
                           ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), ConfigCommand(self)]
         self._parser = self._build_parser()
+
+    def origin(self) -> str | None:
+        """The address of the calling session, ``uds:<socket path>``, or ``None`` outside a session."""
+        socket = os.environ.get(MESSAGING_SOCKET_ENV)
+        return f"uds:{socket}" if socket else None
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = style(argparse.ArgumentParser(
@@ -111,7 +118,12 @@ def main(argv: list[str] | None = None) -> int:
     # bare name is left to the PATH lookup.
     if os.sep in binary:
         binary = os.path.abspath(binary)
-    return Cli(root=root, config_path=config_path, claude=ClaudeCli(binary)).run(argv)
+    try:
+        cli = Cli(root=root, config_path=config_path, claude=ClaudeCli(binary))
+    except CureJobError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    return cli.run(argv)
 
 
 if __name__ == "__main__":

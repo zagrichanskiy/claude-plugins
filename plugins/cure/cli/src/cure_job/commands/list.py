@@ -39,6 +39,8 @@ class ListCommand(Command):
                 line += f"  after={row['after']}:{row['after-state']}"
             if row["prs"]:
                 line += "  prs=" + ",".join(row["prs"])
+            if row["open"]:
+                line += f"  open={row['open']}"
             if row["state"] == INVALID:
                 line += "  " + row["problem"]
             self.cli.out(line)
@@ -52,7 +54,7 @@ INVALID = "invalid"
 def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
-            "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
+            "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
             "after": None, "after-state": None}
 
 
@@ -72,6 +74,7 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "blocked-by": list(view.blocked_by),
         "goal": record.has_goal,
         "approved": record.approved,
+        "open": record.open_items,
         "problem": record.result.problem if record.result else None,
         "waiting-for": waiting_for,
         "reported": record.reported,
