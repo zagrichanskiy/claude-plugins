@@ -4,13 +4,17 @@ The file is a JSON object of groups, each an object of keys:
 ``{"handoff": {"delivery": "pr"}}``. Internally every key goes by its dotted
 name in :data:`DEFAULTS` (``handoff.delivery``); a key without a dot sits at the
 top level. A missing file means every default. A key in error takes its default and is
-reported as a :class:`Problem`; :class:`~cure_job.cli.Cli` decides whether a
-problem stops the command.
+reported as a :class:`Problem`; any problem puts the CLI in safe mode, in which
+``prune`` removes no job and ``approve --by auto`` is refused.
+
+``skills/dispatch/config.example.json`` is the output of :func:`example`;
+regenerate it with ``PYTHONPATH=src python3 -m cure_job.config > ../skills/dispatch/config.example.json``.
 """
 from __future__ import annotations
 
 import json
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -71,8 +75,25 @@ class Config:
         return self.values[key]
 
 
-def load(root: Path) -> Config:
-    path = root / FILE
+def fallback(problem: Problem) -> str:
+    """The line a command that goes on with the defaults prints for ``problem``."""
+    if problem.key is None:
+        return f"{problem}; using every default"
+    if problem.key not in DEFAULTS:
+        return f"{problem}; ignored"
+    return f"{problem}; using default {json.dumps(DEFAULTS[problem.key])}"
+
+
+def plugin_version(plugin_root: Path) -> str | None:
+    """The ``version`` in the plugin's ``plugin.json``, or ``None`` when it cannot be read."""
+    try:
+        version = json.loads((plugin_root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
+    except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError):
+        return None
+    return version if isinstance(version, str) else None
+
+
+def load(path: Path, version: str | None) -> Config:
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -85,10 +106,10 @@ def load(root: Path) -> Config:
         return Config(problems=(Problem(None, f"invalid JSON: {e}"),))
     if not isinstance(data, dict):
         return Config(problems=(Problem(None, "not a JSON object"),))
-    return validate(data)
+    return validate(data, version)
 
 
-def validate(data: dict) -> Config:
+def validate(data: dict, version: str | None) -> Config:
     """Validate the nested form of ``config.json``."""
     values = dict(DEFAULTS)
     problems: list[Problem] = []
@@ -96,14 +117,14 @@ def validate(data: dict) -> Config:
         if key in GROUPS:
             if isinstance(value, dict):
                 for name, item in value.items():
-                    _check(f"{key}.{name}", item, values, problems)
+                    _check(f"{key}.{name}", item, values, problems, version)
             else:
                 problems.append(Problem(key, f"group is not a JSON object, got {json.dumps(value)}"))
         elif "." in key and key in DEFAULTS:
             group, name = key.split(".", 1)
             problems.append(Problem(key, f'flat key; write it as {{"{group}": {{"{name}": ...}}}}'))
         else:
-            _check(key, value, values, problems)
+            _check(key, value, values, problems, version)
     return Config(values, tuple(problems))
 
 
@@ -119,12 +140,19 @@ def nest(values: dict[str, object]) -> dict[str, object]:
     return nested
 
 
-def _check(key: str, value: object, values: dict[str, object], problems: list[Problem]) -> None:
+def example() -> str:
+    """The text of ``config.example.json``: every key with its default."""
+    return json.dumps(nest(DEFAULTS), indent=2) + "\n"
+
+
+def _check(key: str, value: object, values: dict[str, object], problems: list[Problem],
+           version: str | None) -> None:
     if problem := removed(key):
         if problem not in problems:
             problems.append(problem)
     elif key not in DEFAULTS:
-        problems.append(Problem(key, "unknown key"))
+        cure = f"cure {version}" if version else "this cure"
+        problems.append(Problem(key, f"unknown to {cure}; restart the dispatcher after an update"))
     elif problem := _CHECKS[key](value):
         problems.append(Problem(key, problem))
     else:
@@ -197,23 +225,31 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
 _OLD_SCALARS = {"delivery": "handoff.delivery", "branch": "handoff.branch"}
 
 
-def init(root: Path, notice: Callable[[str], None]) -> Path:
-    """Write ``config.json`` from the defaults and ``defaults.md``, then rename ``defaults.md``.
+def init(path: Path, root: Path, version: str | None, notice: Callable[[str], None]) -> Path:
+    """Create ``path``: move ``config.json`` from the state ``root``, else write it from the defaults
+    and ``defaults.md`` and rename ``defaults.md``.
 
     ``notice`` receives one line for each ``defaults.md`` row that is dropped.
     """
-    path, old = root / FILE, root / OLD_FILE
+    old = root / OLD_FILE
     if path.exists():
         raise ConfigError(f"{path} exists")
+    if (root / FILE).exists():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(root / FILE, path)
+        except OSError as e:
+            raise ConfigError(f"cannot move {root / FILE} to {path}: {e}") from e
+        return path
     data: dict[str, object] = dict(DEFAULTS)
     if old.exists():
         data.update(_from_defaults_md(old, notice))
     data = nest(data)
-    problems = validate(data).problems
+    problems = validate(data, version).problems
     if problems:
         raise ConfigError(f"{old}: " + "; ".join(f"{p.key}: {p.problem}" for p in problems))
     try:
-        root.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "x", encoding="utf-8") as f:
             f.write(json.dumps(data, indent=2) + "\n")
         if old.exists():
@@ -266,3 +302,7 @@ def _from_defaults_md(path: Path, notice: Callable[[str], None]) -> dict[str, ob
     if risks:
         found["handoff.resource-risk"] = risks
     return found
+
+
+if __name__ == "__main__":
+    print(example(), end="")

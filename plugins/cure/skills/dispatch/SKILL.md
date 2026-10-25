@@ -38,9 +38,12 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 
 A small change does not affect customers: a fix, a small refactoring, a doc edit.
 
-The configuration file is `${CURE_JOB_ROOT:-~/.claude/cure}/config.json`. A missing file means the
+The configuration file is `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}`. One file serves all jobs. A missing file means the
 built-in defaults. Read a value with `<plugin-root>/bin/cure-job config get <key>`; it prints JSON.
-Never read the file. `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json` is an example of it.
+Never read the file. The defaults live only in the key table of `config.py`.
+`${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json` is generated from that table and is never read at runtime.
+
+On a config error (parse error, bad value, unknown key, removed key) the CLI is in safe mode: a bad key takes its default, an unparseable file gives all defaults, `prune` removes no job and exits 1, `approve --by auto` exits 1, and `next` exits 0 with a `config-error` element.
 
 | Key | Used for |
 |---|---|
