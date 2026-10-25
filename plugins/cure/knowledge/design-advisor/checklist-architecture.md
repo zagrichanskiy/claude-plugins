@@ -21,32 +21,17 @@ supplement for the target's language.
   measurable attributes: end-to-end latency, sustained frame or message rate, CPU headroom, memory
   ceiling, power, boot time, range. Flag a document that discusses structure without ever stating a
   target for any of them.
-- **Attributes come as scenarios, not adjectives** (ATAM). "Low latency" is not a requirement.
-  "Operator sees a box within 150 ms of the frame that contains it, at 30 fps, on four Cortex-A76
-  cores" is one, and it can be falsified.
+- **State each goal as a sentence with its target number.** Write it as "we want ..." or "as a
+  developer I want ...", for example "we want the first frame on screen within 2 s of power-on".
+  Every goal carries a target number. An adjective goal with no number ("low latency") is not a
+  requirement.
+- **How a goal is checked is not part of the goal.** The check belongs in §7 (Operation) of the
+  document skeleton, under validation, not in §1 (Motivation and scope).
 - **Requirements the team already wrote down beat requirements you invent.** Look for them (task
   tracker, a requirements document, an epic) before assuming none exist, and say plainly when the
   budget in the document has no stated source.
 - **Flag attributes in tension** and say which one wins. Resolution versus frame rate, image quality
   versus detectability, latency versus buffering, accuracy versus quantization.
-
-### Product quality characteristics (ISO/IEC 25010:2023)
-
-Check the target against each characteristic of the 2023 revision. Where the 2011 revision used
-another name, it is given in brackets. Each row is one row of the quality-attribute coverage in a
-review: stated with a scenario, missing (a finding), or not applicable with a reason.
-
-| Characteristic | Sub-characteristics | What to check in this domain |
-|---|---|---|
-| Functional suitability | completeness, correctness, appropriateness | Each stated mission task maps to a component that performs it; detection, tracking or telemetry output has an accuracy target and a way to measure it. |
-| Performance efficiency | time behaviour, resource utilisation, capacity | End-to-end latency, sustained frame or message rate, CPU, NPU, memory and power per stage against the budget in §4 (Resource reality on fixed hardware). |
-| Compatibility | co-existence, interoperability | Two components sharing a board, a bus, a camera or a radio channel; wire protocols (MAVLink, RTSP, the IPC schema) and their versions across mixed releases. |
-| Interaction capability (usability) | appropriateness recognisability, learnability, operability, user error protection, user engagement, inclusivity, user assistance, self-descriptiveness | What the operator sees when the link degrades or a stage stops; whether a ground-station action can put the device in an unsafe or unrecoverable state. |
-| Reliability | faultlessness (maturity), availability, fault tolerance, recoverability | Behaviour under overload, link loss and partial failure per §5 (Failure, degradation and the link); restart time and state lost; weeks of uptime without a leak. |
-| Security | confidentiality, integrity, non-repudiation, accountability, authenticity, resistance | Trust boundaries per §10 (Trust boundaries): the link, the update path, model artifacts, removable media. |
-| Maintainability | modularity, reusability, analysability, modifiability, testability | Replaying a field recording on a desk per §6 (Diagnosability in the field); swapping one component without touching others; a test seam at each boundary. |
-| Flexibility (portability) | adaptability, scalability, installability, replaceability | Cost of a board, camera or model change per §7 (Portability and vendor lock-in); a Yocto image and an update path that install on every target machine. |
-| Safety (new in 2023) | operational constraint, risk identification, fail safe, hazard warning, safe integration | What the device does when a stage fails in flight: a defined fail-safe state, a warning to the operator, and no path where a software fault commands the airframe or payload unsafely. |
 
 ## 2. Boundaries and contracts
 
@@ -241,13 +226,14 @@ first three are required even when there are no findings.
 
    `| Component or boundary | §1 | §2 | … | §12 |`
 
-   Quality attributes: one row per characteristic of §1 (Quality attributes, with numbers), for the
-   system as a whole:
+   Quality attributes: one row per goal of the document under review, checked against §1 (Quality
+   attributes, with numbers). When there is no document under review (a system-level review of a
+   change) or the document states no goals, the table has one row `none stated` with a finding:
 
-   `| Characteristic | Status | Scenario or reason | Finding |`
+   `| Goal | Target number | Finding |`
 
-   *Status* is `stated`, `missing` (a finding) or `n/a` (with the reason). Each cell of the first
-   table holds one value:
+   *Target number* is the number the goal states, or `none`. Each goal with `none` has a finding.
+   Each cell of the first table holds one value:
 
    | Value | Meaning |
    |---|---|
@@ -272,8 +258,8 @@ sections that remain keep this order.
 
 ### 1. Motivation and scope
 
-The problem, a context diagram, and the goals. Write a goal in the form "we want ..." or "as a
-developer I want ..." where that form fits. List the non-goals and the constraints. Non-goals stop
+The problem, a context diagram, and the goals. Each goal is a "we want ..." or "as a developer I
+want ..." sentence with a target number. List the non-goals and the constraints. Non-goals stop
 the document growing.
 
 ### 2. Concepts
@@ -302,7 +288,7 @@ answer.
 ### 7. Operation
 
 One subsection each for resource budget, validation, deployment and security, each only when it
-applies.
+applies. The validation subsection gives one check per §1 goal.
 
 ### 8. Stages
 

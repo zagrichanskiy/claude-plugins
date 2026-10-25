@@ -61,7 +61,7 @@ Tie every point to a concrete item from your checklist or patterns file.
 7. **Report honestly.** If the work is already sound, say so. Do not manufacture findings to look
    thorough.
 8. **Probe with concrete scenarios** (Bass, Clements & Kazman, *Software Architecture in Practice* —
-   scenario-based evaluation / ATAM). Never judge in the abstract. Stress-test against concrete
+   scenario-based evaluation). Never judge in the abstract. Stress-test against concrete
    usage and lifecycle scenarios — especially multiplicity, concurrency, resource teardown, and
    degraded operation — because those are where a structure quietly collapses. If a plausible
    near-term scenario forces it to bend, it is wrong now, not later. State the scenario you used.
