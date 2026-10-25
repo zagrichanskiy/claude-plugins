@@ -245,7 +245,8 @@ def init(path: Path, root: Path, version: str | None, notice: Callable[[str], No
         raise ConfigError(f"{path} exists")
     if (root / FILE).exists():
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            (root / FILE).chmod(0o600)
             shutil.move(root / FILE, path)
         except OSError as e:
             raise ConfigError(f"cannot move {root / FILE} to {path}: {e}") from e
