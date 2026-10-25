@@ -1,4 +1,4 @@
-"""The goal file: its digest, its tier, and the plugin paths in it.
+"""The goal file: its digest, its tier, its open items, and the plugin paths in it.
 
 An approval names the sha256 of the goal file's bytes, so any edit of the file
 revokes it. A goal file names files of the cure plugin by the path of the version that
@@ -26,6 +26,8 @@ RULES = Path("skills", "goal", "rules.md")
 _CACHED_ROOT = re.compile(r"[/~][^\s\"'`<>()\[\]]*?/plugins/cache/[^/\s]+/cure/[^/\s]+/")
 
 _RULES_HEADING = re.compile(r"^## Rules[ \t]*$", re.MULTILINE)
+_OPEN_HEADING = re.compile(r"^## Open\b.*$", re.MULTILINE)
+_OPEN_ITEM = re.compile(r"^[ \t]*\S", re.MULTILINE)
 _NEXT_HEADING = re.compile(r"^#{1,2} ", re.MULTILINE)
 _TIER_LINE = re.compile(r"^(?:[-*] )?Tier: (\w+)\b", re.MULTILINE)
 
@@ -42,10 +44,26 @@ def tier(text: str) -> str | None:
     return match.group(1)
 
 
+def open_items(text: str) -> int:
+    """The number of non-blank lines under every ``## Open`` heading, each up to the next ``#`` or ``##`` heading."""
+    count = 0
+    for heading in _OPEN_HEADING.finditer(text):
+        following = _NEXT_HEADING.search(text, heading.end())
+        count += len(_OPEN_ITEM.findall(text, heading.end(), following.start() if following else len(text)))
+    return count
+
+
 def retarget(text: str, plugin_root: Path) -> str:
     """``text`` with each cached cure plugin root replaced by ``plugin_root``."""
     replacement = str(plugin_root).rstrip("/") + "/"
     return _CACHED_ROOT.sub(lambda match: replacement, text)
+
+
+def missing_paths(text: str, plugin_root: Path) -> list[str]:
+    """The paths under ``plugin_root`` that ``text`` names and that do not exist."""
+    root = str(plugin_root).rstrip("/") + "/"
+    named = re.findall(re.escape(root) + r"[^\s\"'`<>()\[\]]+", text)
+    return sorted({path.rstrip(".,;:*") for path in named if not Path(path.rstrip(".,;:*")).exists()})
 
 
 def digest(data: bytes) -> str:

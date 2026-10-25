@@ -12,16 +12,16 @@ from .base import Command, job_id_arg
 
 class ApproveCommand(Command):
     name = "approve"
-    usage = "cure-job approve ID [--by user|auto]"
+    usage = "cure-job approve ID --by user|auto"
     help = "approve the goal of a job before its first launch"
-    description = ("Approve the current goal.md of a job that has no launched run and no result. "
-                   "An edit of goal.md revokes the approval. A second call for the same goal does nothing. "
-                   "--by auto exits 1 while config.json has an error")
+    description = ("Approve the current goal.md of a job that has no launched run and no result. A goal.md "
+                   "with items under ## Open is refused. An edit of goal.md revokes the approval. A second call "
+                   "for the same goal does nothing. --by auto exits 1 while config.json has an error")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")
-        parser.add_argument("--by", choices=APPROVERS, default=APPROVERS[0],
-                            help="user: the user approved; auto: the auto-approve rule applied (default: user)")
+        parser.add_argument("--by", choices=APPROVERS, required=True,
+                            help="user: the user approved; auto: the auto-approve rule applied")
         parser.set_defaults(config_mode="none")
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:

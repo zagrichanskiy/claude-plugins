@@ -2,7 +2,8 @@
 
 ``repos`` names the resources a job locks. ``device`` declares bench use; the
 bench is a short hold the job claims per step. ``origin``, optional,
-names the session the job reports back to. ``after``, optional, names the
+names the session the job reports back to; ``cure-job new`` writes it, and a
+submitted handoff that names it is refused. ``after``, optional, names the
 job this one is stacked on. Every other field and section
 belongs to the dispatcher and is not checked here.
 """
@@ -16,7 +17,9 @@ from . import job_id as ids
 from . import resource
 from .clock import format_local
 from .errors import HandoffError
-from .frontmatter import FrontmatterError, as_list, parse, set_scalars
+from .frontmatter import FrontmatterError, Value, as_list, is_writable, parse, set_scalars
+
+ORIGIN = "origin"
 
 
 class Device(enum.Enum):
@@ -41,10 +44,25 @@ class Handoff:
 
 
 def parse_handoff(text: str) -> Handoff:
+    return _handoff(_entries(text))
+
+
+def parse_submitted(text: str) -> Handoff:
+    """The handoff ``cure-job new`` receives. It must not name the origin, which ``new`` binds."""
+    entries = _entries(text)
+    if ORIGIN in entries:
+        raise HandoffError(f"{ORIGIN} is set; cure-job new binds the origin itself, so remove the entry")
+    return _handoff(entries)
+
+
+def _entries(text: str) -> dict[str, Value]:
     try:
-        entries = parse(text)
+        return parse(text)
     except FrontmatterError as e:
         raise HandoffError(f"invalid frontmatter: {e}") from e
+
+
+def _handoff(entries: dict[str, Value]) -> Handoff:
     repos: list[str] = []
     for entry in as_list(entries.get("repos")):
         try:
@@ -55,7 +73,7 @@ def parse_handoff(text: str) -> Handoff:
             repos.append(name)
     if not repos:
         raise HandoffError("repos is missing or empty")
-    origin = entries.get("origin")
+    origin = entries.get(ORIGIN)
     if isinstance(origin, list):
         raise HandoffError("origin is a list; expected one session name")
     after = entries.get("after") or None
@@ -73,9 +91,14 @@ def parse_handoff(text: str) -> Handoff:
         raise HandoffError(f"device is {device!r}; expected {choices}") from None
 
 
-def stamp(text: str, job_id: str, created: datetime) -> str:
-    """``text`` with the ``id`` and ``created`` entries the CLI owns."""
+def stamp(text: str, job_id: str, created: datetime, origin: str | None = None) -> str:
+    """``text`` with the ``id``, ``created`` and, when given, ``origin`` entries the CLI owns."""
+    values = {"id": job_id, "created": format_local(created)}
+    if origin is not None:
+        if not is_writable(origin):
+            raise HandoffError(f"{ORIGIN} {origin!r} is empty, padded or more than one line")
+        values[ORIGIN] = origin
     try:
-        return set_scalars(text, {"id": job_id, "created": format_local(created)})
+        return set_scalars(text, values)
     except FrontmatterError as e:
         raise HandoffError(f"invalid frontmatter: {e}") from e

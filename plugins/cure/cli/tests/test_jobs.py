@@ -13,7 +13,7 @@ from cure_job.providers.jobs import JobsProvider
 from cure_job.resource import DEVICE_BENCH
 from cure_job.state import LAUNCH_GRACE, State
 from cure_job.store import JobStore
-from tests.builders import NOW, handoff_text, set_age
+from tests.builders import NOW, handoff_text, set_age, settings_args
 from tests.fakes import FakeClaude, FakeClock
 
 REPO = "/work/video-core"
@@ -176,13 +176,13 @@ def test_launch_starts_the_session_in_the_first_repo_with_the_goal_prompt(jobs, 
     job_id = new_job(jobs, clock, approved=True)
     session = jobs.launch(job_id)
     assert session == job_id
-    assert claude.started == [(job_id, REPO, f"/goal @{store.goal_path(job_id)}", ())]
+    assert claude.started == [(job_id, REPO, f"/goal @{store.goal_path(job_id)}", settings_args(job_id))]
 
 
 def test_launch_passes_claude_arguments_through(jobs, claude, clock):
     job_id = new_job(jobs, clock, approved=True)
-    jobs.launch(job_id, ["--add-dir", "/work/other"])
-    assert claude.started[0][3] == ("--add-dir", "/work/other")
+    jobs.launch(job_id, ["--permission-mode", "auto"])
+    assert claude.started[0][3] == (*settings_args(job_id), "--permission-mode", "auto")
 
 
 def tiered_job(jobs, clock, tier_line):
@@ -197,21 +197,21 @@ def tiered_job(jobs, clock, tier_line):
 def test_launch_runs_a_light_or_full_goal_as_the_orchestrator(jobs, claude, clock, tier):
     job_id = tiered_job(jobs, clock, f"- Tier: {tier}.")
     jobs.launch(job_id)
-    assert claude.started[0][3] == ("--agent", "cure:orchestrator")
+    assert claude.started[0][3] == ("--agent", "cure:orchestrator", *settings_args(job_id))
 
 
 @pytest.mark.parametrize("tier_line", ["- Tier: Solo.", "- Tier: Huge.", "no tier named"])
 def test_launch_runs_a_solo_unrecognised_or_untiered_goal_without_an_agent(jobs, claude, clock, tier_line):
     job_id = tiered_job(jobs, clock, tier_line)
     jobs.launch(job_id)
-    assert claude.started[0][3] == ()
+    assert claude.started[0][3] == settings_args(job_id)
 
 
 def test_launch_puts_the_orchestrator_before_user_arguments_and_the_prompt_last(jobs, claude, store, clock):
     job_id = tiered_job(jobs, clock, "- Tier: Full.")
-    jobs.launch(job_id, ["--add-dir", "/work/other"])
+    jobs.launch(job_id, ["--permission-mode", "auto"])
     _, _, prompt, args = claude.started[0]
-    assert args == ("--agent", "cure:orchestrator", "--add-dir", "/work/other")
+    assert args == ("--agent", "cure:orchestrator", *settings_args(job_id), "--permission-mode", "auto")
     assert prompt == f"/goal @{store.goal_path(job_id)}"
 
 

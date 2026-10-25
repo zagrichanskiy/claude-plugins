@@ -24,6 +24,8 @@ class JobRecord:
     events_mtime: datetime | None
     #: The run numbers of the ``result-<run>.md`` files.
     archived_runs: frozenset[int] = frozenset()
+    #: The ``## Open`` items of ``goal.md`` as read with ``goal_digest``; 0 without a goal.
+    open_items: int = 0
 
     @property
     def has_goal(self) -> bool:

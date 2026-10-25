@@ -23,6 +23,7 @@ class Command:
     #: Must be non-empty: argparse lists a subcommand in --help only when it has help.
     help: str
     description: str
+    epilog: str | None = None
 
     def __init__(self, cli: "Cli"):
         self.cli = cli
@@ -30,7 +31,7 @@ class Command:
     def register(self, subparsers) -> None:
         parser = style(subparsers.add_parser(
             self.name, formatter_class=HelpFormatter,
-            usage=self.usage, help=self.help, description=self.description))
+            usage=self.usage, help=self.help, description=self.description, epilog=self.epilog))
         self.add_arguments(parser)
         parser.set_defaults(handler=self.run)
 
@@ -39,6 +40,15 @@ class Command:
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         raise NotImplementedError
+
+
+#: The session that ``finish`` and ``new`` tell to wake.
+DISPATCHER = "dispatcher"
+
+
+def notify_line(job_id: str) -> str:
+    """The line that names the message to send once the job changed."""
+    return f'notify: SendMessage {DISPATCHER} "job {job_id}"'
 
 
 def job_id_arg(text: str) -> str:

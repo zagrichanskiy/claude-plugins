@@ -103,13 +103,13 @@ the project's conventions, test command and run command from the repo.
 
 | Agent | Description |
 |---|---|
-| `dispatcher` | Scans the job queue (`cure-job prune`, then `cure-job next --json`: one element per job with its ordered actions) on start and on every wake-up message, runs `cure:goal` for each queued or held handoff, prints a 3-line summary, then runs `cure-job approve` (`--by auto` for a Solo or Light job with no open item and no failed prelaunch check (tools, permission rules); otherwise after the user's answer) and `cure-job launch` for an `approved` job. `launch` refuses a run-1 job that is not `approved`. It alone asks a job's questions. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
-| `orchestrator` | The session agent of a Light or Full job run. Its system prompt carries `skills/goal/rules.md` (the "All tiers" and "Light and Full" sections), `skills/goal/worker.md` and so the short-hold claim protocol, which context compaction does not drop. `scripts/lint-plugin.py` fails when a copy differs from its file. Tools: `Read`, `Grep`, `Glob`, `Bash`, `Agent`, `Skill`, `SendMessage`; no `Edit` or `Write`, so it edits no code. It writes the ledger, backlog and retrospective with `Bash` heredocs. |
+| `dispatcher` | Scans the job queue (`cure-job prune`, then `cure-job next --json`: one element per job with its ordered actions) on start and on every wake-up message, runs `cure:goal` for each queued or held handoff, prints a 3-line summary, then runs `cure-job approve` (`--by auto` for a Solo or Light job with no `## Open` item and no failed prelaunch check (tools, permission rules); otherwise `--by user` after the user's answer) and `cure-job launch` for an `approved` job. `launch` refuses a run-1 job that is not `approved`. It alone asks a job's questions. Handles lost, stalled, blocked, invalid and needs-input jobs, and tells the origin session when a job finishes. Has `memory: user`, `model: inherit` and no `Agent` tool. |
+| `orchestrator` | The session agent of a Light or Full job run. Its system prompt carries `skills/goal/rules.md` (the "All tiers" and "Light and Full" sections) and `skills/goal/short-holds.md` (the short-hold claim protocol), which context compaction does not drop. The exit protocol is in the job's goal file. `scripts/lint-plugin.py` fails when a copy differs from its file. Tools: `Read`, `Grep`, `Glob`, `Bash`, `Agent`, `Skill`, `SendMessage`; no `Edit` or `Write`, so it edits no code. It writes the ledger, backlog and retrospective with `Bash` heredocs. |
 
 Start the dispatcher once per machine:
 
 ```sh
-claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000}'
+claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSessionInbound":"accept","autoCompactWindow":200000,"permissions":{"allow":["Bash(cure-job *)"],"deny":["Bash(claude *)"]}}'
 ```
 
 | Part | Reason |
@@ -117,6 +117,7 @@ claude --bg --name dispatcher --agent cure:dispatcher --settings '{"crossSession
 | `--agent cure:dispatcher` | Claude Code 2.1.300 loads a plugin agent under its prefixed name. |
 | `crossSessionInbound` | Without `accept`, the session ignores messages from other sessions. |
 | `autoCompactWindow` | Compacts the main session at 200000 tokens. The key has no effect in the agent's frontmatter, so it is set here. |
+| `permissions` | Allows `cure-job` by its bare name (the plugin's `bin/` is on PATH) and denies `claude`; `cure-job launch` starts the job session as a subprocess. The job does not edit `~/.claude/settings.json`. |
 | `--name dispatcher` | Handoffs and job sessions address the dispatcher by this name. |
 | `"env":{"CURE_JOB_ROOT":"<path>"}` | Passes a non-default state root. It goes inside the `--settings` JSON, because a background session does not inherit the caller's environment. |
 

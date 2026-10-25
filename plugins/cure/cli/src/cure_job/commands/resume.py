@@ -9,7 +9,7 @@ from .launch import LaunchCommand, claude_args
 
 class ResumeCommand(LaunchCommand):
     name = "resume"
-    usage = "cure-job resume ID [-- CLAUDE_ARG ...]"
+    usage = "cure-job resume ID [-- --permission-mode MODE]"
     help = "continue the session of a needs-input job"
     description = ("Stop the session of a needs-input job's latest run, resume it in the background with the "
                    "goal file as its next run, and print the session name. A session that no longer exists "

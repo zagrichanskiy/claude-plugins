@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from cure_job.goal import tier
+from cure_job.goal import missing_paths, open_items, tier
 
 
 def goal(*rules: str, before: str = "") -> str:
@@ -42,3 +42,15 @@ def test_tier_takes_the_first_tier_line():
 
 def test_tier_does_not_skip_an_unknown_first_line():
     assert tier(goal("- Tier: Huge.", "- Tier: Full.")) is None
+
+
+def test_missing_paths_ignores_a_trailing_glob_star_on_an_existing_file(tmp_path):
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "cure-job").touch()
+    (tmp_path / "rules.md").touch()
+    text = f"Bash({tmp_path}/bin/cure-job:*) and {tmp_path}/rules.md**"
+    assert missing_paths(text, tmp_path) == []
+
+
+def test_open_items_counts_a_non_empty_open_section_after_an_empty_openapi_section():
+    assert open_items("# Goal\n\n## OpenAPI\n\n## Open questions\n\n- one\n") == 1

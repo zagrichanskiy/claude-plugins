@@ -37,6 +37,10 @@ class SessionGone(CureJobError):
     """The session of a job's latest run is no longer listed, so ``resume`` cannot continue it."""
 
 
+class ReportError(CureJobError):
+    """A ``finish`` value has the wrong form: a ``pr`` that is not a pull request URL, a relative ``retro``."""
+
+
 class StoreError(CureJobError):
     """The state root cannot be read or written, or ``dispatch.jsonl`` is malformed."""
 

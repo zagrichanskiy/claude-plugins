@@ -1,12 +1,14 @@
 """Builders for hand-made job records and job directories, shared by the state and provider tests."""
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from cure_job.events import Approved, Event
 from cure_job.goal import digest
+from cure_job.goal import PLUGIN_ROOT
 from cure_job.handoff import Device, Handoff
 from cure_job.job import JobRecord
 from cure_job.result import Result, ResultStatus
@@ -14,6 +16,15 @@ from cure_job.result import Result, ResultStatus
 NOW = datetime(2026, 10, 13, 18, 0, 0, tzinfo=timezone.utc)
 REPO = "/work/video-core"
 GOAL_DIGEST = digest(b"goal")
+
+
+def settings_args(job_id: str, plugin_root: Path = PLUGIN_ROOT) -> tuple[str, ...]:
+    """The ``--settings`` pair ``launch`` and ``resume`` add: allow rules for the worker's job and the read commands."""
+    cure_job = f"{plugin_root}/bin/cure-job"
+    allow = [f"Bash({cure_job} {command} {job_id} *)" for command in ("finish", "claim", "release")]
+    allow += [f"Bash({cure_job} {command} *)" for command in ("config get", "list")]
+    allow.append(f"Bash({cure_job} finish --help)")
+    return ("--settings", json.dumps({"permissions": {"allow": allow}}, separators=(",", ":")))
 
 
 def handoff_text(repos=(REPO,), device="none", after: str | None = None) -> str:

@@ -11,8 +11,8 @@ class OriginCommand(Command):
     name = "origin"
     usage = "cure-job origin ID ADDRESS"
     help = "set the session a job reports back to, before its first launch"
-    description = ("Set the session a job reports back to, before its first launch. The latest one wins "
-                   "over earlier ones and over the handoff's origin")
+    description = ("Set the session a job reports back to, before its first launch. A job that already has "
+                   "an origin is refused")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")

@@ -1,7 +1,8 @@
 """argparse styling shared by every command parser.
 
 Docker-style help: a ``Usage:`` prefix, no ``{choices}`` header, and each
-option's metavar shown once (``--slug SLUG``) with its help on one line.
+option's metavar shown once (``--slug SLUG``) with its help on one line. A
+description or epilog of several lines keeps its line breaks.
 """
 from __future__ import annotations
 
@@ -14,6 +15,12 @@ class HelpFormatter(argparse.HelpFormatter):
 
     def add_usage(self, usage, actions, groups, prefix=None):
         return super().add_usage(usage, actions, groups, prefix or "Usage:  ")
+
+    def _fill_text(self, text, width, indent):
+        # A text of several lines is laid out by hand, as the finish table is.
+        if "\n" in text:
+            return "".join(indent + line for line in text.splitlines(keepends=True))
+        return super()._fill_text(text, width, indent)
 
     def _format_action(self, action: argparse.Action) -> str:
         text = super()._format_action(action)

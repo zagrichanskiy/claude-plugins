@@ -10,7 +10,8 @@ import pytest
 
 from cure_job.claude import SessionStatus
 from cure_job.cli import Cli
-from cure_job.config import DEFAULTS
+from cure_job.config import DEFAULTS, plugin_version
+from cure_job.goal import PLUGIN_ROOT
 from tests.builders import set_age
 from tests.test_cli import Harness
 
@@ -189,6 +190,20 @@ def test_done_when_3_config_init_converts_defaults_md_and_a_second_init_exits_on
     assert "config.json" in capsys.readouterr().err
 
 
+def test_config_init_moving_a_config_from_the_old_location_leaves_it_private(h, tmp_path):
+    new = tmp_path / "xdg" / "cure" / "config.json"
+    h.root.mkdir(parents=True)
+    old = h.root / "config.json"
+    old.write_text("{}", encoding="utf-8")
+    old.chmod(0o644)
+    h.cli = Cli(root=h.root, config_path=new, claude=h.claude, clock=h.clock, out=h.lines.append)
+    assert h.run("config", "init") == 0
+    assert not old.exists()
+    assert new.read_text(encoding="utf-8") == "{}"
+    assert new.stat().st_mode & 0o777 == 0o600
+    assert new.parent.stat().st_mode & 0o777 == 0o700
+
+
 def test_config_init_without_defaults_md_writes_the_built_in_defaults(h):
     assert h.run("config", "init") == 0
     assert json.loads((h.root / "config.json").read_text(encoding="utf-8")) == nest(DEFAULTS)
@@ -329,7 +344,8 @@ def test_an_unreadable_config_file_is_a_whole_file_error(h, capsys):
 def test_an_unknown_key_is_reported_as_ignored_by_a_lenient_command(h, capsys):
     configure(h, {"handoff": {"bogus": 1}})
     assert h.run("list") == 0
-    assert ("config.json: handoff.bogus: unknown to cure 0.52.0; restart the dispatcher after an update; ignored"
+    version = plugin_version(PLUGIN_ROOT)
+    assert (f"config.json: handoff.bogus: unknown to cure {version}; restart the dispatcher after an update; ignored"
             in capsys.readouterr().err)
 
 

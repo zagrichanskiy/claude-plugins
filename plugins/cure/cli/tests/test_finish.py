@@ -138,10 +138,10 @@ class Harness:
         source = tmp_path / "handoff.md"
         source.write_text(handoff_text((REPO,)), encoding="utf-8")
         assert self.run("new", "--slug", "x", str(source)) == 0
-        job_id = self.lines[-1]
+        job_id = self.lines[0]
         if launched:
             (self.root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
-            assert self.run("approve", job_id) == 0
+            assert self.run("approve", job_id, "--by", "user") == 0
             assert self.run("launch", job_id) == 0
         self.lines.clear()
         return job_id
@@ -155,7 +155,7 @@ def h(root):
 def test_cli_finish_prints_the_result_path_and_list_shows_the_state(h, tmp_path):
     job_id = h.job(tmp_path)
     assert h.run("finish", job_id, "--status", "done") == 0
-    assert h.lines == [str(h.root / "jobs" / job_id / "result.md")]
+    assert h.lines == [str(h.root / "jobs" / job_id / "result.md"), f'notify: SendMessage dispatcher "job {job_id}"']
     h.lines.clear()
     h.run("list", "--json")
     assert json.loads(h.lines[0])[0]["state"] == "done"
