@@ -87,6 +87,7 @@ add one.
 - Pass agents paths and ids. Ask for findings only.
 - After a `designer` or `architect` consult, add the lines already changed, counted as the failure exit states, to the consult's line estimate. Run this per repository: the estimate for that repository's files plus the lines already changed in it. Compare each sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure exit.
 - Full: run `test-author` only for a behaviour change that has no test.
+- Light goal with one review round: the round includes one reviewer re-check of the fixes. It starts no second round. A `MUST-FIX` or `SHOULD-CONSIDER` that the re-check reports takes the failure exit; no further fix loop runs. A Light goal with two review rounds keeps its round-2 re-check as round 2.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
   its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
   exit.

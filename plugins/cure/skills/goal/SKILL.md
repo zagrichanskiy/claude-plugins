@@ -193,6 +193,8 @@ the mode file names one), and prefer the project's plugin over a general one whe
 something. A general plugin's reviewer named for work a project
 agent covers proposes a tool the project does not use.
 
+`implementer`, `test-author`, `qa`, `reviewer` and the other agents without a `Skill` tool cannot invoke a skill. When a work item needs a skill's rules for such an agent, write "the orchestrator passes the skill's `SKILL.md` path to the agent; the agent reads that file and the docs it routes to", not "the agent invokes the skill". The path is `<installPath>/skills/<skill>/SKILL.md`, with `installPath` read from the plugin's entry in the plugin directory's `installed_plugins.json`; for a cure skill it is `<plugin-root>/skills/<skill>/SKILL.md`.
+
 ## Delegate, then reflect
 
 Every Light and Full goal has this structure. A Solo goal has the session alone. The user runs goals
@@ -242,7 +244,7 @@ in a direct run. A cap in a handoff or a design source is never copied into the 
 
 | Tier | `<review cause>` |
 |---|---|
-| Light | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks the review round's fixes |
+| Light | a `MUST-FIX` or `SHOULD-CONSIDER` is open after the reviewer's one re-check of the review round's fixes |
 | Light, two review rounds | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks round 2's fixes |
 | Full | a `MUST-FIX` or `SHOULD-CONSIDER` is open after a PR's review round 3 |
 | Solo | none |
