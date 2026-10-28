@@ -17,7 +17,7 @@ from tests.test_cli import Harness
 
 BAD_CONFIGS = {
     "unknown-key": ({"bogus": 1}, "bogus", None),
-    "wrong-type": ({"split": {"limit": "800"}}, "split.limit", 800),
+    "wrong-type": ({"split": {"limit": "800"}}, "split.limit", 1200),
     "wrong-type-factor": ({"split": {"factor": "1.5"}}, "split.factor", 1.5),
     "out-of-range": ({"prune": {"failed-days": 0}}, "prune.failed-days", 30),
 }
@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 13
+    assert len(DEFAULTS) == 16
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -116,6 +116,64 @@ def test_config_get_without_a_key_prints_the_nested_object_with_file_values(h):
     assert printed["split"] == {"limit": 900, "factor": 1.5, "tracker": "github", "jira-command": ""}
     assert printed["handoff"] == {"delivery": "commit", "branch": "new", "resource-risk": []}
     assert printed["launch-grace-seconds"] == 60
+
+
+@pytest.mark.parametrize("tier, rounds", [("Solo", 0), ("Light", 2), ("Full", 3)])
+def test_config_get_reviews_tier_without_a_file_prints_its_default_round_count(h, tier, rounds):
+    assert h.run("config", "get", f"reviews.{tier}") == 0
+    assert h.lines == [str(rounds)]
+
+
+def test_config_get_without_a_file_prints_the_reviews_group(h):
+    assert h.run("config", "get") == 0
+    assert json.loads(h.lines[0])["reviews"] == {"Solo": 0, "Light": 2, "Full": 3}
+
+
+def test_config_get_reviews_tier_prints_the_file_value(h):
+    configure(h, {"reviews": {"Full": 5, "Solo": 0}})
+    assert h.run("config", "get", "reviews.Full") == 0
+    assert h.run("config", "get", "reviews.Light") == 0
+    assert h.lines == ["5", "2"]
+
+
+@pytest.mark.parametrize("value, problem", [
+    (0, "0 is below 1"),
+    (1.5, "expected an integer, got 1.5"),
+    ("2", 'expected an integer, got "2"'),
+    (True, "expected an integer, got true"),
+])
+def test_config_check_rejects_a_reviews_light_value_that_is_not_a_positive_integer(h, capsys, value, problem):
+    configure(h, {"reviews": {"Light": value}})
+    assert h.run("config", "check") == 1
+    assert f"config.json: reviews.Light: {problem}" in capsys.readouterr().err
+    assert h.run("config", "get", "reviews.Light") == 0
+    assert h.lines[-1] == "2"
+
+
+@pytest.mark.parametrize("tier, value, problem, default", [
+    ("Solo", 1, "1 is outside 0..0", "0"),
+    ("Full", 1, "1 is below 2", "3"),
+])
+def test_config_check_rejects_a_reviews_value_below_its_tier_bound(h, capsys, tier, value, problem, default):
+    configure(h, {"reviews": {tier: value}})
+    assert h.run("config", "check") == 1
+    assert f"config.json: reviews.{tier}: {problem}" in capsys.readouterr().err
+    assert h.run("config", "get", f"reviews.{tier}") == 0
+    assert h.lines[-1] == default
+
+
+def test_config_check_accepts_the_lowest_reviews_value_of_each_tier(h):
+    configure(h, {"reviews": {"Solo": 0, "Light": 1, "Full": 2}})
+    assert h.run("config", "check") == 0
+    for tier in ("Solo", "Light", "Full"):
+        assert h.run("config", "get", f"reviews.{tier}") == 0
+    assert h.lines[-3:] == ["0", "1", "2"]
+
+
+def test_config_check_rejects_an_unknown_reviews_tier(h, capsys):
+    configure(h, {"reviews": {"Huge": 2}})
+    assert h.run("config", "check") == 1
+    assert "config.json: reviews.Huge: unknown to " in capsys.readouterr().err
 
 
 def test_config_get_reads_a_nested_top_level_scalar_by_its_name(h):

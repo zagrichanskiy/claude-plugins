@@ -33,7 +33,10 @@ DEFAULTS: dict[str, object] = {
     "handoff.resource-risk": [],
     "dispatcher.auto-approve-tiers": ["Solo", "Light"],
     "dispatcher.stalled-confirm-seconds": 60,
-    "split.limit": 800,
+    "reviews.Solo": 0,
+    "reviews.Light": 2,
+    "reviews.Full": 3,
+    "split.limit": 1200,
     "split.factor": 1.5,
     "split.tracker": "github",
     "split.jira-command": "",
@@ -188,6 +191,16 @@ def _int_range(low: int, high: int) -> Callable[[object], str | None]:
     return check
 
 
+def _int_at_least(low: int) -> Callable[[object], str | None]:
+    def check(value: object) -> str | None:
+        if type(value) is not int:
+            return f"expected an integer, got {json.dumps(value)}"
+        if value < low:
+            return f"{value} is below {low}"
+        return None
+    return check
+
+
 def _number_range(low: float, high: float) -> Callable[[object], str | None]:
     def check(value: object) -> str | None:
         if type(value) not in (int, float):
@@ -244,6 +257,9 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "handoff.resource-risk": _risks,
     "dispatcher.auto-approve-tiers": _tiers,
     "dispatcher.stalled-confirm-seconds": _int_range(10, 600),
+    "reviews.Solo": _int_range(0, 0),
+    "reviews.Light": _int_at_least(1),
+    "reviews.Full": _int_at_least(2),
     "split.limit": _int_range(100, 5000),
     "split.factor": _number_range(1.0, 1.9),
     "split.tracker": _tracker,
