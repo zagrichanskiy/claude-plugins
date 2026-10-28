@@ -50,8 +50,8 @@ On a config error (parse error, bad value, unknown key, removed key, or a `confi
 | `handoff.delivery` | `delivery`, when the user did not state it. |
 | `handoff.branch` | Values: `new` (default), `current`, or a literal branch name. Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
 | `reviews.Solo`, `reviews.Light`, `reviews.Full` | Review rounds per tier; one round is one reviewer pass (bounds: Solo 0, Light at least 1, Full at least 2; defaults 0, 2, 3). `cure:goal` reads `reviews.<tier>` once with `cure-job config get reviews.<tier>` and writes the number into the goal as the round limit. Solo 0 means no review round. A repository's `CLAUDE.md` may set a higher Light count. |
-| `split.limit` | The base of the cap (default 800). The cap, the largest changed-line count of a part and the split threshold, is `split.limit` × `split.factor` (default 800 × 1.5 = 1200). |
-| `split.factor` | Number from 1.0 to 1.9 (default 1.5). Multiplies `split.limit` into the cap. `cure:goal` uses it as the multiplier of the size check. It stays below 2, because the failure exit of `skills/goal/job.md` fires at 2 × the estimate. |
+| `split.limit` | Integer from 100 to 5000 (default 1200). The cap: the split threshold, the largest changed-line count of a part and the PR-diff threshold of the goal size check. |
+| `split.factor` | Number from 1.0 to 1.9 (default 1.5). `cure:goal` uses it only for the overrun check: the job diff passed `split.factor` × the estimate. It does not change the cap. It stays below 2, because the failure exit of `skills/goal/job.md` fires at 2 × the estimate. |
 | `split.tracker` | Where a ticket for split-off work is created. Values: `github` (default; an issue in the delivering repository, through `gh`) or `jira` (through a Jira command or MCP tool of the dispatching session). `cure:split` uses the ticket form to pick the tracker and this key only with no ticket. Its `tracker` agent runs `split.jira-command` when it has no Jira MCP tool. |
 | `split.jira-command` | Shell command template with `<title>`, `<body>` and an optional `<project>` (the project key of the ticket of the job's branch) that creates a Jira ticket and prints its key (default empty). Used only by `cure:split` when `tracker` has no Jira MCP tool; `jira` there fails preflight while it is empty. |
 
@@ -64,7 +64,7 @@ Frontmatter grammar: `key: scalar` on one line, `key: [a, b]` inline lists, and 
 
 Runs after the template is filled and before any handoff is written. It ends with the drafts. It asks the user nothing. The main list writes the handoffs and reports.
 
-The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The cap is `split.limit` × `split.factor`, read with `cure-job config get split.limit` and `cure-job config get split.factor`. The rules below use both.
+The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The cap is `split.limit`, read with `cure-job config get split.limit`.
 
 | # | Step |
 |---|---|

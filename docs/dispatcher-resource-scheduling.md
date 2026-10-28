@@ -30,7 +30,7 @@ Each row is a rule the implementation follows, with the reason for it.
 | `after: <id>` in the handoff. The job waits until the predecessor is `done` and bases its branch on it. | A stacked change needs the predecessor's commits in the tree. They exist only after `done`. |
 | `cure-job next --json` returns the action each job needs. It is the only place scheduling decisions are made. The dispatcher maps actions to procedures. | Conditions become tested code; the dispatcher prompt shrinks. |
 | Settings live in a validated `config.json`. A config error makes every key with an error take its default; a file that does not parse makes every key take its default. `config check` exits 1. `next` exits 0 with a `config-error` element. `prune` removes no job and exits 1. `approve --by auto` exits 1. Other commands use defaults and warn. | A typo never stops a running job. |
-| `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. The estimate plus the current diff of an existing target PR is compared with the cap, `split.limit` × `split.factor` (default 800 × 1.5 = 1200); the Estimate line holds the estimate alone, one line per repository when there are several. At or under the cap the work stays in one ticket and one pull request, even with several features. Above the cap it splits into the fewest parts without asking the user; each part is at or under the cap and may hold several features. | The working session holds the code context and the user. |
+| `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. The estimate plus the current diff of an existing target PR is compared with the cap, `split.limit` (default 1200); the Estimate line holds the estimate alone, one line per repository when there are several. At or under the cap the work stays in one ticket and one pull request, even with several features. Above the cap it splits into the fewest parts without asking the user; each part is at or under the cap and may hold several features. | The working session holds the code context and the user. |
 | The goal caps the diff at twice the estimate. When the job's own diff, from the commit it started on, passes `split.factor` × the estimate and the branch diff passes the cap, `cure:goal` calls `cure:split` before the push, for a job with one repository and no successor job. Below the cap it writes the retrospective and pushes. | The estimate can be 2x low. |
 | Parts are ordinary jobs chained with `after:`. | Reuses stacking; no new job type. |
 | With `delivery: pr`, each part after part 1 gets its own ticket; part 1 keeps the original ticket. With no usable tracker the task is not split. | One PR per repository per ticket. |
@@ -141,7 +141,7 @@ decisions. Each part builds, passes its tests and is reviewable alone.
 flowchart TD
     A[cure:dispatch fills the handoff] --> B[Estimate changed lines per repository]
     B --> B2[Add the current diff of the target PR, when one exists]
-    B2 --> C{Any repository above the cap, split.limit × split.factor?}
+    B2 --> C{Any repository above the cap, split.limit?}
     C -- no --> D[cure-job new: one job]
     C -- yes --> E[Cut the repository above the cap into the fewest parts by layer]
     E --> G{delivery: pr?}

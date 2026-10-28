@@ -36,7 +36,7 @@ DEFAULTS: dict[str, object] = {
     "reviews.Solo": 0,
     "reviews.Light": 2,
     "reviews.Full": 3,
-    "split.limit": 800,
+    "split.limit": 1200,
     "split.factor": 1.5,
     "split.tracker": "github",
     "split.jira-command": "",

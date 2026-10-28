@@ -159,7 +159,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   the job's retrospective file; the retrospective work item completes that file. Call `cure:split`
   only when the job has one repository, `<plugin-root>/bin/cure-job list --json` shows no job
   whose `after` is this job, and the PR diff passes the cap
-  (`split.limit` × `split.factor`; read it from the Settled line "Split cap", else from `<plugin-root>/bin/cure-job config get split.limit` and `split.factor`); otherwise the `Wn` row names the unmet
+  (`split.limit`; read it from the Settled line "Split cap", else from `<plugin-root>/bin/cure-job config get split.limit`); otherwise the `Wn` row names the unmet
   condition, the retrospective is written and the job delivers its single branch. The goal computes R = PR diff − cap. When R is larger than the job's own diff (insertions plus deletions of `git diff --shortstat <base commit>..HEAD`), the work items cannot reach R: the job skips `cure:split`, adds a `Wn` row that names this reason and delivers its single branch. The call passes the repository, the branch, the base ref, the base commit work item 1 recorded, the estimate, the delivery, the cap, R and the job's work items (each with its files and tests). `cure:split` cuts the PR diff into as many parts as the cap needs. Record the tip of `<branch>` before the call. The job does not stop at `split.factor` ×: it finishes its work first. The check asks the
   user nothing. What follows depends on `delivery`:
   - `pr`: the push and the pull requests are those of `cure:split`. When `cure:split` stops before

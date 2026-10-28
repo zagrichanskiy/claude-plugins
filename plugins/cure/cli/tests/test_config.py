@@ -17,7 +17,7 @@ from tests.test_cli import Harness
 
 BAD_CONFIGS = {
     "unknown-key": ({"bogus": 1}, "bogus", None),
-    "wrong-type": ({"split": {"limit": "800"}}, "split.limit", 800),
+    "wrong-type": ({"split": {"limit": "800"}}, "split.limit", 1200),
     "wrong-type-factor": ({"split": {"factor": "1.5"}}, "split.factor", 1.5),
     "out-of-range": ({"prune": {"failed-days": 0}}, "prune.failed-days", 30),
 }
