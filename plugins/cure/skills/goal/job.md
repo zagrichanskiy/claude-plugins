@@ -149,7 +149,7 @@ Every exit runs in this order: (1) `<plugin-root>/bin/cure-job finish <id> --sta
 (`<plugin-root>/bin/cure-job finish --help` lists the options; never write `result.md` yourself); (2) `SendMessage`
 with the `notify:` line `finish` printed; (3) the final message. The `finish` command, its output
 and the `SendMessage` or its error are in the transcript before the final message. The final message
-restates each done-when item with its evidence (after a split, an item the excess owns has `<stacked>` as its evidence, as `rules.md` states). An item is unproven only when its proof is
+restates each done-when item with its evidence (after a split, an item a moved work item owns has the branch of its part as its evidence, as `rules.md` states). An item is unproven only when its proof is
 unavailable (a device, a login, a manual check), never when its check ran and failed; give a reason
 for each. Keep the goal file, the retrospective and the backlog; list the retrospective with
 `--retro`. Never touch the job directory.
@@ -173,7 +173,7 @@ run exits at once.
 Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N (the largest N, when the job has several Estimate lines) rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal. Record the effective `delivery` under Settled too; the size check passes it to `cure:split`.
 
 Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `SHOULD-CONSIDER` is
-open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated
+open after review round <limit>" (limit = `reviews.Full`). When the handoff's `delivery` is `commit` (the default), the generated
 text carries no pull-request wording.
 
 The `lines` value of the `stats.md` row is measured the same way, per repository against its base

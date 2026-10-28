@@ -89,12 +89,7 @@ K-1. (Light and Full, when Settled has an estimate) Size check, as `rules.md` "L
      It is the item directly before the push (K), so it follows the last review round and commit.
      Under `delivery: commit` there is no push item: it sits directly before the retrospective item.
      A diff past `split.factor` × the estimate adds a `Wn` row and a proposal to the retrospective file.
-     It runs `cure:split` only when the PR diff (`rules.md` "Light and Full" defines it) also passes the cap (`split.limit` × `split.factor`). Actions it may run: `git commit --amend`, `git reset --keep`, `git switch`,
-     `git switch -c`, `git branch -m`, `git branch -D`, `git checkout <commit> -- <path>`, `git rm`,
-     `git restore` and `git clean -f` on paths this run created or changed,
-     `git push --force-with-lease`, pushing a second branch, `gh issue create`, `gh pr create`,
-     `gh pr view` and the `split.jira-command` command. Under `delivery: commit` it runs no push, no `gh`
-     command and no Jira command.
+     It runs `cure:split` only when the PR diff (`rules.md` "Light and Full" defines it) also passes the cap (`split.limit` × `split.factor`). Actions it may run, directly or through `delivery` and `tracker`: those of `skills/split/SKILL.md` and the two agent files. Under `delivery: commit` it pushes nothing and creates no ticket or pull request.
 K.   <The push and the pull request, when the job pushes. K is the item before the retrospective.>
 N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
      its summary.
@@ -216,7 +211,7 @@ unattended and pays for the orchestrator's context on every turn.
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Branch and commits | Branch creation and every commit are orchestrator work items, committed with explicit paths. No work item or agent brief assigns them to `implementer`, `test-author` or `skill-author`, because these agents refuse to create a branch or commit. The orchestrator's commit messages omit attribution trailers (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids them, because that file overrides a session attribution reminder. Trailers the repository requires, such as `Signed-off-by:`, stay. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. Two writing agents that share a CLI or a file format get its command names, run semantics and format in both briefs; otherwise the docs agent runs after the CLI. |
-| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs; once the PR exists a fix is squashed into the job's latest commit, never a separate commit. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes (the review round is defined in `rules.md`). Fixes ship as small PRs per component, each with at most <N> review rounds (N = `reviews.Full`), the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round <N> takes the failure exit; no round <N+1> starts. Rounds 2..<N> re-check only the fixes of the previous round and raise no new topic, as `rules.md` defines. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs; once the PR exists a fix is squashed into the job's latest commit, never a separate commit. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. After every designer or architect consult the orchestrator compares the consult's line estimate plus the lines already changed with `<lines>`, as the Light and Full rules state. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; a `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is asked before its round closes; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. The `qa` brief gives the expected value of each check. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
@@ -236,8 +231,8 @@ Choose the tier by judgement from size and risk, not size alone. A small change 
 | Full | A large or risky change | `designer` or `architect` consult, implementer, `test-author`, `qa`, `review-change`, `verifier`, retrospective. |
 
 There is no tier without a goal file. The work items name the tier's agents. The review-loop and
-verification rows above describe Full. Light has one review round by one reviewer, except as the repository's `CLAUDE.md` states, and no
-live-verification gate.
+verification rows above describe Full. Light has <N> review rounds (N = `reviews.Light`; one reviewer pass each, as defined in `rules.md`) and no
+live-verification gate. A repository's `CLAUDE.md` may set a higher count; that count replaces N.
 
 A Solo goal differs from the template as follows:
 
@@ -251,14 +246,13 @@ A Solo goal differs from the template as follows:
 - Rules: the lines "Tier: Solo.", Stops, Permission mode (only when the user chose one) and Waiting.
 
 The review-round cap and failure cause come from this tier rule, or from the user's own statement
-in a direct run. A cap in a handoff or a design source is never copied into the goal. The failure cause in the exit text, by tier:
+in a direct run. When writing the goal, read `reviews.<tier>` once with `<plugin-root>/bin/cure-job config get reviews.<tier>` and write the number as N into the goal (bounds and defaults: Solo is 0, default 0; Light is at least 1, default 2; Full is at least 2, default 3. The CLI rejects other values). Solo holds no review round. A review round is one reviewer pass: round 1 reviews the diff, rounds 2..N re-check the fixes of the previous round. A cap in a handoff or a design source is never copied into the goal. The failure cause in the exit text, by tier:
 
 | Tier | `<review cause>` |
 |---|---|
-| Light | a `MUST-FIX` or `SHOULD-CONSIDER` is open after the reviewer's one re-check of the review round's fixes |
-| Light, two review rounds | a `MUST-FIX` or `SHOULD-CONSIDER` is open after `qa` re-checks round 2's fixes |
-| Full | a `MUST-FIX` or `SHOULD-CONSIDER` is open after a PR's review round 3 |
-| Solo | none |
+| Light | a `MUST-FIX` or `SHOULD-CONSIDER` is open after review round <N> (N = `reviews.Light`, or the higher count the repository's `CLAUDE.md` sets) |
+| Full | a `MUST-FIX` or `SHOULD-CONSIDER` is open after a PR's review round <N> (N = `reviews.Full`) |
+| Solo | none (`reviews.Solo` is 0: no review round) |
 
 ## The retrospective
 

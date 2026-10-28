@@ -25,9 +25,9 @@ block. You are its single claimant.
 
 | Tool | Use |
 |---|---|
-| `Agent` | Dispatch `implementer`, `test-author`, `skill-author`, `qa`, `reviewer`, `verifier`, `designer`, `architect`. |
+| `Agent` | Dispatch `implementer`, `test-author`, `skill-author`, `qa`, `reviewer`, `verifier`, `designer`, `architect`, and, for `cure:split`, `delivery` and `tracker`. |
 | `Skill` | Run `review-change` in Full, `cure:split` at the size check, and the PR skill a work item names. |
-| `Bash` | `git`, `gh`, `cure-job`, the `split.jira-command` command of `cure:split`, and the writes below. |
+| `Bash` | `git`, `gh`, `cure-job`, and the writes below. |
 | `Read`, `Grep`, `Glob` | Read the goal file, reports, the ledger, the backlog, the plugin directory's `installed_plugins.json` and the `SKILL.md` files a work item names. Not source. |
 | `SendMessage` | Send the `notify:` line that `cure-job finish` prints, at an exit. |
 
@@ -160,31 +160,30 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   only when the job has one repository, `<plugin-root>/bin/cure-job list --json` shows no job
   whose `after` is this job, and the PR diff passes the cap
   (`split.limit` × `split.factor`; read it from the Settled line "Split cap", else from `<plugin-root>/bin/cure-job config get split.limit` and `split.factor`); otherwise the `Wn` row names the unmet
-  condition, the retrospective is written and the job delivers its single branch. The goal computes R = PR diff − cap and picks the smallest set of whole work items from `git diff --stat <base commit>` whose lines total at least R. When R is larger than the job's own diff (insertions plus deletions of `git diff --shortstat <base commit>..HEAD`), no pick reaches R: the job skips `cure:split`, adds a `Wn` row that names this reason and delivers its single branch. The call passes the repository, the branch, the base ref, the base commit work item 1 recorded, the estimate, the delivery, the cap, R and a
-  description of the excess work (the files and tests of the picked work items). Record the tip of `<branch>` before the call. The job does not stop at `split.factor` ×: it finishes its work first. The check asks the
+  condition, the retrospective is written and the job delivers its single branch. The goal computes R = PR diff − cap. When R is larger than the job's own diff (insertions plus deletions of `git diff --shortstat <base commit>..HEAD`), the work items cannot reach R: the job skips `cure:split`, adds a `Wn` row that names this reason and delivers its single branch. The call passes the repository, the branch, the base ref, the base commit work item 1 recorded, the estimate, the delivery, the cap, R and the job's work items (each with its files and tests). `cure:split` cuts the PR diff into as many parts as the cap needs. Record the tip of `<branch>` before the call. The job does not stop at `split.factor` ×: it finishes its work first. The check asks the
   user nothing. What follows depends on `delivery`:
   - `pr`: the push and the pull requests are those of `cure:split`. When `cure:split` stops before
     it pushes `<branch>`, it has rolled `<branch>` back to the recorded tip (its section "Roll
     back"). The job checks that `git -C <repo> branch --show-current` prints `<branch>` and that
     `git -C <repo> rev-parse <branch>` prints the recorded tip. Then it pushes and opens its single
     PR as planned. A failed check or a failed rollback takes the failure exit, and the job pushes
-    nothing. When `cure:split` pushed `<branch>` and then failed for a reason other than its check 4, the job takes the failure exit with
-    `--pr` for each pull request opened, pushes nothing further, and names the excess as left on local `<stacked>`. The retrospective records why the split stopped. The report names any ticket
+    nothing. The report names any ticket `cure:split` created before it stopped. When `cure:split` pushed `<branch>` and then failed, the job takes the failure exit with
+    `--pr` for each pull request opened, pushes nothing further, and names the work as left on the local stacked branches. The retrospective records why the split stopped. The report names any ticket
     `cure:split` already created.
-  - `commit`: `cure:split` creates the stacked branch locally, with no ticket and no push, and the
-    report names the branch. When it stops, the job runs the same two checks, then delivers its
+  - `commit`: `cure:split` creates the stacked branches locally, with no ticket and no push, and the
+    report names them. When it stops, the job runs the same two checks, then delivers its
     single branch. A failed check takes the failure exit.
-  - `cure:split` reports a failure of its check 4 (the part left on `<branch>` is over the cap): the job adds a `Wn` row that names the overrun in changed lines and delivers both parts. No rollback runs.
-  - After a successful split, the job re-runs on `<stacked>` each done-when check the excess owns
-    (`qa` for a test run). Such an item counts as delivered when the check passes there, and the final
-    message names `<stacked>` as its evidence. A check on `<branch>` that fails only because the excess
+  - `cure:split` stops at its check 4 (a part of the chain is still over the cap after one re-cut): it has changed no branch. The job adds a `Wn` row that names the overrun in changed lines and delivers its single branch.
+  - After a successful split, the job re-runs each done-when check that a moved work item owns on the branch of the part that the split report
+    maps the item to (`qa` for a test run). Such an item counts as delivered when the check passes there, and the final
+    message names that branch as its evidence. A check on `<branch>` that fails only because the work
     moved is not a failure cause.
 - Review fixes: once the PR exists, squash each fix into the job's latest commit
   (`git commit --amend --no-edit` with explicit paths). No separate fix commit. Amending a commit
   already pushed makes the next push `git push --force-with-lease`. The severity floor
   is unchanged: every `MUST-FIX` and `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
-- Light goal with one review round: the round includes one reviewer re-check of the fixes. It starts no second round. A `MUST-FIX` or `SHOULD-CONSIDER` that the re-check reports takes the failure exit; no further fix loop runs. A Light goal with two review rounds keeps its round-2 re-check as round 2.
+- Review round: one reviewer pass, the same unit for every tier. The goal states N, the round limit (N = `reviews.<tier>`). Round 1 reviews the diff. Rounds 2..N re-check only the fixes of the previous round and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no round N+1 starts.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
   its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
   exit.

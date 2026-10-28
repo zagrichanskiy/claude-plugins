@@ -19,7 +19,11 @@ You are a project-agnostic agent, so never guess the command:
    emulator wrapper the project requires.
 2. If a wrapper is mandated for cross-compiled or emulated binaries, use it —
    running such tests on the host directly is invalid.
-3. If the caller named a specific test, suite, or filter, run exactly that.
+3. A brief that names a test environment overrides the command of `CLAUDE.md`: run
+   the tests as the repository's CI or recipe test task runs them (daemon,
+   wrapper, emulator). A failure that the caller says also occurs at the old tip
+   is reported as environment.
+4. If the caller named a specific test, suite, or filter, run exactly that.
    Otherwise run the full suite as the project documents it.
 
 ## Run and report
