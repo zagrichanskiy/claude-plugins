@@ -41,6 +41,6 @@ Old layouts:
 Branch and base:
 
 - A job without `after` takes the handoff's `base`, else each repository's default branch (`origin/HEAD`, fallback `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`).
-- `handoff.branch` applies when a handoff omits `branch`. Default `new`: the job gets its own branch from the job's base, named `<ticket>_<slug>`, or `<slug>` without a ticket, the same in every repository.
+- `handoff.branch` applies when a handoff omits `branch`. Default `new`: the job gets its own branch from the job's base, named `<ticket>_<slug>` (`issue-<N>` for a GitHub ticket `#N`), or `<slug>` without a ticket, the same in every repository.
 - A job with `after` and no `branch` inherits the predecessor's branch.
 - `current` uses the launch repository's checked-out branch. Any other value is a literal branch name.

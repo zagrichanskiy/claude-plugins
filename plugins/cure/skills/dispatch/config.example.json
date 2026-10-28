@@ -13,7 +13,8 @@
   },
   "split": {
     "limit": 800,
-    "tracker": "github"
+    "tracker": "github",
+    "jira-command": ""
   },
   "short-hold": {
     "wait-seconds": 540,

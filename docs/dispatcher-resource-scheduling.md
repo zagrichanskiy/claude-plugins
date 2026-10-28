@@ -30,10 +30,10 @@ Each row is a rule the implementation follows, with the reason for it.
 | `after: <id>` in the handoff. The job waits until the predecessor is `done` and bases its branch on it. | A stacked change needs the predecessor's commits in the tree. They exist only after `done`. |
 | `cure-job next --json` returns the action each job needs. It is the only place scheduling decisions are made. The dispatcher maps actions to procedures. | Conditions become tested code; the dispatcher prompt shrinks. |
 | Settings live in a validated `config.json`. A config error makes every key with an error take its default; a file that does not parse makes every key take its default. `config check` exits 1. `next` exits 0 with a `config-error` element. `prune` removes no job and exits 1. `approve --by auto` exits 1. Other commands use defaults and warn. | A typo never stops a running job. |
-| `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. The estimate includes the current diff of an existing target PR. Above `split.limit` (default 800) it splits into parts without asking the user. | The working session holds the code context and the user. |
-| The goal caps the diff at twice the estimate. When the diff passes 1.5x the estimate, `cure:goal` calls `cure:split` before the push. | The estimate can be 2x low. |
+| `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. The estimate plus the current diff of an existing target PR is compared with `split.limit`; the Estimate line holds the estimate alone, one line per repository when there are several. Above `split.limit` (default 800) it splits into parts without asking the user. | The working session holds the code context and the user. |
+| The goal caps the diff at twice the estimate. When the job's own diff, from the commit it started on, passes 1.5x the estimate, `cure:goal` calls `cure:split` before the push, for a job with one repository and no successor job. | The estimate can be 2x low. |
 | Parts are ordinary jobs chained with `after:`. | Reuses stacking; no new job type. |
-| With `delivery: pr`, each part gets its own ticket. | One PR per repository per ticket. |
+| With `delivery: pr`, each part after part 1 gets its own ticket; part 1 keeps the original ticket. With no usable tracker the task is not split. | One PR per repository per ticket. |
 
 ## Out of scope
 
@@ -145,7 +145,7 @@ flowchart TD
     C -- no --> D[cure-job new: one job]
     C -- yes --> E[Cut the repository above the limit into parts by layer]
     E --> G{delivery: pr?}
-    G -- yes --> H[One ticket per part]
+    G -- yes --> H[One ticket per part after part 1]
     G -- no --> I[cure-job new per part, after: previous part]
     H --> I
 ```

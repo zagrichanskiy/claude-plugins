@@ -35,6 +35,7 @@ DEFAULTS: dict[str, object] = {
     "dispatcher.stalled-confirm-seconds": 60,
     "split.limit": 800,
     "split.tracker": "github",
+    "split.jira-command": "",
     "short-hold.wait-seconds": 540,
     "short-hold.wait-total-minutes": 120,
     "prune.failed-days": 30,
@@ -200,6 +201,10 @@ def _tracker(value: object) -> str | None:
     return None if value in ("github", "jira") else f"expected \"github\" or \"jira\", got {json.dumps(value)}"
 
 
+def _text(value: object) -> str | None:
+    return None if isinstance(value, str) else f"expected a string, got {json.dumps(value)}"
+
+
 def _tiers(value: object) -> str | None:
     if (not isinstance(value, list) or any(tier not in TIERS for tier in value)
             or len(set(value)) != len(value)):
@@ -230,6 +235,7 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "dispatcher.stalled-confirm-seconds": _int_range(10, 600),
     "split.limit": _int_range(100, 5000),
     "split.tracker": _tracker,
+    "split.jira-command": _text,
     "short-hold.wait-seconds": _int_range(10, 540),
     "short-hold.wait-total-minutes": _int_range(10, 1440),
     "prune.failed-days": _int_range(1, 365),

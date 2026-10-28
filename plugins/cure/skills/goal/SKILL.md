@@ -82,14 +82,19 @@ the reasoning that would otherwise be re-litigated.
 Before work item 1, read `<plugin-root>/skills/goal/rules.md` and follow it. Read it again after a
 context compaction and before an exit.
 
-1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor, the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
+1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor or marked "Base: the PR branch of split part 1", the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
    runs>; <each Settled fact marked verify>.
 2. <One step, its agent, its files.>
 K-1. (Light and Full, when Settled has an estimate) Size check, as `rules.md` "Light and Full" states.
      It is the item directly before the push (K), so it follows the last review round and commit.
+     Under `delivery: commit` there is no push item: it sits directly before the retrospective item.
      A diff past 1.5 x the estimate adds a `Wn` row and a proposal to the retrospective file and runs
-     `cure:split`. Actions it may run: `git commit --amend`, `git reset --hard`, pushing a second
-     branch, `gh issue create`. Under `delivery: commit` it runs none of the last two.
+     `cure:split`. Actions it may run: `git commit --amend`, `git reset --keep`, `git switch`,
+     `git switch -c`, `git branch -m`, `git branch -D`, `git checkout <commit> -- <path>`, `git rm`,
+     `git restore` and `git clean -f` on paths this run created or changed,
+     `git push --force-with-lease`, pushing a second branch, `gh issue create`, `gh pr create`,
+     `gh pr view` and the `split.jira-command` command. Under `delivery: commit` it runs no push, no `gh`
+     command and no Jira command.
 K.   <The push and the pull request, when the job pushes. K is the item before the retrospective.>
 N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
      its summary.
@@ -283,11 +288,11 @@ Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and 
 user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
 reaches it takes the failure exit instead of growing.
 
-- Count changed lines as the failure exit states: `git diff --shortstat <base>` plus the lines of untracked files. Do not use `git add -N`; its entries break `git stash` and `git rebase`.
+- Count changed lines as the failure exit states: `git diff --shortstat <base commit>` (work item 1's record) plus the lines of untracked files. Do not use `git add -N`; its entries break `git stash` and `git rebase`.
 - Estimate tests apart from code. Tests of a state-machine change are estimated at 2x its code. Validator tests are estimated per key. A legacy parser is estimated separately.
 - The test-author brief states a line budget beside the list of behaviours to cover. The budget is the test estimate above.
 - A goal with a test-author step has a work item between the implementer item and the test-author item. It measures the diff as the failure exit states and prints the count.
-- The cut line is the point where a change is divided into a delivered part and a rest. The goal writer plans it, or the session that writes the follow-up goal after a failure exit at the cap applies it. Under `delivery: pr`, it rewords the ticket to the delivered part and opens a new ticket for the rest. Each ticket has one PR per repository, and the PR does not reference the split.
+- The cut line is the point where a change is divided into a delivered part and a rest. The goal writer plans it, or the session that writes the follow-up goal after a failure exit at the cap applies it. Under `delivery: pr`, it rewords the ticket to the delivered part and opens a new ticket for the rest. With no usable tracker it applies no cut. Each ticket has one PR per repository, and the PR does not reference the split.
 
 Size a goal from `~/.claude/retros/stats.md`: `grep '| <repo> |' ~/.claude/retros/stats.md` lists
 the earlier goals of the repository with their turns, tokens and lines. Do not read the retrospectives for this.

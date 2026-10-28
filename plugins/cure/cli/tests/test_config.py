@@ -81,7 +81,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 11
+    assert len(DEFAULTS) == 12
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -107,7 +107,7 @@ def test_config_get_without_a_key_prints_the_nested_object_with_file_values(h):
     configure(h, {"split": {"limit": 900}})
     assert h.run("config", "get") == 0
     printed = json.loads(h.lines[0])
-    assert printed["split"] == {"limit": 900, "tracker": "github"}
+    assert printed["split"] == {"limit": 900, "tracker": "github", "jira-command": ""}
     assert printed["handoff"] == {"delivery": "commit", "branch": "new", "resource-risk": []}
     assert printed["launch-grace-seconds"] == 60
 
@@ -251,6 +251,7 @@ REJECTED = {
     "branch-not-a-string": {"handoff": {"branch": 3}},
     "tracker-unknown": {"split": {"tracker": "gitlab"}},
     "tracker-not-a-string": {"split": {"tracker": 1}},
+    "jira-command-not-a-string": {"split": {"jira-command": 1}},
     "tier-unknown": {"dispatcher": {"auto-approve-tiers": ["Solo", "Heavy"]}},
     "tier-duplicate": {"dispatcher": {"auto-approve-tiers": ["Solo", "Solo"]}},
     "tiers-not-a-list": {"dispatcher": {"auto-approve-tiers": "Solo"}},
@@ -280,7 +281,8 @@ def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewher
     {"dispatcher": {"auto-approve-tiers": []}},
     {"handoff": {"resource-risk": [RISK, {"scope": "repo: /work/a", "text": "t"}]}},
     {"launch-grace-seconds": 30}, {"split": {"limit": 900}},
-    {"split": {"tracker": "github"}}, {"split": {"tracker": "jira"}}])
+    {"split": {"tracker": "github"}}, {"split": {"tracker": "jira"}},
+    {"split": {"jira-command": "jira-create <title> <body>"}}])
 def test_an_accepted_value_passes_check(h, data):
     configure(h, data)
     assert h.run("config", "check") == 0
