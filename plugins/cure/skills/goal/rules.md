@@ -18,6 +18,10 @@ add one.
   commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
   `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
   different bases.
+- A job that continues an existing branch (the branch exists on run 1): work item 1 also records
+  that branch's HEAD per repository, where the base commit is recorded. The size check and the
+  changed-line cap in the failure exit measure from that HEAD, not from the base commit, because the
+  estimate in Settled covers this job's work only.
 - Work item 1 also records, per repository, a dirty-tree baseline: branch, HEAD,
   `git diff --shortstat` and the paths that `git -C <repo> status --porcelain` lists. It records them
   where the base commit is recorded. The changed-line cap in the failure exit and the stats row's
@@ -89,12 +93,19 @@ add one.
 - Size check: after the last review round and the final commit, before the push, measure the diff
   per repository as the failure exit states, against the estimate in Settled ("Estimate: ~N changed
   lines"). Skip the check when Settled has no estimate. When the diff of any repository passes 1.5 x
-  its estimate: write the retrospective (why the diff grew, and the fix to the rule or skill), then
-  call `cure:split` with the repository, the branch, the base, the estimate and a description of the
+  its estimate: add a `Wn` row (why the diff grew) and a proposal (the fix to the rule or skill) to
+  the job's retrospective file; the retrospective work item completes that file. Then call
+  `cure:split` with the repository, the branch, the base, the estimate and a description of the
   excess feature. The job does not stop at 1.5 x: it finishes its work first. The check asks the
-  user nothing. The push and the pull requests are then those of `cure:split`.
+  user nothing. What follows depends on `delivery`:
+  - `pr`: the push and the pull requests are those of `cure:split`. When `cure:split` stops without
+    pushing, the job pushes and opens its single PR as planned. The retrospective records why the
+    split stopped. The report names any ticket `cure:split` already created.
+  - `commit`: `cure:split` creates the stacked branch locally, with no ticket and no push, and the
+    report names the branch. When it stops, the job delivers its single branch.
 - Review fixes: once the PR exists, squash each fix into the job's latest commit
-  (`git commit --amend --no-edit` with explicit paths). No separate fix commit. The severity floor
+  (`git commit --amend --no-edit` with explicit paths). No separate fix commit. Amending a commit
+  already pushed makes the next push `git push --force-with-lease`. The severity floor
   is unchanged: every `MUST-FIX` and `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
 - Light goal with one review round: the round includes one reviewer re-check of the fixes. It starts no second round. A `MUST-FIX` or `SHOULD-CONSIDER` that the re-check reports takes the failure exit; no further fix loop runs. A Light goal with two review rounds keeps its round-2 re-check as round 2.

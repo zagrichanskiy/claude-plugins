@@ -30,8 +30,8 @@ Each row is a rule the implementation follows, with the reason for it.
 | `after: <id>` in the handoff. The job waits until the predecessor is `done` and bases its branch on it. | A stacked change needs the predecessor's commits in the tree. They exist only after `done`. |
 | `cure-job next --json` returns the action each job needs. It is the only place scheduling decisions are made. The dispatcher maps actions to procedures. | Conditions become tested code; the dispatcher prompt shrinks. |
 | Settings live in a validated `config.json`. A config error makes every key with an error take its default; a file that does not parse makes every key take its default. `config check` exits 1. `next` exits 0 with a `config-error` element. `prune` removes no job and exits 1. `approve --by auto` exits 1. Other commands use defaults and warn. | A typo never stops a running job. |
-| `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. Above `split.limit` (default 800) it proposes parts. The user may keep one job. | The working session holds the code context and the user. |
-| The goal caps the diff at twice the estimate. | The estimate can be 2x low. |
+| `cure:dispatch` estimates the changed lines per repository from the planned work, before the job exists. The estimate includes the current diff of an existing target PR. Above `split.limit` (default 800) it splits into parts without asking the user. | The working session holds the code context and the user. |
+| The goal caps the diff at twice the estimate. When the diff passes 1.5x the estimate, `cure:goal` calls `cure:split` before the push. | The estimate can be 2x low. |
 | Parts are ordinary jobs chained with `after:`. | Reuses stacking; no new job type. |
 | With `delivery: pr`, each part gets its own ticket. | One PR per repository per ticket. |
 
@@ -140,12 +140,11 @@ decisions. Each part builds, passes its tests and is reviewable alone.
 ```mermaid
 flowchart TD
     A[cure:dispatch fills the handoff] --> B[Estimate changed lines per repository]
-    B --> C{Any repository above split.limit?}
+    B --> B2[Add the current diff of the target PR, when one exists]
+    B2 --> C{Any repository above split.limit?}
     C -- no --> D[cure-job new: one job]
     C -- yes --> E[Cut the repository above the limit into parts by layer]
-    E --> F{User: split or one job?}
-    F -- one job --> D
-    F -- split --> G{delivery: pr?}
+    E --> G{delivery: pr?}
     G -- yes --> H[One ticket per part]
     G -- no --> I[cure-job new per part, after: previous part]
     H --> I

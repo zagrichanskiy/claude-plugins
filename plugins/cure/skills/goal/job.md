@@ -154,7 +154,7 @@ for each. Keep the goal file, the retrospective and the backlog; list the retros
 `--retro`. Never touch the job directory.
 
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
-<review cause>, or the diff passes <lines> lines (per repository, in <repo>: insertions plus deletions of `git diff --shortstat <base commit>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`); the base commit is the one work item 1 recorded), or a consult's line estimate for a repository's files plus the lines already changed in it passes <lines> lines, or `git fetch` or
+<review cause>, or the diff passes <lines> lines (per repository, in <repo>: insertions plus deletions of `git diff --shortstat <base commit>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`); the base commit is the one work item 1 recorded, or for a job that continues an existing branch, the branch HEAD it recorded), or a consult's line estimate for a repository's files plus the lines already changed in it passes <lines> lines, or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice (not counting an exit 1 that names `--pr` or `--retro`), or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
 transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` failed
@@ -176,7 +176,7 @@ open after review round 3". When the handoff's `delivery` is `commit` (the defau
 text carries no pull-request wording.
 
 The `lines` value of the `stats.md` row is measured the same way, per repository against its base
-commit, and the row carries the estimate as `est_lines`. A cap against the branch name would count only uncommitted lines when the job commits on
+commit (or recorded branch HEAD), and the row carries the estimate as `est_lines`. A cap against the branch name would count only uncommitted lines when the job commits on
 `<base>` itself.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The

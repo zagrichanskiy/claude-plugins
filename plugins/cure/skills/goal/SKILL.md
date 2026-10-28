@@ -85,9 +85,12 @@ context compaction and before an exit.
 1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor, the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
    runs>; <each Settled fact marked verify>.
 2. <One step, its agent, its files.>
-N-3. (Light and Full, when Settled has an estimate) Size check, as `rules.md` "Light and Full" states:
-     after the last review round and commit, before the push, a diff past 1.5 x the estimate takes the
-     retrospective and `cure:split`.
+K-1. (Light and Full, when Settled has an estimate) Size check, as `rules.md` "Light and Full" states.
+     It is the item directly before the push (K), so it follows the last review round and commit.
+     A diff past 1.5 x the estimate adds a `Wn` row and a proposal to the retrospective file and runs
+     `cure:split`. Actions it may run: `git commit --amend`, `git reset --hard`, pushing a second
+     branch, `gh issue create`. Under `delivery: commit` it runs none of the last two.
+K.   <The push and the pull request, when the job pushes. K is the item before the retrospective.>
 N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
      its summary.
 N-1. Append the `stats.md` row with the command of `rules.md`. `<date> | <repo> | <slug>` is filled
