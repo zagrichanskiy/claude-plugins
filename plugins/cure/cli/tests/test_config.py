@@ -81,7 +81,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 10
+    assert len(DEFAULTS) == 11
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -93,6 +93,11 @@ def test_config_get_with_a_key_prints_that_value_as_json(h):
     assert h.lines == ["900", '"commit"']
 
 
+def test_config_get_split_tracker_without_a_file_prints_github(h):
+    assert h.run("config", "get", "split.tracker") == 0
+    assert h.lines == ['"github"']
+
+
 def test_config_get_handoff_branch_without_a_file_prints_new(h):
     assert h.run("config", "get", "handoff.branch") == 0
     assert h.lines == ['"new"']
@@ -102,7 +107,7 @@ def test_config_get_without_a_key_prints_the_nested_object_with_file_values(h):
     configure(h, {"split": {"limit": 900}})
     assert h.run("config", "get") == 0
     printed = json.loads(h.lines[0])
-    assert printed["split"] == {"limit": 900}
+    assert printed["split"] == {"limit": 900, "tracker": "github"}
     assert printed["handoff"] == {"delivery": "commit", "branch": "new", "resource-risk": []}
     assert printed["launch-grace-seconds"] == 60
 
@@ -244,6 +249,8 @@ RISK = {"scope": "all", "text": "r"}
 REJECTED = {
     "delivery-unknown": {"handoff": {"delivery": "push"}},
     "branch-not-a-string": {"handoff": {"branch": 3}},
+    "tracker-unknown": {"split": {"tracker": "gitlab"}},
+    "tracker-not-a-string": {"split": {"tracker": 1}},
     "tier-unknown": {"dispatcher": {"auto-approve-tiers": ["Solo", "Heavy"]}},
     "tier-duplicate": {"dispatcher": {"auto-approve-tiers": ["Solo", "Solo"]}},
     "tiers-not-a-list": {"dispatcher": {"auto-approve-tiers": "Solo"}},
@@ -272,7 +279,8 @@ def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewher
     {"handoff": {"branch": "new"}}, {"handoff": {"branch": "current"}},
     {"dispatcher": {"auto-approve-tiers": []}},
     {"handoff": {"resource-risk": [RISK, {"scope": "repo: /work/a", "text": "t"}]}},
-    {"launch-grace-seconds": 30}, {"split": {"limit": 900}}])
+    {"launch-grace-seconds": 30}, {"split": {"limit": 900}},
+    {"split": {"tracker": "github"}}, {"split": {"tracker": "jira"}}])
 def test_an_accepted_value_passes_check(h, data):
     configure(h, data)
     assert h.run("config", "check") == 0

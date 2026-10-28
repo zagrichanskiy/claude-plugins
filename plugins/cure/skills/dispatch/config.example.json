@@ -12,7 +12,8 @@
     "stalled-confirm-seconds": 60
   },
   "split": {
-    "limit": 800
+    "limit": 800,
+    "tracker": "github"
   },
   "short-hold": {
     "wait-seconds": 540,

@@ -50,6 +50,7 @@ On a config error (parse error, bad value, unknown key, removed key, or a `confi
 | `handoff.delivery` | `delivery`, when the user did not state it. |
 | `handoff.branch` | Values: `new` (default), `current`, or a literal branch name. Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
 | `split.limit` | Changed lines per repository above which the task is split (default 800). |
+| `split.tracker` | Where a ticket for split-off work is created. Values: `github` (default; an issue in the delivering repository, through `gh`) or `jira` (through the Jira command or MCP server the session has). |
 
 Omit `id` and `created`. `cure-job new` sets them.
 
