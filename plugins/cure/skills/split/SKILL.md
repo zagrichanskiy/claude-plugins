@@ -21,6 +21,7 @@ below.
 | Branch | The branch to split. |
 | Base | The branch the pull request targets, and the base commit the caller recorded (`<base-commit>`). Without a base commit: `git merge-base origin/<base> <branch>`. |
 | Estimate | The estimated changed lines of the task. The report compares the diff with it. |
+| Ticket | In a job, the handoff `ticket`. By hand, the ticket parsed from the branch name or given by the user. `<orig>` is its id (`<N>` of a GitHub `#N`, or the Jira key). `<ticket-repo>` is the repository the ticket names, else the remote; it is the `--repo` of every command on `<orig>`. With no ticket, the rewrite and the link are skipped. |
 | Excess | A description of the feature to move: the behaviour, the files and the tests that belong to it. |
 | Delivery | `pr` or `commit`, as the caller passes it (the job's handoff `delivery`). Without one, as when run by hand: `<plugin-root>/bin/cure-job config get handoff.delivery` (default `commit`). |
 
@@ -43,6 +44,7 @@ job has no Edit tool and no MCP tool, and runs `git`, `gh` and `cure-job` only. 
 | Edit files | `implementer` | `implementer` |
 | Run the tests of a branch | The orchestrator runs `git switch <name>`, then dispatches `qa` with the test command and the expected result. The dispatch carries the short-hold claim when the goal claims. | The session |
 | Create a Jira ticket | The command in `split.jira-command`: `<plugin-root>/bin/cure-job config get split.jira-command` prints it as JSON. | The session's Jira command or MCP tool |
+| Edit and link the original ticket in Jira | Not run. The report lists both as manual steps, with the remaining-scope text. | The session's Jira command or MCP tool |
 
 ## Steps
 
@@ -156,17 +158,26 @@ Only under `delivery: pr`, after both test runs pass.
 
 | Tracker | Action |
 |---|---|
-| `github` (default) | `gh issue create --repo <owner/repo> --title "<excess as one sentence>" --body "<scope and parent ticket>"`. The ticket id is `#N` from the URL it prints. |
+| `github` (default) | `gh issue create --repo <owner/repo> --title "<excess as one sentence>" --body-file - <<'BODY'` with the complete description as the body. The ticket id is `#N` from the URL it prints. |
 | `jira` | Create the ticket as section "Executors" says. In a job, replace `<title>`, `<body>` and, when the template has it, `<project>` in `split.jira-command` with the shell-quoted values. `<project>` is the project key of the ticket of `<branch>` (the part of the key before the dash). By hand, take the project from the task context. The ticket id is the key it returns. |
+
+The description of the new ticket is complete on its own: what the feature does, its scope (commands, options, files, formats) and its acceptance criteria. It has no "Split from" line and no reference to the ticket of `<branch>`.
 
 `<tid>` is the branch form of the ticket id: `issue-<N>` for a GitHub `#N`, the key for Jira.
 Then `git branch -m <stacked> <tid>_<slug>` and, on that branch, reword the commit with
 `git commit --amend -m "<ticket>: <excess as one sentence>"`. If the create, the rename or the
 reword fails, roll back, stop and report. The report names a ticket already created.
 
+After the push of `<branch>` succeeds (section "Push and pull requests"), link the tickets and rewrite the original ticket, so a rolled-back split leaves `<orig>` unchanged. Both are skipped with no ticket. A failed link or rewrite is reported and the run continues. The report carries the original body, so the user can restore it.
+
+| Tracker | Link | Rewrite to the remaining scope (the moved scope is removed) |
+|---|---|---|
+| `github` (default) | `gh issue comment <orig> --repo <ticket-repo> --body-file - <<'BODY'` with the body `Moved scope: #<new>` (`owner/repo#<new>` across repositories). | Read the body with `gh issue view <orig> --repo <ticket-repo> --json body`. Then `gh issue edit <orig> --repo <ticket-repo> --body-file - <<'BODY'` with the remaining scope. |
+| `jira` | A Jira issue link between the two keys. | Read with `mcp__atlassian__getJiraIssue` or the session's Jira command. Edit with `mcp__atlassian__editJiraIssue` or the Jira command. |
+
 ## Push and pull requests
 
-`<owner/repo>` comes from the remote of the repository. Pass it as `--repo` to every `gh` command. Order: push `<branch>`, push `<stacked>`, open the pull request of `<branch>`, open that of `<stacked>`. Run each `git push` as its own Bash call, starting with `git -C <repo> push -u origin <name>`. When a review fix amended a commit of `<branch>` that is already pushed, push it with `git -C <repo> push --force-with-lease origin <branch>`.
+`<owner/repo>` comes from the remote of the repository. Pass it as `--repo` to every `gh` command on the pull requests. Order: push `<branch>`, push `<stacked>`, open the pull request of `<branch>`, open that of `<stacked>`. Run each `git push` as its own Bash call, starting with `git -C <repo> push -u origin <name>`. When a review fix amended a commit of `<branch>` that is already pushed, push it with `git -C <repo> push --force-with-lease origin <branch>`.
 
 | Branch | Pull request |
 |---|---|
@@ -186,5 +197,6 @@ pull request merges and its head branch is deleted, GitHub retargets the stacked
 | Ticket | The new ticket id, or none under `delivery: commit`. |
 | Stacked branch | Its name. |
 | Pull requests | Under `pr`, the two URLs, original first. |
+| Original ticket | `<orig>`, the result of the link and of the rewrite, and its body before the rewrite. For Jira in a job: the two manual steps with the remaining-scope text. |
 | Lines | Changed lines of each branch, and the estimate. |
 | Decisions | Each fork decided by the recommended option. |

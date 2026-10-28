@@ -107,7 +107,7 @@ Part handoffs:
 
 Part spec rules. Each part's handoff and ticket body, including any list of events or scope items in the ticket body, follow them:
 
-1. List only the items this part owns. Mark each item an earlier part delivers as "delivered by part j" and do not list it as work. The marked items go in a separate list, not under work.
+1. List only the items this part owns. Mark each item an earlier part delivers as "delivered by part j" and do not list it as work. The marking applies to the handoff only. The marked items go in a separate list, not under work. The ticket body lists them as prerequisites present at the base and names no part or ticket.
 2. For each config key the spec cites, say whether it exists at the base of this part. A key that a later part adds is marked "not yet".
 3. Name each line a downstream reader parses, with its exact form: the file, the line text and the parser.
 4. A part that creates a file format includes the format's frontmatter block in the spec.
@@ -115,14 +115,18 @@ Part spec rules. Each part's handoff and ticket body, including any list of even
 6. A "no references" check excludes migration code. Name the paths it excludes.
 7. Name fields as they are in the file: handoff `repos`, not the row field `resources`.
 
-Writing a split: create the tickets, then run `cure-job new` for each part in order, each with `after` set as in the table above.
+Writing a split: create the tickets, link them, rewrite the original ticket, then run `cure-job new` for each part in order, each with `after` set as in the table above.
+
+Rewrite, only with the effective `delivery: pr` and a session ticket: after the links, rewrite the description of the original ticket (part 1) to the scope that stays with part 1. The moved scope is removed. GitHub: read the body with `gh issue view <N> --repo <owner/repo> --json body`, then `gh issue edit <N> --repo <owner/repo> --body-file - <<'BODY'` with the remaining scope. Jira: read with `mcp__atlassian__getJiraIssue` or the session's Jira command, then edit with `mcp__atlassian__editJiraIssue` or the Jira command.
+
+A failed link or rewrite is reported and the split continues. The report carries the original body.
 
 Tickets, only with the effective `delivery: pr` and a split. They are created for parts 2 to n; part 1 keeps the original ticket. `<owner/repo>` comes from an `owner/repo#N` or URL ticket, else from the remote of the delivering repository. Pass it as `--repo` to every `gh` command. Before the first create, with `split.tracker` `github`, run `gh auth status` and `gh repo view <owner/repo> --json hasIssuesEnabled`. The first row that matches applies:
 
 | Case | Action |
 |---|---|
-| `split.tracker` is `github` (default), `gh auth status` succeeds, and the session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>"`. The body names the parent ticket. |
-| `split.tracker` is `jira` and the session has a Jira command or MCP tool | Create each ticket with the session's Jira command or MCP tool. The project comes from the session ticket. |
+| `split.tracker` is `github` (default), `gh auth status` succeeds, and the session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>" --body-file - <<'BODY'`. The body is complete on its own: what the part does, its scope (commands, options, files, formats) and its acceptance criteria. It has no "Split from" line and no reference to another ticket. The link is a comment on the original ticket: `gh issue comment <N> --repo <owner/repo> --body-file - <<'BODY'` with the body `Moved scope: #<new>`. |
+| `split.tracker` is `jira` and the session has a Jira command or MCP tool | Create each ticket with the session's Jira command or MCP tool. The project comes from the session ticket. The description follows the same rule. A Jira issue link carries the relation. |
 | No tracker the skill can write to, `gh auth status` fails, or issues are disabled (checked before any create) | Create no ticket and do not split: write one handoff with the Estimate line, as step 5 says. The report names the check. The skill never logs in and never reads or stores a token. |
 | A create or `cure-job new` fails after the checks above passed | Stop. Tell the user the ids of the tickets and jobs already created. Part 1 is queued and the dispatcher may launch it on its next wake or at once. Parts after part 1 wait on their `after:` chain. The user closes the created jobs with `cure-job close <id>`; for a running job, `cure-job stop <id>` first. |
 
