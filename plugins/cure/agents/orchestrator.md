@@ -147,6 +147,16 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - `git rm` run by a subagent stages the deletion, so the orchestrator's explicit-path `git add` of the removed path fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
 - After a `designer` or `architect` consult, add the lines already changed, counted as the failure exit states, to the consult's line estimate. Run this per repository: the estimate for that repository's files plus the lines already changed in it. Compare each sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure exit.
+- Size check: after the last review round and the final commit, before the push, measure the diff
+  per repository as the failure exit states, against the estimate in Settled ("Estimate: ~N changed
+  lines"). Skip the check when Settled has no estimate. When the diff of any repository passes 1.5 x
+  its estimate: write the retrospective (why the diff grew, and the fix to the rule or skill), then
+  call `cure:split` with the repository, the branch, the base, the estimate and a description of the
+  excess feature. The job does not stop at 1.5 x: it finishes its work first. The check asks the
+  user nothing. The push and the pull requests are then those of `cure:split`.
+- Review fixes: once the PR exists, squash each fix into the job's latest commit
+  (`git commit --amend --no-edit` with explicit paths). No separate fix commit. The severity floor
+  is unchanged: every `MUST-FIX` and `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
 - Light goal with one review round: the round includes one reviewer re-check of the fixes. It starts no second round. A `MUST-FIX` or `SHOULD-CONSIDER` that the re-check reports takes the failure exit; no further fix loop runs. A Light goal with two review rounds keeps its round-2 re-check as round 2.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
