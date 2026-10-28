@@ -156,7 +156,13 @@ was started.
 
 **Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
 soft-offer closers; the reminder also restates the reply-length limit. The output style carries the
-length and identifier rules in full.
+length and identifier rules in full. Names go on identifiers the user knows or can open (tickets,
+PRs, issues, controls, sections, requirement ids). In a reply, an id the user cannot open and has
+not seen (review finding numbers, ledger item numbers, a job's internal step or work-item numbers)
+is not cited; the problem is stated in one sentence instead. Artifacts are exempt: a commit message
+may carry a bare "work item N" or "step N", and a PR body names the item. A table of fixes has a
+Problem column before the Fix column. The problem a change solves is not background; the length
+rule does not drop it.
 
 | Event | Script | Effect |
 |---|---|---|
