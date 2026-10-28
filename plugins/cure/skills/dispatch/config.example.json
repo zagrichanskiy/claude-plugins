@@ -13,6 +13,7 @@
   },
   "split": {
     "limit": 800,
+    "factor": 1.5,
     "tracker": "github",
     "jira-command": ""
   },

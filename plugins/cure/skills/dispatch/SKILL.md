@@ -49,7 +49,8 @@ On a config error (parse error, bad value, unknown key, removed key, or a `confi
 |---|---|
 | `handoff.delivery` | `delivery`, when the user did not state it. |
 | `handoff.branch` | Values: `new` (default), `current`, or a literal branch name. Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
-| `split.limit` | Changed lines per repository above which the task is split (default 800). |
+| `split.limit` | The base of the cap (default 800). The cap, the largest changed-line count of a part and the split threshold, is `split.limit` × `split.factor` (default 800 × 1.5 = 1200). |
+| `split.factor` | Number from 1.0 to 1.9 (default 1.5). Multiplies `split.limit` into the cap. `cure:goal` uses it as the multiplier of the size check. It stays below 2, because the failure exit of `skills/goal/job.md` fires at 2 × the estimate. |
 | `split.tracker` | Where a ticket for split-off work is created. Values: `github` (default; an issue in the delivering repository, through `gh`) or `jira` (through a Jira command or MCP tool of the dispatching session). `cure:split` in a job runs `split.jira-command` instead: the orchestrator of a job has no MCP tool. |
 | `split.jira-command` | Shell command template with `<title>`, `<body>` and an optional `<project>` (the project key of the ticket of the job's branch) that creates a Jira ticket and prints its key (default empty). Used only by `cure:split` in a job; `jira` there fails preflight while it is empty. |
 
@@ -62,14 +63,14 @@ Frontmatter grammar: `key: scalar` on one line, `key: [a, b]` inline lists, and 
 
 Runs after the template is filled and before any handoff is written. It ends with the drafts. It asks the user nothing. The main list writes the handoffs and reports.
 
-The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The rules below use it.
+The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The cap is `split.limit` × `split.factor`, read with `cure-job config get split.limit` and `cure-job config get split.factor`. The rules below use both.
 
 | # | Step |
 |---|---|
 | 1 | Estimate the change per repository (below). |
 | 2 | Add the current diff of the target PR, for the decision of steps 3 and 4 only. Run `git -C <repo> fetch`, then `git -C <repo> diff --shortstat origin/<base>...<branch>`, insertions plus deletions; M is the result. `<base>` is the handoff `base`, else the default branch of the repository; when `origin/<base>` is absent, use the local `<base>...<branch>`. `<branch>` is the handoff `branch`, resolved as `job.md` resolves an omitted `branch`. When the local ref of `<branch>` is absent, use `origin/<branch>`. M = 0 when `<branch>` is absent locally and on `origin` (check each with `git rev-parse --verify -q`), as with the branch of an `after` predecessor. The step is skipped for a small change (see `ticket`, `branch` in Fields). The sum of estimate and M, per repository, goes into no handoff. |
-| 3 | No repository sum above `split.limit`: add the Settled line "Estimate: ~N changed lines" (N is the repository estimate, without the diff; "in <repo>" and one line per repository when there are several) and write one handoff. Done. |
-| 4 | Otherwise cut the work into parts by the split rule and draft one handoff per part. Split without asking. When the existing diff takes the sum over the limit, the PR stays as it is. Part 1 commits on the PR's own branch with the budget `split.limit` minus the existing diff. When that budget is 0 or less, part 1 gets no new work and is not queued, and new work starts at part 2 (see `after`, `base` and `branch` in Part handoffs). Further parts (2 to n) have the budget `split.limit` and are stacked on part 1's branch (the draft's `branch:`, else the head branch of the PR) through `after`; under `delivery: pr` each has a new ticket and branch. |
+| 3 | No repository sum above the cap: the work stays in one ticket and one pull request, even when it holds several features. Add the Settled line "Estimate: ~N changed lines" (N is the repository estimate, without the diff; "in <repo>" and one line per repository when there are several) and write one handoff. Done. |
+| 4 | Otherwise cut the work into parts by the split rule and draft one handoff per part. Split without asking. When the existing diff takes the sum over the cap, the PR stays as it is. Part 1 commits on the PR's own branch with the budget cap minus M. When that budget is 0 or less, part 1 gets no new work and is not queued, and new work starts at part 2 (see `after`, `base` and `branch` in Part handoffs). Further parts (2 to n) have the budget cap and are stacked on part 1's branch (the draft's `branch:`, else the head branch of the PR) through `after`; under `delivery: pr` each has a new ticket and branch. |
 | 5 | Only with the effective `delivery: pr`, the tickets of parts 2 to n are created as the Tickets table says. Part 1 keeps the ticket and branch of the unsplit draft. A repository with no usable tracker is a case where the work cannot be cut: no ticket and no split. When the work cannot be cut, write one handoff with the Estimate line and tell the user in the report why. |
 | 6 | Keep the drafts. Write nothing yet. |
 
@@ -82,13 +83,13 @@ Estimate:
 
 Split rule:
 
-1. Cut only the repository over `split.limit`.
-2. Order by layer: types and interfaces, implementation, callers and wiring, removal of what was replaced, docs.
-3. Use the fewest parts, each at or below `split.limit`.
+1. Cut only the repository over the cap.
+2. A whole feature is the packing unit. A single feature over the cap is cut by layer: types and interfaces, implementation, callers and wiring, removal of what was replaced, docs.
+3. Use the fewest parts, each at or below the cap. Pack whole features into the parts up to the cap. A part may hold several features. One part per feature is not required.
 4. Tests go with the code they test.
 5. No part leaves a caller of something that does not exist yet. Each part builds and passes its tests alone.
-6. A repository under the limit stays whole and goes with the part that needs it. That part lists both repos, the delivering repo first.
-7. With two repositories over the limit, the provider repository parts come first.
+6. A repository at or under the cap stays whole and goes with the part that needs it. That part lists both repos, the delivering repo first.
+7. With two repositories over the cap, the provider repository parts come first.
 8. The parts form one linear chain.
 
 Part handoffs:

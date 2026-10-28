@@ -1,13 +1,14 @@
 ---
 name: split
-description: Split a finished branch at a feature seam so each part is its own ticket and pull request. Removes the excess from the unpublished commits, commits it on a new branch stacked on the original branch, tests both branches, and under `delivery: pr` creates a ticket, pushes both and opens both pull requests. Use when a job's diff passed 1.5 times its estimate (called by `cure:goal` before the push), or when the user says "split this branch", "split this PR", or "/cure:split".
+description: Split a finished branch at a seam where both parts build and pass their tests, so the excess is its own ticket and pull request. Removes the excess from the unpublished commits, commits it on a new branch stacked on the original branch, tests both branches, and under `delivery: pr` creates a ticket, pushes both and opens both pull requests. Use when a job's diff passed `split.factor` times its estimate and the PR diff passed the cap `split.limit` × `split.factor` (called by `cure:goal` before the push), or when the user says "split this branch", "split this PR", or "/cure:split".
 allowed-tools: Read, Grep, Glob, Bash, Agent
 ---
 
 # Split
 
-A branch grew past its estimate. This skill moves the excess feature to its own ticket, branch and
-pull request. It asks the user nothing. It decides a fork by the recommended option and lists the
+A branch grew past its cap. This skill makes two parts: it moves the smallest excess that brings
+`<branch>` at or under the cap to its own ticket, branch and pull request. The excess may hold
+several features. It asks the user nothing. It decides a fork by the recommended option and lists the
 decision in the report.
 
 Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Write its value in place of `<plugin-root>` in every command
@@ -19,11 +20,15 @@ below.
 |---|---|
 | Repository | Absolute git toplevel. One repository per run. |
 | Branch | The branch to split. |
-| Base | The branch the pull request targets, and the base commit the caller recorded (`<base-commit>`). Without a base commit: `git merge-base origin/<base> <branch>`. |
+| Base | The branch the pull request targets (`<base>`), the ref the work was based on (`<base-ref>`: the local `<base>` when `<base>` is a predecessor's branch or the job's Settled says "Base: the PR branch of split part 1"; else `origin/<base>` when it exists; else the local `<base>`), and the base commit the caller recorded (`<base-commit>`). Without a base commit: `git merge-base <base-ref> <branch>`. |
 | Estimate | The estimated changed lines of the task. The report compares the diff with it. |
+| Cap | `split.limit` × `split.factor`, in changed lines (default 800 × 1.5 = 1200). In a job, the caller passes the value from Settled. Without one: `<plugin-root>/bin/cure-job config get split.limit` and `split.factor`. |
+| R | The required move: the PR diff before the split minus the cap, in changed lines. In a job, the caller passes it. By hand: measure the PR diff (below) and subtract the cap. The excess is the smallest set of whole work items totalling at least R. |
 | Ticket | In a job, the handoff `ticket`. By hand, the ticket parsed from the branch name or given by the user. `<orig>` is its id (`<N>` of a GitHub `#N`, or the Jira key). `<ticket-repo>` is the repository the ticket names, else the remote; it is the `--repo` of every command on `<orig>`. With no ticket, the rewrite and the link are skipped. |
-| Excess | A description of the feature to move: the behaviour, the files and the tests that belong to it. |
+| Excess | A description of the work to move: the behaviour, the files and the tests that belong to it. In a job, the goal picks the smallest set of whole work items from `git diff --stat` that totals at least R. |
 | Delivery | `pr` or `commit`, as the caller passes it (the job's handoff `delivery`). Without one, as when run by hand: `<plugin-root>/bin/cure-job config get handoff.delivery` (default `commit`). |
+
+PR diff: the insertions plus deletions of `git diff --shortstat <base-ref>...<branch>`. It reads committed refs only, never the working tree.
 
 Read a missing input from the context: the current branch from `git -C <repo> rev-parse --abbrev-ref HEAD`,
 the base from the job's `base` or `gh pr view --repo <owner/repo> --json baseRefName`. Without a repository, a branch or an
@@ -78,15 +83,15 @@ logs in and never reads or stores a token.
 
 ## Seam
 
-The excess is a seam when all of these hold:
+The excess is a seam when checks 1 to 3 hold. Check 4 is the cap check. Checks 1 to 3 hold when the split succeeds. Check 4 may fail:
 
 1. `<branch>` without the excess builds and passes its tests. Step 5 proves it.
 2. No file that stays calls something only the excess defines.
 3. The tests of the excess move with its code.
-4. One sentence describes the excess as one feature.
+4. `<branch>` without the excess has a PR diff at or under the cap (the measure defined under Inputs). Step 3 measures it after it commits the removal. When it does not hold, the skill does not roll back: the report states the overrun as a failure and the run continues to the delivery of both parts.
 
-Checks 2 to 4 need source reading. The orchestrator of a job reads no source, so the brief of the
-`implementer` agent in step 3 carries them: it answers yes or no for each, with the file names that
+Checks 2 and 3 need source reading. The orchestrator of a job reads no source, so the brief of the
+`implementer` agent in step 3 carries them: it answers yes or no for each of them, with the file names that
 fail, before it edits a file. A "no" stops the skill with nothing changed.
 
 A file that both parts edit stays on `<branch>` with the lines the remaining part needs. The stacked
@@ -97,7 +102,7 @@ branch takes the file whole from the old tip.
 1. List the files of the excess: `git diff --stat <base-commit> <branch>` and the excess description.
 2. Dispatch the `implementer` agent. In a job the orchestrator has no Edit tool, so this step
    always goes through the agent. Brief it with the repository, the branch, the file list, the
-   excess description, checks 2 to 4 of section "Seam", and the rule "remove the excess, keep the
+   excess description, checks 2 and 3 of section "Seam", and the rule "remove the excess, keep the
    remaining feature building and tested, do not commit". Pass paths, not file text. A file the
    excess deleted comes back with `git checkout <base-commit> -- <path>`.
 3. Commit the removal on `<branch>`. Check whether its latest commit is published:
@@ -130,7 +135,7 @@ those of `<stacked>`, as section "Executors" says. The pass on `<branch>` proves
 |---|---|
 | `<branch>` fails | The seam is wrong. Roll back (section "Roll back"). Stop and report. |
 | `<stacked>` fails | Run its tests once more. When they fail again, roll back, stop and report. The skill amends nothing. |
-| Both pass | Dispatch the `reviewer` agent on `git diff <old-tip> <branch>`. Its brief adds checks 2 to 4 of section "Seam": no file that stays calls something only `<stacked>` defines, the tests of the excess moved, and `<stacked>` holds one feature. A failed check is a MUST-FIX. A MUST-FIX or SHOULD-CONSIDER rolls back, stops and reports. Otherwise continue. |
+| Both pass | Dispatch the `reviewer` agent on `git diff <old-tip> <branch>`. Its brief adds checks 2 and 3 of section "Seam": no file that stays calls something only `<stacked>` defines, and the tests of the excess moved. A failed check is a MUST-FIX. A MUST-FIX or SHOULD-CONSIDER rolls back, stops and reports. Otherwise continue. |
 
 ## Roll back
 
@@ -198,5 +203,5 @@ pull request merges and its head branch is deleted, GitHub retargets the stacked
 | Stacked branch | Its name. |
 | Pull requests | Under `pr`, the two URLs, original first. |
 | Original ticket | `<orig>`, the result of the link and of the rewrite, and its body before the rewrite. For Jira in a job: the two manual steps with the remaining-scope text. |
-| Lines | Changed lines of each branch, and the estimate. |
+| Lines | Changed lines of each branch, the estimate and the cap. When `<branch>` is over the cap after the removal: the overrun in lines, marked as a failure. |
 | Decisions | Each fork decided by the recommended option. |

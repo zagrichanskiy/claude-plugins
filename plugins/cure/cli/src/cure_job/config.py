@@ -34,6 +34,7 @@ DEFAULTS: dict[str, object] = {
     "dispatcher.auto-approve-tiers": ["Solo", "Light"],
     "dispatcher.stalled-confirm-seconds": 60,
     "split.limit": 800,
+    "split.factor": 1.5,
     "split.tracker": "github",
     "split.jira-command": "",
     "short-hold.wait-seconds": 540,
@@ -187,6 +188,16 @@ def _int_range(low: int, high: int) -> Callable[[object], str | None]:
     return check
 
 
+def _number_range(low: float, high: float) -> Callable[[object], str | None]:
+    def check(value: object) -> str | None:
+        if type(value) not in (int, float):
+            return f"expected a number, got {json.dumps(value)}"
+        if not low <= value <= high:
+            return f"{value} is outside {low}..{high}"
+        return None
+    return check
+
+
 def _branch(value: object) -> str | None:
     if not isinstance(value, str) or not value or re.search(r"\s", value):
         return f"expected a branch name, got {json.dumps(value)}"
@@ -234,6 +245,7 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "dispatcher.auto-approve-tiers": _tiers,
     "dispatcher.stalled-confirm-seconds": _int_range(10, 600),
     "split.limit": _int_range(100, 5000),
+    "split.factor": _number_range(1.0, 1.9),
     "split.tracker": _tracker,
     "split.jira-command": _text,
     "short-hold.wait-seconds": _int_range(10, 540),

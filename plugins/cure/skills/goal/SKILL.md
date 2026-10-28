@@ -88,8 +88,8 @@ context compaction and before an exit.
 K-1. (Light and Full, when Settled has an estimate) Size check, as `rules.md` "Light and Full" states.
      It is the item directly before the push (K), so it follows the last review round and commit.
      Under `delivery: commit` there is no push item: it sits directly before the retrospective item.
-     A diff past 1.5 x the estimate adds a `Wn` row and a proposal to the retrospective file and runs
-     `cure:split`. Actions it may run: `git commit --amend`, `git reset --keep`, `git switch`,
+     A diff past `split.factor` × the estimate adds a `Wn` row and a proposal to the retrospective file.
+     It runs `cure:split` only when the PR diff (`rules.md` "Light and Full" defines it) also passes the cap (`split.limit` × `split.factor`). Actions it may run: `git commit --amend`, `git reset --keep`, `git switch`,
      `git switch -c`, `git branch -m`, `git branch -D`, `git checkout <commit> -- <path>`, `git rm`,
      `git restore` and `git clean -f` on paths this run created or changed,
      `git push --force-with-lease`, pushing a second branch, `gh issue create`, `gh pr create`,
@@ -289,6 +289,7 @@ user can re-run. The changed-line cap in the failure exit is a stop signal, not 
 reaches it takes the failure exit instead of growing.
 
 - Count changed lines as the failure exit states: `git diff --shortstat <base commit>` (work item 1's record) plus the lines of untracked files. Do not use `git add -N`; its entries break `git stash` and `git rebase`.
+- When Settled has an estimate, record the cap in Settled at draft time: read `<plugin-root>/bin/cure-job config get split.limit` and `split.factor`, and write "Split cap: <limit> × <factor> = <cap> changed lines". The size check reads both values from there.
 - Estimate tests apart from code. Tests of a state-machine change are estimated at 2x its code. Validator tests are estimated per key. A legacy parser is estimated separately.
 - The test-author brief states a line budget beside the list of behaviours to cover. The budget is the test estimate above.
 - A goal with a test-author step has a work item between the implementer item and the test-author item. It measures the diff as the failure exit states and prints the count.
