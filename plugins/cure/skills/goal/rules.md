@@ -9,15 +9,19 @@ add one.
 - Work item 1: run `git fetch`, then the fact check the item names. A false Settled statement, a
   failed fetch or a failed tool check is a failure cause. Base moved: base the work on
   `origin/<base>`. Other mismatch: record it, use the corrected value.
-- Base taken from a predecessor job: work item 1 compares `<base>` with the local branch, not with
-  `origin/<base>`, because the predecessor commits locally and pushes nothing. When `origin/<base>`
+- Base taken from a predecessor job, or a Settled line "Base: the PR branch of split part 1": work item 1 compares `<base>` with the local branch, not with
+  `origin/<base>`, because the predecessor commits locally and pushes nothing. A split part 1 branch that exists only on
+  origin has no local branch: first run `git branch --track <base> origin/<base>`. When `origin/<base>`
   exists, it runs `git merge-base --is-ancestor origin/<base> <base>`. A failure is a failure
   cause. Never base the work on `origin/<base>` in this case: that drops the predecessor's commits.
   Any other base keeps the check above.
-- Work item 1 records `git -C <repo> rev-parse <base>` for each repository as that repository's base
-  commit, or `git -C <repo> rev-parse origin/<base>` when the base moved and the work is based on
-  `origin/<base>`: in the ledger, or in the transcript for Solo. The repositories of one job can have
-  different bases.
+- Work item 1 records one base commit per repository, the commit the job started on: in the ledger,
+  or in the transcript for Solo. For a branch that exists on run 1 (locally, else as
+  `origin/<branch>`), it is `git -C <repo> rev-parse <branch>` (else `origin/<branch>`). Otherwise it
+  is `git -C <repo> rev-parse <base>`, or `git -C <repo> rev-parse origin/<base>` when the base moved
+  and the work is based on `origin/<base>`. The repositories of one job can have different bases.
+  The size check, the changed-line cap in the failure exit, the stats row's `lines` and `cure:split`
+  read this value.
 - Work item 1 also records, per repository, a dirty-tree baseline: branch, HEAD,
   `git diff --shortstat` and the paths that `git -C <repo> status --porcelain` lists. It records them
   where the base commit is recorded. The changed-line cap in the failure exit and the stats row's
@@ -30,10 +34,11 @@ add one.
   list), work item 1 runs the changed rule against the workspace it runs against, for example
   `repo forall -c 'git remote get-url origin'`, and records the output. A counter-example the changed
   rule misclassifies is a question.
-- Branch: the goal names the job's branch as a literal name. A branch that does not exist on run 1 is
+- Branch: the goal names the job's branch as a literal name. A branch exists when it is local or on origin. A branch that does not exist on run 1 is
   not a mismatch of work item 1. The step after the fact check creates the branch from `<base>` in each
-  repository with `git switch -c <branch> <base>`, or runs `git switch <branch>` when it exists (a run
-  after `needs-input`). Never use `git switch -C`: it resets the branch and drops earlier commits. In
+  repository with `git switch -c <branch> <base>`, or runs `git switch <branch>` when it exists locally (a run
+  after `needs-input`), or `git switch -c <branch> --track origin/<branch>` when it exists only on
+  origin. Never use `git switch -C`: it resets the branch and drops earlier commits. In
   Light and Full this step is the orchestrator's, in Solo the session's.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.
@@ -86,6 +91,37 @@ add one.
 - `git rm` run by a subagent stages the deletion, so the orchestrator's explicit-path `git add` of the removed path fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
 - After a `designer` or `architect` consult, add the lines already changed, counted as the failure exit states, to the consult's line estimate. Run this per repository: the estimate for that repository's files plus the lines already changed in it. Compare each sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure exit.
+- Size check: after the last review round and the final commit, before the push, measure the diff
+  per repository (as the failure exit states, from the base commit, the commit the job started on), against the repository's Estimate line in Settled ("Estimate: ~N changed
+  lines", with "in <repo>" when the job has several). Skip the check when Settled has no estimate. The PR diff is the insertions plus deletions of `git diff --shortstat <base-ref>...<branch>`. `<base-ref>` is the local `<base>` when `<base>` is a predecessor's branch or Settled says "Base: the PR branch of split part 1"; else `origin/<base>` when it exists; else the local `<base>`. It reads committed refs only, never the working tree. When the diff of any repository passes `split.factor` ×
+  its estimate: add a `Wn` row (why the diff grew) and a proposal (the fix to the rule or skill) to
+  the job's retrospective file; the retrospective work item completes that file. Call `cure:split`
+  only when the job has one repository, `<plugin-root>/bin/cure-job list --json` shows no job
+  whose `after` is this job, and the PR diff passes the cap
+  (`split.limit` × `split.factor`; read it from the Settled line "Split cap", else from `<plugin-root>/bin/cure-job config get split.limit` and `split.factor`); otherwise the `Wn` row names the unmet
+  condition, the retrospective is written and the job delivers its single branch. The goal computes R = PR diff − cap and picks the smallest set of whole work items from `git diff --stat <base commit>` whose lines total at least R. When R is larger than the job's own diff (insertions plus deletions of `git diff --shortstat <base commit>..HEAD`), no pick reaches R: the job skips `cure:split`, adds a `Wn` row that names this reason and delivers its single branch. The call passes the repository, the branch, the base ref, the base commit work item 1 recorded, the estimate, the delivery, the cap, R and a
+  description of the excess work (the files and tests of the picked work items). Record the tip of `<branch>` before the call. The job does not stop at `split.factor` ×: it finishes its work first. The check asks the
+  user nothing. What follows depends on `delivery`:
+  - `pr`: the push and the pull requests are those of `cure:split`. When `cure:split` stops before
+    it pushes `<branch>`, it has rolled `<branch>` back to the recorded tip (its section "Roll
+    back"). The job checks that `git -C <repo> branch --show-current` prints `<branch>` and that
+    `git -C <repo> rev-parse <branch>` prints the recorded tip. Then it pushes and opens its single
+    PR as planned. A failed check or a failed rollback takes the failure exit, and the job pushes
+    nothing. When `cure:split` pushed `<branch>` and then failed for a reason other than its check 4, the job takes the failure exit with
+    `--pr` for each pull request opened, pushes nothing further, and names the excess as left on local `<stacked>`. The retrospective records why the split stopped. The report names any ticket
+    `cure:split` already created.
+  - `commit`: `cure:split` creates the stacked branch locally, with no ticket and no push, and the
+    report names the branch. When it stops, the job runs the same two checks, then delivers its
+    single branch. A failed check takes the failure exit.
+  - `cure:split` reports a failure of its check 4 (the part left on `<branch>` is over the cap): the job adds a `Wn` row that names the overrun in changed lines and delivers both parts. No rollback runs.
+  - After a successful split, the job re-runs on `<stacked>` each done-when check the excess owns
+    (`qa` for a test run). Such an item counts as delivered when the check passes there, and the final
+    message names `<stacked>` as its evidence. A check on `<branch>` that fails only because the excess
+    moved is not a failure cause.
+- Review fixes: once the PR exists, squash each fix into the job's latest commit
+  (`git commit --amend --no-edit` with explicit paths). No separate fix commit. Amending a commit
+  already pushed makes the next push `git push --force-with-lease`. The severity floor
+  is unchanged: every `MUST-FIX` and `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
 - Light goal with one review round: the round includes one reviewer re-check of the fixes. It starts no second round. A `MUST-FIX` or `SHOULD-CONSIDER` that the re-check reports takes the failure exit; no further fix loop runs. A Light goal with two review rounds keeps its round-2 re-check as round 2.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print

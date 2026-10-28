@@ -82,9 +82,20 @@ the reasoning that would otherwise be re-litigated.
 Before work item 1, read `<plugin-root>/skills/goal/rules.md` and follow it. Read it again after a
 context compaction and before an exit.
 
-1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor, the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
+1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor or marked "Base: the PR branch of split part 1", the check of `rules.md`); <ticket, branch, named files>; <each tool Done-when
    runs>; <each Settled fact marked verify>.
 2. <One step, its agent, its files.>
+K-1. (Light and Full, when Settled has an estimate) Size check, as `rules.md` "Light and Full" states.
+     It is the item directly before the push (K), so it follows the last review round and commit.
+     Under `delivery: commit` there is no push item: it sits directly before the retrospective item.
+     A diff past `split.factor` × the estimate adds a `Wn` row and a proposal to the retrospective file.
+     It runs `cure:split` only when the PR diff (`rules.md` "Light and Full" defines it) also passes the cap (`split.limit` × `split.factor`). Actions it may run: `git commit --amend`, `git reset --keep`, `git switch`,
+     `git switch -c`, `git branch -m`, `git branch -D`, `git checkout <commit> -- <path>`, `git rm`,
+     `git restore` and `git clean -f` on paths this run created or changed,
+     `git push --force-with-lease`, pushing a second branch, `gh issue create`, `gh pr create`,
+     `gh pr view` and the `split.jira-command` command. Under `delivery: commit` it runs no push, no `gh`
+     command and no Jira command.
+K.   <The push and the pull request, when the job pushes. K is the item before the retrospective.>
 N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
      its summary.
 N-1. Append the `stats.md` row with the command of `rules.md`. `<date> | <repo> | <slug>` is filled
@@ -205,7 +216,7 @@ unattended and pays for the orchestrator's context on every turn.
 | Orchestrator | The main session dispatches, tracks and checks. It does not read source or edit code. |
 | Branch and commits | Branch creation and every commit are orchestrator work items, committed with explicit paths. No work item or agent brief assigns them to `implementer`, `test-author` or `skill-author`, because these agents refuse to create a branch or commit. The orchestrator's commit messages omit attribution trailers (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids them, because that file overrides a session attribution reminder. Trailers the repository requires, such as `Signed-off-by:`, stay. |
 | Agent per step | Each work item names its agent. Items with disjoint files run in parallel. Two writing agents that share a CLI or a file format get its command names, run semantics and format in both briefs; otherwise the docs agent runs after the CLI. |
-| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
+| Review-then-fix split | Round 1 produces a triaged fix list, not fixes. Fixes ship as small PRs per component, each with at most 3 review rounds, the cap counted per PR and not across the whole effort, and a round ended by a measured failure counts apart from a round spent on review findings. A measured-failure round is one that ended on a failed test or check, not on review findings. The round cap is a failure exit in the template. A `MUST-FIX` or `SHOULD-CONSIDER` still open after a PR's round 3 takes the failure exit; no round 4 starts. Round 3 only re-checks findings that round 2's fixes introduced or left open and raises no new topic. The orchestrator commits each round's fixes with explicit paths, new files included, before the re-check runs; once the PR exists a fix is squashed into the job's latest commit, never a separate commit. One doc-only edit pass is allowed after the last review round. A doc-only pass changes no file that the build, the tests, or a loaded skill or agent reads. |
 | Consultation | Which advisor answers a hard implementation question: `designer` for class level, `architect` for component level. The answer is recorded before the implementer starts. A class flagged in 2 consecutive review rounds gets a `designer` consult before an implementer touches it again; the round-1 triage and the PR's first review round count as consecutive for this gate. After every designer or architect consult the orchestrator compares the consult's line estimate plus the lines already changed with `<lines>`, as the Light and Full rules state. The orchestrator never writes the class-level decision itself. |
 | Review loop | Review, fix, re-review stops at the severity floor: done when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open. `NITPICK` and `enhancement`-tagged findings go to a backlog, not into another round; the backlog never holds a `MUST-FIX` or `SHOULD-CONSIDER`; a `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is asked before its round closes; see the `review-change` skill for the triage words. A ledger file holds every finding and its status, every assumption and every question with its answer. State a token budget per agent per round in the goal. |
 | Verification | `qa` runs the suite after each fix. Its pass count is a done-when item. The `qa` brief gives the expected value of each check. Before merge, a live-verification gate also runs: the `verifier` agent's output is the done-when item. An unattended session cannot prove a manual check, so a manual check goes into the PR checklist, never into the done-when list. A green test suite alone does not clear this gate. |
@@ -277,11 +288,12 @@ Bound a goal by deliverables, not by lines: one reviewable concern, one PR, and 
 user can re-run. The changed-line cap in the failure exit is a stop signal, not the scope. A goal that
 reaches it takes the failure exit instead of growing.
 
-- Count changed lines as the failure exit states: `git diff --shortstat <base>` plus the lines of untracked files. Do not use `git add -N`; its entries break `git stash` and `git rebase`.
+- Count changed lines as the failure exit states: `git diff --shortstat <base commit>` (work item 1's record) plus the lines of untracked files. Do not use `git add -N`; its entries break `git stash` and `git rebase`.
+- When Settled has an estimate, record the cap in Settled at draft time: read `<plugin-root>/bin/cure-job config get split.limit` and `split.factor`, and write "Split cap: <limit> × <factor> = <cap> changed lines". The size check reads both values from there.
 - Estimate tests apart from code. Tests of a state-machine change are estimated at 2x its code. Validator tests are estimated per key. A legacy parser is estimated separately.
 - The test-author brief states a line budget beside the list of behaviours to cover. The budget is the test estimate above.
 - A goal with a test-author step has a work item between the implementer item and the test-author item. It measures the diff as the failure exit states and prints the count.
-- The cut line is the point where a change is divided into a delivered part and a rest. The goal writer plans it, or the session that writes the follow-up goal after a failure exit at the cap applies it. Under `delivery: pr`, it rewords the ticket to the delivered part and opens a new ticket for the rest. Each ticket has one PR per repository, and the PR does not reference the split.
+- The cut line is the point where a change is divided into a delivered part and a rest. The goal writer plans it, or the session that writes the follow-up goal after a failure exit at the cap applies it. Under `delivery: pr`, it rewords the ticket to the delivered part and opens a new ticket for the rest. With no usable tracker it applies no cut. Each ticket has one PR per repository, and the PR does not reference the split.
 
 Size a goal from `~/.claude/retros/stats.md`: `grep '| <repo> |' ~/.claude/retros/stats.md` lists
 the earlier goals of the repository with their turns, tokens and lines. Do not read the retrospectives for this.

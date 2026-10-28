@@ -38,6 +38,15 @@ Any reference with both a number and a name gets both, every time: controls, sec
 ids, ClickUp tasks, PR and issue numbers. Repeat the name on later mentions. Look it up rather than
 writing a bare number.
 
+The name rule applies to identifiers the user knows or can open: tickets, PRs, issues, controls,
+sections, requirement ids. In a reply, do not cite an id the user cannot open and has not seen:
+review findings, ledger items, a job's internal step or work-item numbers. State the problem in one
+plain sentence instead. This applies to replies, not to artifacts: a commit message may carry a bare
+"work item N" or "step N", and a PR body names the item.
+
+A table of fixes has a Problem column before the Fix column. The problem a change solves is not
+background. The length rule does not drop it.
+
 # Artifacts carry decisions, not notes
 
 A ticket, PR, commit message, or document records what is true and what was decided - never

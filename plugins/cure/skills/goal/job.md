@@ -8,9 +8,9 @@ in this mode. A worker session then runs the goal and cannot reach the user.
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
 - Read the `CLAUDE.md` of each repository in `repos`.
-- Read `handoff.delivery`, `handoff.branch` and `handoff.resource-risk` with
+- Read `handoff.delivery`, `handoff.branch`, `handoff.resource-risk`, `split.limit` and `split.factor` with
   `cure-job config get <key>` before writing the goal. Each prints JSON; the
-  built-in default applies when `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
+  built-in default applies when `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket; a GitHub ticket `#N` is written `issue-<N>`), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
   that decision `(default)` under Settled. Never read `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself.
 - Base of a job without `after`: the `base` the handoff states. When it states none, the default
   branch of each repository in `repos`, detected per repository with
@@ -25,6 +25,7 @@ in this mode. A worker session then runs the goal and cannot reach the user.
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every
   job. A scope `device: <name>` matches a handoff whose `device` value is `<name>`. A scope `repo: <path>` matches a handoff whose `repos` lists `<path>`. Never shorten
   or drop these lines to save characters.
+- Copy the handoff's Settled line "Base: the PR branch of split part 1" into the goal's Settled verbatim. `rules.md` keys the base check on it.
 - A handoff with `device: bench` declares bench use. The goal must carry the short-hold claim and
   release (below).
 
@@ -50,7 +51,7 @@ chain need not be `done` when the goal is written, but it has a `goal.md`: the c
 successor's goal only after the predecessor's row has `goal` true. Every job on the chain is `done`
 when the successor launches, and the work item 1 base check tests the branch then.
 
-Write the base per repository in the goal's fact check. For a base taken from a predecessor, the
+Write the base per repository in the goal's fact check. For a base taken from a predecessor or marked "Base: the PR branch of split part 1", the
 fact check is the one in `rules.md`, not `<base>` equals `origin/<base>`.
 
 ## Writing the goal
@@ -148,7 +149,7 @@ Every exit runs in this order: (1) `<plugin-root>/bin/cure-job finish <id> --sta
 (`<plugin-root>/bin/cure-job finish --help` lists the options; never write `result.md` yourself); (2) `SendMessage`
 with the `notify:` line `finish` printed; (3) the final message. The `finish` command, its output
 and the `SendMessage` or its error are in the transcript before the final message. The final message
-restates each done-when item with its evidence. An item is unproven only when its proof is
+restates each done-when item with its evidence (after a split, an item the excess owns has `<stacked>` as its evidence, as `rules.md` states). An item is unproven only when its proof is
 unavailable (a device, a login, a manual check), never when its check ran and failed; give a reason
 for each. Keep the goal file, the retrospective and the backlog; list the retrospective with
 `--retro`. Never touch the job directory.
@@ -169,7 +170,7 @@ When it holds none, the final message starts with `no-answer:`, the run calls no
 run exits at once.
 ```
 
-Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal.
+Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N (the largest N, when the job has several Estimate lines) rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal. Record the effective `delivery` under Settled too; the size check passes it to `cure:split`.
 
 Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `SHOULD-CONSIDER` is
 open after review round 3". When the handoff's `delivery` is `commit` (the default), the generated

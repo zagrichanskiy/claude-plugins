@@ -12,7 +12,10 @@
     "stalled-confirm-seconds": 60
   },
   "split": {
-    "limit": 800
+    "limit": 800,
+    "factor": 1.5,
+    "tracker": "github",
+    "jira-command": ""
   },
   "short-hold": {
     "wait-seconds": 540,

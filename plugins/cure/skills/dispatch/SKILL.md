@@ -14,7 +14,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/template.md`.
 2. Fill the template from the session's context (table below).
-3. Estimate and split (section "Estimate and split"). It yields drafts and the user's choice: one handoff, or one per part.
+3. Estimate and split (section "Estimate and split"). It yields the drafts: one handoff, or one per part.
 4. Create the tickets of a split (section "Estimate and split"). Write each handoff with `cure-job new` (below), the parts in order. Keep the printed job id and `notify:` line.
 5. Send the dispatcher the `notify:` line of each job (below).
 6. Tell the user the job ids, the tickets of a split, and whether the dispatcher was reached or started.
@@ -49,7 +49,10 @@ On a config error (parse error, bad value, unknown key, removed key, or a `confi
 |---|---|
 | `handoff.delivery` | `delivery`, when the user did not state it. |
 | `handoff.branch` | Values: `new` (default), `current`, or a literal branch name. Not applied by dispatch: it omits `branch` unless the `ticket`, `branch` rule above sets it. `cure:goal` applies it when the handoff omits `branch` (see `skills/goal/job.md` Input). |
-| `split.limit` | Changed lines per repository above which the task is split (default 800). |
+| `split.limit` | The base of the cap (default 800). The cap, the largest changed-line count of a part and the split threshold, is `split.limit` × `split.factor` (default 800 × 1.5 = 1200). |
+| `split.factor` | Number from 1.0 to 1.9 (default 1.5). Multiplies `split.limit` into the cap. `cure:goal` uses it as the multiplier of the size check. It stays below 2, because the failure exit of `skills/goal/job.md` fires at 2 × the estimate. |
+| `split.tracker` | Where a ticket for split-off work is created. Values: `github` (default; an issue in the delivering repository, through `gh`) or `jira` (through a Jira command or MCP tool of the dispatching session). `cure:split` in a job runs `split.jira-command` instead: the orchestrator of a job has no MCP tool. |
+| `split.jira-command` | Shell command template with `<title>`, `<body>` and an optional `<project>` (the project key of the ticket of the job's branch) that creates a Jira ticket and prints its key (default empty). Used only by `cure:split` in a job; `jira` there fails preflight while it is empty. |
 
 Omit `id` and `created`. `cure-job new` sets them.
 
@@ -58,17 +61,18 @@ Frontmatter grammar: `key: scalar` on one line, `key: [a, b]` inline lists, and 
 
 ## Estimate and split
 
-Runs after the template is filled and before any handoff is written. It ends with the drafts and the user's choice. The main list writes the handoffs and reports.
+Runs after the template is filled and before any handoff is written. It ends with the drafts. It asks the user nothing. The main list writes the handoffs and reports.
 
-The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The rules below use it.
+The effective `delivery` is the stated value, else the output of `cure-job config get handoff.delivery`. The cap is `split.limit` × `split.factor`, read with `cure-job config get split.limit` and `cure-job config get split.factor`. The rules below use both.
 
 | # | Step |
 |---|---|
 | 1 | Estimate the change per repository (below). |
-| 2 | No repository above `split.limit`: add the Settled line "Estimate: ~N changed lines" (N is the largest repository sum) and write one handoff. Done. |
-| 3 | Otherwise cut the work into parts by the split rule and draft one handoff per part. |
-| 4 | With the effective `delivery: pr` on GitHub, run `gh auth status` and `gh repo view <owner/repo> --json hasIssuesEnabled` first (see Tickets). Then ask in one `AskUserQuestion`. The question lists each part with slug, repos and estimate. Options: split as proposed, or queue as one job. With `delivery: pr` and no tracker the skill can write to, the same round asks for one ticket id per part. When the work cannot be cut, the question gives the reason and offers queue as one job, or stop. |
-| 5 | Keep the drafts and the answer. Write nothing yet. |
+| 2 | Add the current diff of the target PR, for the decision of steps 3 and 4 only. Run `git -C <repo> fetch`, then `git -C <repo> diff --shortstat origin/<base>...<branch>`, insertions plus deletions; M is the result. `<base>` is the handoff `base`, else the default branch of the repository; when `origin/<base>` is absent, use the local `<base>...<branch>`. `<branch>` is the handoff `branch`, resolved as `job.md` resolves an omitted `branch`. When the local ref of `<branch>` is absent, use `origin/<branch>`. M = 0 when `<branch>` is absent locally and on `origin` (check each with `git rev-parse --verify -q`), as with the branch of an `after` predecessor. The step is skipped for a small change (see `ticket`, `branch` in Fields). The sum of estimate and M, per repository, goes into no handoff. |
+| 3 | No repository sum above the cap: the work stays in one ticket and one pull request, even when it holds several features. Add the Settled line "Estimate: ~N changed lines" (N is the repository estimate, without the diff; "in <repo>" and one line per repository when there are several) and write one handoff. Done. |
+| 4 | Otherwise cut the work into parts by the split rule and draft one handoff per part. Split without asking. When the existing diff takes the sum over the cap, the PR stays as it is. Part 1 commits on the PR's own branch with the budget cap minus M. When that budget is 0 or less, part 1 gets no new work and is not queued, and new work starts at part 2 (see `after`, `base` and `branch` in Part handoffs). Further parts (2 to n) have the budget cap and are stacked on part 1's branch (the draft's `branch:`, else the head branch of the PR) through `after`; under `delivery: pr` each has a new ticket and branch. |
+| 5 | Only with the effective `delivery: pr`, the tickets of parts 2 to n are created as the Tickets table says. Part 1 keeps the ticket and branch of the unsplit draft. A repository with no usable tracker is a case where the work cannot be cut: no ticket and no split. When the work cannot be cut, write one handoff with the Estimate line and tell the user in the report why. |
+| 6 | Keep the drafts. Write nothing yet. |
 
 Estimate:
 
@@ -79,13 +83,13 @@ Estimate:
 
 Split rule:
 
-1. Cut only the repository over `split.limit`.
-2. Order by layer: types and interfaces, implementation, callers and wiring, removal of what was replaced, docs.
-3. Use the fewest parts, each at or below `split.limit`.
+1. Cut only the repository over the cap.
+2. A whole feature is the packing unit. A single feature over the cap is cut by layer: types and interfaces, implementation, callers and wiring, removal of what was replaced, docs.
+3. Use the fewest parts, each at or below the cap. Pack whole features into the parts up to the cap. A part may hold several features. One part per feature is not required.
 4. Tests go with the code they test.
 5. No part leaves a caller of something that does not exist yet. Each part builds and passes its tests alone.
-6. A repository under the limit stays whole and goes with the part that needs it. That part lists both repos, the delivering repo first.
-7. With two repositories over the limit, the provider repository parts come first.
+6. A repository at or under the cap stays whole and goes with the part that needs it. That part lists both repos, the delivering repo first.
+7. With two repositories over the cap, the provider repository parts come first.
 8. The parts form one linear chain.
 
 Part handoffs:
@@ -93,17 +97,18 @@ Part handoffs:
 | Field | Value |
 |---|---|
 | `outcome`, `## Work`, `## Done when`, `device` | Per part. `device: bench` only if the part needs the bench. |
-| `## Settled` | The applicable lines, plus "Estimate: ~N changed lines" (N is the part's largest repository sum) and "Split: part k of n". |
+| `## Settled` | The applicable lines, plus "Estimate: ~N changed lines" (N is the part's own estimate, without the diff; "in <repo>" and one line per repository when there are several) and "Split: part k of n". Part 2 with part 1 not queued also has "Base: the PR branch of split part 1". |
 | `Resource risk:` lines, `## Tools` | Copied verbatim. |
 | `## Open` | Each item goes into the first part it affects. |
-| `after` | Part 1: the `after` of the unsplit draft, if any. Part k > 1: the job id of part k-1, printed by `cure-job new`. |
-| `ticket` | `delivery: pr`: the part own ticket. `delivery: commit`: the session ticket. |
-| `branch` | `delivery: pr`: `<ticket>_<slug>`, or `<slug>` without a ticket. `delivery: commit`: one branch, the same explicit `branch:` value in every part; the parts stack as commits on it. |
-| Slug | `<slug>-part<k>`. |
+| `after` | Part 1: the `after` of the unsplit draft, if any. Part k > 1: the job id of part k-1, printed by `cure-job new`; part 2 with part 1 not queued: the `after` of the unsplit draft. |
+| `base` | Part 2 with part 1 not queued: the head branch of the PR. Other parts: as the unsplit draft. |
+| `ticket` | Part 1: the `ticket` of the unsplit draft. Part k > 1, `delivery: pr`: the part own ticket. Part k > 1, `delivery: commit`: the session ticket. |
+| `branch` | Part 1: the `branch` of the unsplit draft (omitted when the draft omits it). Part k > 1, `delivery: pr`: `<ticket>_<slug>`, with the ticket in the branch form of `skills/split/SKILL.md` section "Ticket" (`<tid>`). Part k > 1, `delivery: commit`: the `branch:` value of part 1, else the head branch of the PR; the parts stack as commits on it. |
+| Slug | `<slug>-part<k>`, for parts k > 1. |
 
 Part spec rules. Each part's handoff and ticket body, including any list of events or scope items in the ticket body, follow them:
 
-1. List only the items this part owns. Mark each item an earlier part delivers as "delivered by part j" and do not list it as work. The marked items go in a separate list, not under work.
+1. List only the items this part owns. Mark each item an earlier part delivers as "delivered by part j" and do not list it as work. The marking applies to the handoff only. The marked items go in a separate list, not under work. The ticket body lists them as prerequisites present at the base and names no part or ticket.
 2. For each config key the spec cites, say whether it exists at the base of this part. A key that a later part adds is marked "not yet".
 3. Name each line a downstream reader parses, with its exact form: the file, the line text and the parser.
 4. A part that creates a file format includes the format's frontmatter block in the spec.
@@ -111,16 +116,20 @@ Part spec rules. Each part's handoff and ticket body, including any list of even
 6. A "no references" check excludes migration code. Name the paths it excludes.
 7. Name fields as they are in the file: handoff `repos`, not the row field `resources`.
 
-Writing a split: queue as one job writes the unsplit handoff with the Estimate line. Split creates the tickets, then runs `cure-job new` for each part in order, each with `after` set as in the table above.
+Writing a split: create the tickets, link them, rewrite the original ticket, then run `cure-job new` for each part in order, each with `after` set as in the table above.
 
-Tickets, only with the effective `delivery: pr` and only after the user chose split. `<owner/repo>` comes from an `owner/repo#N` or URL ticket, else from the remote of the delivering repository. Pass it as `--repo` to every `gh` command:
+Rewrite, only with the effective `delivery: pr` and a session ticket: after the links, rewrite the description of the original ticket (part 1) to the scope that stays with part 1. The moved scope is removed. GitHub: read the body with `gh issue view <N> --repo <owner/repo> --json body`, then `gh issue edit <N> --repo <owner/repo> --body-file - <<'BODY'` with the remaining scope. Jira: read with `mcp__atlassian__getJiraIssue` or the session's Jira command, then edit with `mcp__atlassian__editJiraIssue` or the Jira command.
+
+A failed link or rewrite is reported and the split continues. The report carries the original body.
+
+Tickets, only with the effective `delivery: pr` and a split. They are created for parts 2 to n; part 1 keeps the original ticket. `<owner/repo>` comes from an `owner/repo#N` or URL ticket, else from the remote of the delivering repository. Pass it as `--repo` to every `gh` command. Before the first create, with `split.tracker` `github`, run `gh auth status` and `gh repo view <owner/repo> --json hasIssuesEnabled`. The first row that matches applies:
 
 | Case | Action |
 |---|---|
-| The session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `gh repo view <owner/repo> --json hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>"`. The body names the parent ticket. |
-| Another tracker | The split question asks for one ticket id per part. The user creates them. |
-| `gh auth status` fails | Run before the question. Report it. The question asks for the ticket ids; the user gives the ticket ids. The skill never logs in and never reads or stores a token. |
-| A create or `cure-job new` fails | Stop. Tell the user the ids of the tickets and jobs already created. Part 1 is queued and the dispatcher may launch it on its next wake or at once. Parts after part 1 wait on their `after:` chain. The user closes the created jobs with `cure-job close <id>`; for a running job, `cure-job stop <id>` first. |
+| `split.tracker` is `github` (default), `gh auth status` succeeds, and the session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>" --body-file - <<'BODY'`. The body is complete on its own: what the part does, its scope (commands, options, files, formats) and its acceptance criteria. It has no "Split from" line and no reference to another ticket. The link is a comment on the original ticket: `gh issue comment <N> --repo <owner/repo> --body-file - <<'BODY'` with the body `Moved scope: #<new>`. |
+| `split.tracker` is `jira` and the session has a Jira command or MCP tool | Create each ticket with the session's Jira command or MCP tool. The project comes from the session ticket. The description follows the same rule. A Jira issue link carries the relation. |
+| No tracker the skill can write to, `gh auth status` fails, or issues are disabled (checked before any create) | Create no ticket and do not split: write one handoff with the Estimate line, as step 5 says. The report names the check. The skill never logs in and never reads or stores a token. |
+| A create or `cure-job new` fails after the checks above passed | Stop. Tell the user the ids of the tickets and jobs already created. Part 1 is queued and the dispatcher may launch it on its next wake or at once. Parts after part 1 wait on their `after:` chain. The user closes the created jobs with `cure-job close <id>`; for a running job, `cure-job stop <id>` first. |
 
 ## Writing the handoff
 

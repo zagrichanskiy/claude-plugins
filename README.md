@@ -138,7 +138,8 @@ every job that finished while it was stopped.
 | Skill | Invocation | Description |
 |---|---|---|
 | `goal` | `/cure:goal` | Writes the brief that `/goal @<file>` runs from: asks every open question in one round first, then an orchestrator-led work list with an agent per step and a closing retrospective that writes evidence-backed change proposals to `~/.claude/retros/`, a review-then-fix split with a severity floor, designer and live-verification gates, a measurable done-when list and the standing rules, then measures the file with `wc -c`. |
-| `dispatch` | `/cure:dispatch` | Hands a task from the current session to the dispatcher as a queued job: fills a handoff file from the session's context, writes it with `cure-job new` and sends the dispatcher the job id. When the estimate of a repository exceeds `split.limit`, it asks once and may queue the task as chained part jobs (`after:`). |
+| `dispatch` | `/cure:dispatch` | Hands a task from the current session to the dispatcher as a queued job: fills a handoff file from the session's context, writes it with `cure-job new` and sends the dispatcher the job id. When the estimate of a repository, plus the current diff of the target PR, exceeds the cap (`split.limit` × `split.factor`), it splits without asking into the fewest chained part jobs (`after:`), each at or under the cap. |
+| `split` | `/cure:split` | Splits a finished branch at a seam where both parts build and pass their tests: removes the excess from the unpublished commits, commits it on a branch stacked on the original and tests both branches. Under `delivery: pr` it also creates the ticket on the tracker `split.tracker` names (`github` or `jira`), pushes both branches and opens both pull requests; under `commit` (the default) it creates only the local stacked branch. `cure:goal` calls it when a job's diff passes `split.factor` times its estimate and the PR diff passes the cap. |
 | `note` | `/cure:note` | Gives working notes one home per repository, frontmatter that states their own end, and a sweep that deletes the ones a merged PR or committed document has superseded. Also writes design notes (problem, decisions, rejected, open, next steps). |
 | `retro` | `/cure:retro` | Turns the retrospectives in `~/.claude/retros/` into GitHub issues: merges equal proposals, checks them against the target file and the existing issues, shows one table for review, creates the accepted issues and deletes each retrospective once all its proposals have a decision. Appends `stats.md` rows for legacy retrospectives that have a Measurements section. |
 | `explain` | `/cure:explain` | Explains a technology, design or codebase as a stepwise conversation rather than one dense answer. Builds a tree from the user's questions and answers one node per message. |
@@ -155,7 +156,13 @@ was started.
 
 **Hooks** — `plugins/cure/hooks/hooks.json`, both enforcing the `Flat` rules on identifiers and
 soft-offer closers; the reminder also restates the reply-length limit. The output style carries the
-length and identifier rules in full.
+length and identifier rules in full. Names go on identifiers the user knows or can open (tickets,
+PRs, issues, controls, sections, requirement ids). In a reply, an id the user cannot open and has
+not seen (review finding numbers, ledger item numbers, a job's internal step or work-item numbers)
+is not cited; the problem is stated in one sentence instead. Artifacts are exempt: a commit message
+may carry a bare "work item N" or "step N", and a PR body names the item. A table of fixes has a
+Problem column before the Fix column. The problem a change solves is not background; the length
+rule does not drop it.
 
 | Event | Script | Effect |
 |---|---|---|
