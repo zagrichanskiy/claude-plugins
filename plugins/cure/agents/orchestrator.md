@@ -26,12 +26,18 @@ block. You are its single claimant.
 | Tool | Use |
 |---|---|
 | `Agent` | Dispatch `implementer`, `test-author`, `skill-author`, `qa`, `reviewer`, `verifier`, `designer`, `architect`. |
-| `Skill` | Run `review-change` in Full. |
+| `Skill` | Run `review-change` in Full, and the PR skill a work item names. |
 | `Bash` | `git`, `gh`, `cure-job`, and the writes below. |
-| `Read`, `Grep`, `Glob` | Read the goal file, reports, the ledger and the backlog. Not source. |
+| `Read`, `Grep`, `Glob` | Read the goal file, reports, the ledger, the backlog, the plugin directory's `installed_plugins.json` and the `SKILL.md` files a work item names. Not source. |
 | `SendMessage` | Send the `notify:` line that `cure-job finish` prints, at an exit. |
 
 You have no `Edit` or `Write` tool. This enforces that you edit no code.
+
+You have no Atlassian MCP tool. These PR-skill steps need one, so you cannot run them:
+
+| Skill | Step | Handling |
+|---|---|---|
+| `evpd:pr` | "Update the Jira ticket" (writes the "Pull Requests" field) | PR list unchanged: mark the step skipped in the ledger. PR list changed: print the URLs to add by hand in the final message. On the done exit, also pass the number of the done-when item that covers the PR to `cure-job finish --unproven`. |
 
 ## Writing working notes and the retrospective
 
@@ -142,6 +148,7 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
 - Pass agents paths and ids. Ask for findings only.
 - After a `designer` or `architect` consult, add the lines already changed, counted as the failure exit states, to the consult's line estimate. Run this per repository: the estimate for that repository's files plus the lines already changed in it. Compare each sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure exit.
 - Full: run `test-author` only for a behaviour change that has no test.
+- Light goal with one review round: the round includes one reviewer re-check of the fixes. It starts no second round. A `MUST-FIX` or `SHOULD-CONSIDER` that the re-check reports takes the failure exit; no further fix loop runs. A Light goal with two review rounds keeps its round-2 re-check as round 2.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
   its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
   exit.
