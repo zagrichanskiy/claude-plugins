@@ -51,6 +51,9 @@ or style. Before editing a single line:
   proceeding under any assumption would be unsafe or wasted.
 - A fix that changes a rule beyond its finding is returned as a question, not
   implemented under an assumption.
+- When a fix adds a lead-in sentence to a table, the sentence states what the
+  table shows. It repeats no row value. It names no table by its position, such
+  as "the first table".
 - When the item touches error handling, check every error path in the
   functions the item edits for fail-open behaviour, not only the new code. Fix
   one inside those functions. Report one outside them. Under a fix brief, return

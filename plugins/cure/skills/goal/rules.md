@@ -122,7 +122,15 @@ add one.
   already pushed makes the next push `git push --force-with-lease`. The severity floor
   is unchanged: every `MUST-FIX` and `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
-- Review round: one reviewer pass, the same unit for every tier. The goal states N, the round limit (N = `reviews.<tier>`). Round 1 reviews the diff. Rounds 2..N re-check only the fixes of the previous round and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no round N+1 starts.
+- Review round: one reviewer pass, the same unit for every tier. The goal states N, the round limit (N = `reviews.<tier>`). Round 1 reviews the diff. Rounds 2..N re-check only the fixes of the previous round and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no round N+1 starts. A work item with a fresh-reader check adds its passes to each round, as "Fresh-reader check" states.
+- Fresh-reader check: a reader with no context reads a document set and reports each element it cannot explain. Each such element counts as a `SHOULD-CONSIDER` finding.
+  - Review round k holds the reviewer pass and the fresh-reader passes. Both share the round limit N.
+  - Round 1 runs one fresh-reader pass per document. Each pass reads the whole document, not the diff.
+  - The changed lines of round k (k ≥ 2) are those of `git diff <commit round k-1 read>..HEAD` over the document set.
+  - Rounds 2..N run one pass per document that has a changed line or a finding of the previous round.
+  - The reader reads whole documents. It gets no briefing on earlier findings.
+  - The orchestrator sorts the reader's findings by line. A finding of the previous round and a finding on a changed line belong to the round.
+  - For any other finding, the orchestrator reads the element in the round-1 version (`git show <commit round 1 read>:<doc>`). An element already present and unexplained there goes to the backlog. Any other finding belongs to the round.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print
   its summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure
   exit.
