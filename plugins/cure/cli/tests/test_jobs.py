@@ -1,6 +1,7 @@
 """``JobsProvider``: the seven operations, their refusals and the writes they make, with fake seams."""
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 import pytest
@@ -177,6 +178,13 @@ def test_launch_starts_the_session_in_the_first_repo_with_the_goal_prompt(jobs, 
     session = jobs.launch(job_id)
     assert session == job_id
     assert claude.started == [(job_id, REPO, f"/goal @{store.goal_path(job_id)}", settings_args(job_id))]
+
+
+def test_launch_sets_cure_job_id_in_the_session_settings(jobs, claude, clock):
+    job_id = new_job(jobs, clock, approved=True)
+    jobs.launch(job_id)
+    args = claude.started[0][3]
+    assert json.loads(args[args.index("--settings") + 1])["env"] == {"CURE_JOB_ID": job_id}
 
 
 def test_launch_passes_claude_arguments_through(jobs, claude, clock):

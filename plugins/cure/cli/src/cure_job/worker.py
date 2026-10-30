@@ -13,6 +13,8 @@ from typing import Sequence
 from .errors import CureJobError
 
 CURE_JOB = Path("bin", "cure-job")
+#: The variable a worker session reads its job id from.
+JOB_ID_VARIABLE = "CURE_JOB_ID"
 
 
 class RunArguments:
@@ -43,7 +45,8 @@ class RunArguments:
 
 
 class WorkerSettings:
-    """The ``--settings`` that allow a worker to run ``cure-job finish``, ``claim`` and ``release`` on its job."""
+    """The ``--settings`` that allow a worker to run ``cure-job finish``, ``claim`` and ``release`` on its job,
+    and set :data:`JOB_ID_VARIABLE` in its environment."""
 
     COMMANDS = ("finish", "claim", "release")
     READS = ("config get", "list")
@@ -58,4 +61,5 @@ class WorkerSettings:
                 + [f"Bash({self.cure_job} finish --help)"])
 
     def arguments(self) -> list[str]:
-        return ["--settings", json.dumps({"permissions": {"allow": self.rules()}}, separators=(",", ":"))]
+        settings = {"permissions": {"allow": self.rules()}, "env": {JOB_ID_VARIABLE: self.job_id}}
+        return ["--settings", json.dumps(settings, separators=(",", ":"))]

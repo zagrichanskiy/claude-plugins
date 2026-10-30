@@ -9,7 +9,7 @@ Config file: `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}
 Question policies: `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md`, beside `config.json`. The dispatcher reads it before each question round and appends a policy when the user calls a question not needed. The CLI does not read it.
 
 - The defaults live only in the key table of `config.py`.
-- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`; `launch-grace-seconds` is top-level).
+- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `band`; `launch-grace-seconds` is top-level).
 - Lookup names stay dotted: `cure-job config get handoff.delivery`.
 
 | Command | Effect |
@@ -44,3 +44,21 @@ Branch and base:
 - `handoff.branch` applies when a handoff omits `branch`. Default `new`: the job gets its own branch from the job's base, named `<ticket>_<slug>` (`issue-<N>` for a GitHub ticket `#N`), or `<slug>` without a ticket, the same in every repository.
 - A job with `after` and no `branch` inherits the predecessor's branch.
 - `current` uses the launch repository's checked-out branch. Any other value is a literal branch name.
+
+## Job band
+
+The hooks module `hooks/register.tsx` draws a band above the prompt. It reads `cure-job list --json` on each draw and calls no tracker.
+
+| Session | Band |
+|---|---|
+| Job session (`CURE_JOB_ID` set by `cure-job launch` and `resume`) | The job's ticket as a link, its summary, its PR links, its branch and the session's working directory. No buttons. |
+| Dispatcher (main agent `cure:dispatcher`) | One entry per `awaiting-approval` job: the ticket link, summary, PR links, the handoff branch and the workspace, with Approve (`cure-job approve <id> --by user`) and Reject (`cure-job close <id>`). Nothing when no job awaits approval. |
+| Any other session | Nothing. |
+
+Ticket links:
+
+- A Jira key (`ABC-12`) links to `<band.jira-url>/browse/<key>`. `band.jira-url` defaults to `https://ienso-team.atlassian.net`.
+- `owner/repo#N` links to that GitHub issue. `#N` links to an issue of the workspace's GitHub `origin`, else shows as text.
+- An http(s) URL links to itself.
+
+A job session without a handoff `branch` shows `git branch --show-current` of its working directory.

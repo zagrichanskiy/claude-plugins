@@ -4,6 +4,7 @@ repos:
 device: none
 outcome: One sentence naming the result the job delivers.
 ticket: ABC-123
+ticket-summary: <written by cure-job new --ticket-summary; omit>
 branch: feature/name
 base: main
 delivery: commit
