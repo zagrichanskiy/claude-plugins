@@ -185,8 +185,54 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
         "resources": ["/work/video-core"], "blocked-by": [], "goal": True, "approved": True,
         "problem": None, "origin": None, "open": 0,
         "waiting-for": None, "reported": False, "sessions-removed": False,
-        "prs": [], "after": None, "after-state": None}
+        "prs": [], "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
+        "workspace": "/work/video-core"}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
+
+
+def test_list_json_exposes_ticket_summary_branch_and_workspace(h, tmp_path):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text(("/work/a", "/work/b")).replace(
+        "device: none", "device: none\nticket: ABC-12\nbranch: ABC-12_band"), encoding="utf-8")
+    assert h.run("new", "--slug", "x", "--ticket-summary", "Draw: a [band] \"here\"", str(source)) == 0
+    h.lines.clear()
+    h.run("list", "--json")
+    item = json.loads(h.lines[0])[0]
+    assert (item["ticket"], item["ticket-summary"], item["branch"], item["workspace"]) == (
+        "ABC-12", 'Draw: a [band] "here"', "ABC-12_band", "/work/a")
+
+
+def test_new_ticket_summary_replaces_the_handoff_entry(h, tmp_path):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text().replace("device: none", "device: none\nticket-summary: old"), encoding="utf-8")
+    assert h.run("new", "--slug", "x", "--ticket-summary", "new title", str(source)) == 0
+    text = (h.root / "jobs" / h.lines[0] / "handoff.md").read_text(encoding="utf-8")
+    assert 'ticket-summary: "new title"' in text and "old" not in text
+
+
+def test_new_trims_a_padded_ticket_summary(h, tmp_path):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text(), encoding="utf-8")
+    assert h.run("new", "--slug", "x", "--ticket-summary", "  padded title \n", str(source)) == 0
+    text = (h.root / "jobs" / h.lines[0] / "handoff.md").read_text(encoding="utf-8")
+    assert 'ticket-summary: "padded title"' in text
+
+
+@pytest.mark.parametrize("summary", ["", " \n ", "two\nlines"])
+def test_new_refuses_a_ticket_summary_that_is_not_one_line(h, tmp_path, capsys, summary):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text(), encoding="utf-8")
+    with pytest.raises(SystemExit):
+        h.run("new", "--slug", "x", "--ticket-summary", summary, str(source))
+    assert "--ticket-summary" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("key", ["ticket", "ticket-summary", "branch"])
+def test_new_refuses_a_handoff_whose_ticket_field_is_a_list(h, tmp_path, capsys, key):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text().replace("device: none", f"device: none\n{key}: [a, b]"), encoding="utf-8")
+    assert h.run("new", "--slug", "x", str(source)) == 1
+    assert key in capsys.readouterr().err
 
 
 def test_list_json_reports_run_session_and_problem(h, tmp_path):

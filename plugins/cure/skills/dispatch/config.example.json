@@ -29,5 +29,8 @@
   "prune": {
     "failed-days": 30
   },
+  "band": {
+    "jira-url": "https://ienso-team.atlassian.net"
+  },
   "launch-grace-seconds": 60
 }

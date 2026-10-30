@@ -81,8 +81,9 @@ class JobsProvider:
         self.sleep = sleep
         self.monotonic = monotonic
 
-    def new(self, text: str, slug: str, origin: str | None = None) -> str:
-        """Queue the handoff ``text`` as a new job reporting back to ``origin`` and return the job id."""
+    def new(self, text: str, slug: str, origin: str | None = None, ticket_summary: str | None = None) -> str:
+        """Queue the handoff ``text`` as a new job reporting back to ``origin`` and return the job id.
+        ``ticket_summary``, when given, replaces the handoff's ``ticket-summary``."""
         handoff = parse_submitted(text)
         if handoff.after is not None:
             snapshot = self.store.snapshot()
@@ -94,7 +95,7 @@ class JobsProvider:
             base = make_id(created, os.path.basename(handoff.launch_dir), slug)
         except ValueError as e:
             raise HandoffError(f"cannot build a job id: {e}") from e
-        return self.store.create(base, lambda job_id: stamp(text, job_id, created, origin))
+        return self.store.create(base, lambda job_id: stamp(text, job_id, created, origin, ticket_summary))
 
     def views(self) -> list[JobView]:
         return self.listing().views
