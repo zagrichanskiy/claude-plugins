@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 16
+    assert len(DEFAULTS) == 17
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -102,6 +102,26 @@ def test_config_get_split_tracker_without_a_file_prints_github(h):
 def test_config_get_split_factor_without_a_file_prints_1_5(h):
     assert h.run("config", "get", "split.factor") == 0
     assert h.lines == ["1.5"]
+
+
+def test_config_get_band_jira_url_without_a_file_prints_the_default(h):
+    assert h.run("config", "get", "band.jira-url") == 0
+    assert h.lines == ['"https://ienso-team.atlassian.net"']
+
+
+def test_config_get_band_jira_url_prints_the_file_value(h):
+    configure(h, {"band": {"jira-url": "https://example.atlassian.net"}})
+    assert h.run("config", "get", "band.jira-url") == 0
+    assert h.lines == ['"https://example.atlassian.net"']
+
+
+@pytest.mark.parametrize("value", ["http://example.atlassian.net", "example.atlassian.net", "", 5])
+def test_config_check_rejects_a_band_jira_url_that_is_not_https(h, capsys, value):
+    configure(h, {"band": {"jira-url": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: band.jira-url: expected an https URL" in capsys.readouterr().err
+    assert h.run("config", "get", "band.jira-url") == 0
+    assert h.lines[-1] == '"https://ienso-team.atlassian.net"'
 
 
 def test_config_get_handoff_branch_without_a_file_prints_new(h):
