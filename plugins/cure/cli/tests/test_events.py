@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from cure_job.events import Claim, Closed, Launched, SessionsRemoved, decode, encode
+from cure_job.events import (Claim, Closed, DraftEnded, DraftMode, DraftStarted, Launched, SessionsRemoved, decode,
+                             encode)
 
 AT = datetime(2026, 10, 13, 17, 42, 5, tzinfo=timezone.utc)
 
@@ -24,7 +25,16 @@ def test_closed_line_shape():
     assert encode(Closed("superseded")) == '{"event":"closed","reason":"superseded"}'
 
 
-@pytest.mark.parametrize("event", [Launched(2, "x-r2", AT), Claim("/work/a"), Closed(""), SessionsRemoved(AT)])
+def test_draft_line_shapes():
+    assert encode(DraftStarted(1, "draft-x-1", DraftMode.APPLY, AT)) == (
+        '{"event":"draft-started","n":1,"session":"draft-x-1","mode":"apply","at":"2026-10-13T17:42:05+00:00"}')
+    assert encode(DraftEnded(1, 2, ("a", "b", "c"), AT)) == (
+        '{"event":"draft-ended","n":1,"open":2,"summary":["a","b","c"],"at":"2026-10-13T17:42:05+00:00"}')
+
+
+@pytest.mark.parametrize("event", [Launched(2, "x-r2", AT), Claim("/work/a"), Closed(""), SessionsRemoved(AT),
+                                   DraftStarted(3, "draft-x-3", DraftMode.WRITE, AT),
+                                   DraftEnded(3, 0, ("a", "b", "c"), AT)])
 def test_decode_inverts_encode(event):
     assert decode(encode(event)) == event
 
@@ -57,6 +67,9 @@ def test_decode_ignores_unknown_keys():
     '{"event":"reported","at":"2026-10-13T17:42:05Z"}',
     '{"event":"reported","run":1}',
     '{"event":"reported","run":"1","at":"2026-10-13T17:42:05Z"}',
+    '{"event":"draft-started","n":1,"session":"s","mode":"edit","at":"2026-10-13T17:42:05Z"}',
+    '{"event":"draft-ended","n":1,"open":true,"summary":[],"at":"2026-10-13T17:42:05Z"}',
+    '{"event":"draft-ended","n":1,"open":0,"summary":"a","at":"2026-10-13T17:42:05Z"}',
 ])
 def test_decode_rejects_bad_lines_with_value_error(line):
     with pytest.raises(ValueError):

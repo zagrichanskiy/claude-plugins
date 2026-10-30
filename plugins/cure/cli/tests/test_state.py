@@ -8,7 +8,8 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Approved, Claim, Closed, Launched, Reported, SessionsRemoved, StopIssued
+from cure_job.events import (Approved, Claim, Closed, DraftEnded, DraftMode, DraftStarted, Launched, Reported,
+                             SessionsRemoved, StopIssued)
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
@@ -168,7 +169,7 @@ def test_is_open(state, is_open):
 def test_state_values_are_the_documented_words():
     assert {s.value for s in State} == {
         "queued", "held", "awaiting-approval", "approved", "launched", "running", "stalled", "blocked", "lost",
-        "needs-input", "done", "failed", "abandoned"}
+        "needs-input", "done", "failed", "abandoned", "drafting", "draft-blocked", "draft-lost"}
 
 
 # --- lock rule ----------------------------------------------------------------------------------------
@@ -402,3 +403,58 @@ def test_stalled_has_a_session_and_is_open_but_not_launchable():
 def test_stalled_job_keeps_its_resources():
     stalled = make_record(A, events=(launched(A, age=timedelta(hours=1)),))
     assert states([stalled, make_record(B)], {A: IDLE}) == {A: State.STALLED, B: State.HELD}
+
+
+# --- drafts -------------------------------------------------------------------------------------------
+
+def drafting(*extra, age=timedelta(minutes=5), mode=DraftMode.WRITE, **kwargs):
+    """``A`` with ``extra`` events, then draft 1 started ``age`` ago and not ended."""
+    return make_record(A, events=(*extra, DraftStarted(1, DRAFT, mode, NOW - age)), **kwargs)
+
+
+DRAFT = f"draft-{A}-1"
+WAITING = SessionStatus.WAITING
+
+
+@pytest.mark.parametrize("status, age, state", [
+    (BUSY, timedelta(hours=1), State.DRAFTING), (WAITING, timedelta(seconds=1), State.DRAFT_BLOCKED),
+    (IDLE, timedelta(seconds=1), State.DRAFTING), (IDLE, timedelta(hours=1), State.DRAFT_LOST),
+    (None, timedelta(seconds=1), State.DRAFTING), (STOPPED, timedelta(seconds=1), State.DRAFTING),
+    (None, timedelta(hours=1), State.DRAFT_LOST), (STOPPED, timedelta(hours=1), State.DRAFT_LOST),
+])
+def test_open_draft_state_follows_its_session(status, age, state):
+    assert state_of(drafting(age=age), {} if status is None else {DRAFT: status}) is state
+
+
+@pytest.mark.parametrize("extra, kwargs", [
+    ((), {}), ((), {"goal": True}), ((), {"approved": True}),
+    ((launched(A),), {"result": result_of(ResultStatus.NEEDS_INPUT)}), ((launched(A),), {}),
+])
+def test_open_draft_overrides_queued_awaiting_approval_approved_needs_input_and_lost(extra, kwargs):
+    assert state_of(drafting(*extra, **kwargs), {DRAFT: BUSY}) is State.DRAFTING
+
+
+def test_open_draft_overrides_held():
+    assert states([make_record(B, approved=True, events=(launched(B),)), drafting()], {B: BUSY, DRAFT: BUSY})[A] \
+        is State.DRAFTING
+
+
+@pytest.mark.parametrize("status, state", [(BUSY, State.RUNNING), (IDLE, State.STALLED),
+                                           (SessionStatus.WAITING, State.BLOCKED)])
+def test_live_run_overrides_an_open_draft(status, state):
+    assert state_of(drafting(launched(A, age=timedelta(hours=1))), {A: status, DRAFT: BUSY}) is state
+
+
+def test_ended_draft_gives_the_job_its_own_state_back():
+    record = make_record(A, goal=True, events=(DraftStarted(1, DRAFT, DraftMode.WRITE, NOW),
+                                               DraftEnded(1, 0, ("a", "b", "c"), NOW)))
+    assert state_of(record) is State.AWAITING_APPROVAL
+
+
+def test_closed_job_with_an_open_draft_is_abandoned():
+    assert state_of(drafting(Closed("x"))) is State.ABANDONED
+
+
+def test_needs_sessions_for_an_open_draft_of_an_open_job():
+    assert needs_sessions([drafting()])
+    assert not needs_sessions([drafting(Closed("x"))])

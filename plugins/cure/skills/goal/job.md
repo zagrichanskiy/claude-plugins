@@ -1,6 +1,6 @@
 # Job run
 
-The caller invokes the skill with a handoff file and a job directory. The skill never asks the user
+The caller, the `cure:goal-writer` agent, invokes the skill with a handoff file and a job directory. The skill never asks the user
 in this mode. A worker session then runs the goal and cannot reach the user.
 
 ## Input
@@ -98,10 +98,10 @@ The skill never asks the user in this mode. It records each fork in `<job>/goal.
   the policy's `Do` under Settled as `(policy)`. Do not list it under `## Open`.
 - A fork with no user-visible effect: record its recommended option under Settled as
   `(recommended)`. Do not list it under `## Open`.
-- When the caller passes answers, each answered item moves under Settled with its answer. When no
+- When the caller passes an answers file, each answered item moves under Settled with its answer. When no
   item is left, remove the `## Open` heading.
 
-After `needs-input`, add the user's answers under Settled the same way. Then add one line under
+After `needs-input`, add the answers from the answers file under Settled the same way. Then add one line under
 Settled: "Run <n>: the questions of the earlier `needs-input` exit are answered above and closed;
 continue from `<ledger path>`". Solo: "Run <n>: the questions of the earlier `needs-input` exit are
 answered above and closed; earlier work is in the tree".

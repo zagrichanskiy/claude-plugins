@@ -3,7 +3,7 @@
 ``JobStore`` is the state-root seam: production code builds it on
 ``~/.claude/cure`` and a test builds it on a temporary directory. The layout is
 ``<root>/jobs/<id>/`` with ``handoff.md``, ``goal.md``, ``dispatch.jsonl``,
-``result.md`` and ``result-<run>.md``. The root and ``jobs/`` are private to
+``result.md``, ``result-<run>.md`` and ``answers-<n>.md``. The root and ``jobs/`` are private to
 the user (0700), and every file the store writes is 0600.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ from .errors import HandoffError, StoreError, UnknownJob
 from .events import Event, decode, encode
 from .goal import digest, open_items
 from .handoff import Handoff, parse_handoff
-from .job import JobRecord
+from .job import JobRecord, answers_name
 from .result import parse_result
 
 _JOBS = "jobs"
@@ -237,6 +237,22 @@ class JobStore:
                     os.unlink(temp)
                 raise
         return True
+
+    def write_answers(self, job_id: str, n: int, text: str) -> Path:
+        """Publish ``text`` as the ``answers-<n>.md`` of draft ``n`` in one step and return its path."""
+        target = self.job_dir(job_id) / answers_name(n)
+        with _store_errors(target):
+            # mkstemp creates the file 0600.
+            descriptor, temp = tempfile.mkstemp(prefix=".answers-", suffix=".tmp", dir=target.parent)
+            try:
+                with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+                    sink.write(text)
+                os.replace(temp, target)
+            except BaseException:
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(temp)
+                raise
+        return target
 
     def restore_result(self, job_id: str, run: int) -> None:
         directory = self.job_dir(job_id)

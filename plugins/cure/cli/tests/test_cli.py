@@ -185,7 +185,7 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
         "resources": ["/work/video-core"], "blocked-by": [], "goal": True, "approved": True,
         "problem": None, "origin": None, "open": 0,
         "waiting-for": None, "reported": False, "sessions-removed": False,
-        "prs": [], "after": None, "after-state": None}
+        "prs": [], "after": None, "after-state": None, "draft": None}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
 
 

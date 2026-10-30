@@ -25,6 +25,8 @@ from .commands.approve import ApproveCommand
 from .commands.claim import ClaimCommand
 from .commands.close import CloseCommand
 from .commands.config import ConfigCommand
+from .commands.draft import DraftCommand
+from .commands.drafted import DraftedCommand
 from .commands.finish import FinishCommand
 from .commands.launch import LaunchCommand
 from .commands.list import ListCommand
@@ -63,9 +65,9 @@ class Cli:
         self.version = config.plugin_version(plugin_root)
         self.config = config.load(config_path, root, self.version)
         self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config)
-        self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
-                          LaunchCommand(self), ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self),
-                          StopCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
+        self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), DraftCommand(self),
+                          DraftedCommand(self), ApproveCommand(self), LaunchCommand(self), ResumeCommand(self),
+                          ClaimCommand(self), ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
                           ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), ConfigCommand(self)]
         self._parser = self._build_parser()
 

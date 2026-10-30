@@ -7,6 +7,7 @@ prints through the output sink of the owning :class:`~cure_job.cli.Cli`.
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import TYPE_CHECKING
 
 from .. import job_id, resource
@@ -42,7 +43,22 @@ class Command:
         raise NotImplementedError
 
 
-#: The session that ``finish`` and ``new`` tell to wake.
+#: The argument value that reads stdin.
+STDIN = "-"
+
+
+def read_input(parser: argparse.ArgumentParser, label: str, path: str) -> str:
+    """The text of ``path``, or of stdin for ``-``. An unreadable file is a usage error of ``label``."""
+    if path == STDIN:
+        return sys.stdin.read()
+    try:
+        with open(path, encoding="utf-8") as source:
+            return source.read()
+    except (OSError, UnicodeDecodeError) as e:
+        parser.error(f"argument {label}: cannot read {path}: {e}")
+
+
+#: The session that ``finish``, ``drafted`` and ``new`` tell to wake.
 DISPATCHER = "dispatcher"
 
 

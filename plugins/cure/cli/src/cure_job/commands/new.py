@@ -2,13 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from .. import job_id
 from ..providers.jobs import JobsProvider
-from .base import Command, notify_line
-
-_STDIN = "-"
+from .base import STDIN, Command, notify_line, read_input
 
 
 class NewCommand(Command):
@@ -19,7 +16,7 @@ class NewCommand(Command):
                    "the session of $CLAUDE_CODE_MESSAGING_SOCKET; a handoff that names an origin is refused")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("file", metavar="FILE", nargs="?", default=_STDIN,
+        parser.add_argument("file", metavar="FILE", nargs="?", default=STDIN,
                             help="handoff file; - or absent reads stdin")
         parser.add_argument("--slug", metavar="SLUG", required=True, type=_slug_arg,
                             help="short name of the job, the last part of the job id")
@@ -27,19 +24,10 @@ class NewCommand(Command):
         self._parser = parser
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
-        job_id = jobs.new(self._read(args.file), args.slug, self.cli.origin())
+        job_id = jobs.new(read_input(self._parser, "FILE", args.file), args.slug, self.cli.origin())
         self.cli.out(job_id)
         self.cli.out(notify_line(job_id))
         return 0
-
-    def _read(self, path: str) -> str:
-        if path == _STDIN:
-            return sys.stdin.read()
-        try:
-            with open(path, encoding="utf-8") as source:
-                return source.read()
-        except (OSError, UnicodeDecodeError) as e:
-            self._parser.error(f"argument FILE: cannot read {path}: {e}")
 
 
 def _slug_arg(text: str) -> str:
