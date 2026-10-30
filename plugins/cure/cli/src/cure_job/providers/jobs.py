@@ -1,8 +1,9 @@
-"""The fourteen job operations.
+"""The sixteen job operations.
 
-Every operation except ``new``, ``approve``, ``finish``, ``reported`` and ``release``
-reads one snapshot of the state root, derives the job states from it and makes its
-writes. ``approve``, ``finish``, ``reported`` and ``release`` read only their own job.
+Every operation except ``new``, ``approve``, ``finish``, ``drafted``, ``reported`` and
+``release`` reads one snapshot of the state root, derives the job states from it and
+makes its writes. ``approve``, ``finish``, ``drafted``, ``reported`` and ``release`` read
+only their own job.
 ``claim`` runs its check and its write under :meth:`JobStore.locked` and reads
 no session list. No other operation holds the lock, so their check and write
 are not atomic across processes.
@@ -27,16 +28,17 @@ from ..clock import Clock
 from ..config import Config
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
-from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
+from ..events import (Approved, Claim, Closed, DraftEnded, DraftMode, DraftStarted, Launched, Origin, Release,
+                      Reported, SessionsRemoved, StopIssued)
 from ..goal import PLUGIN_ROOT, RULES, missing_paths, retarget, tier
 from ..handoff import parse_submitted, stamp
 from ..job_id import make_id, session_name
 from ..result import Report, render_result
-from ..job import JobRecord
+from ..job import JobRecord, draft_session_name
 from ..state import (HALF_CREATED_AGE, JobView, State, derive, expired, holders, is_open, is_ready, lock_rank,
                      needs_sessions, retention)
 from ..store import InvalidJob, JobStore, Snapshot
-from ..worker import WorkerSettings
+from ..worker import GoalWriterSettings, WorkerSettings
 
 
 class Listing(NamedTuple):
@@ -66,6 +68,9 @@ CLAIM_POLL_SECONDS = 10.0
 #: a goal without a recognised tier, runs in a plain session.
 ORCHESTRATOR = "cure:orchestrator"
 ORCHESTRATED_TIERS = ("Light", "Full")
+
+#: The agent a draft session runs as.
+GOAL_WRITER = "cure:goal-writer"
 
 
 class JobsProvider:
@@ -118,6 +123,7 @@ class JobsProvider:
         listing = self.listing()
         view = self._find(listing, job_id)
         record = view.record
+        _refuse_open_draft(record, "launch")
         if view.state is State.AWAITING_APPROVAL:
             raise JobStateError(f"job {job_id} is {view.state.value}; approve its goal first: "
                                 f"cure-job approve {job_id} --by user")
@@ -140,6 +146,8 @@ class JobsProvider:
             claude_args = ["--agent", ORCHESTRATOR, *claude_args]
         run = record.run + 1
         session = session_name(job_id, run)
+        if record.draft is not None:
+            self._stop_session(record.draft.session, self.claude.sessions().get(record.draft.session))
         self._record_run(record, run, session,
                          lambda: self.claude.start(session, record.handoff.launch_dir, prompt, claude_args))
         return session
@@ -187,7 +195,7 @@ class JobsProvider:
         missing = missing_paths(retarget(self.store.read_goal(job_id), self.plugin_root), self.plugin_root)
         if missing:
             raise PluginError(f"{operation} refused: the goal file names {', '.join(missing)}, which does not exist; "
-                              "write the goal again with cure:goal")
+                              f"write the goal again: cure-job draft {job_id}")
         self.store.rewrite_goal(job_id, lambda text: retarget(text, self.plugin_root))
         return f"/goal @{goal}"
 
@@ -232,12 +240,69 @@ class JobsProvider:
             raise JobStateError(f"job {job_id} has a result; approve needs a job without one")
         if not record.has_goal:
             raise JobStateError(f"job {job_id} has no goal file: {self.store.goal_path(job_id)} does not exist")
+        _refuse_open_draft(record, "approve")
         if record.open_items:
             raise JobStateError(f"job {job_id}: {self.store.goal_path(job_id)} has {record.open_items} item(s) "
                                 "under ## Open; settle them before approve")
         if record.approved:
             return
         self.store.append_event(job_id, Approved(record.goal_digest, by, self.clock()))
+
+    def draft(self, job_id: str, answers: str | None, config_dir: Path, claude_args: Sequence[str] = ()) -> str:
+        """Start a goal-writer session that writes the goal of ``job_id``, or applies ``answers`` to it.
+
+        Stops the live session of the previous draft first. Returns the session name.
+        """
+        snapshot = self.store.snapshot()
+        sessions = self.claude.sessions()
+        view = self._find(self._listing(snapshot, sessions), job_id)
+        record = view.record
+        if not view.state.is_draftable:
+            raise JobStateError(f"job {job_id} is {view.state.value}; draft needs "
+                                + ", ".join(state.value for state in State if state.is_draftable))
+        if answers is not None and not record.has_goal:
+            raise JobStateError(f"job {job_id} has no goal file: {self.store.goal_path(job_id)} does not exist; "
+                                f"write it first: cure-job draft {job_id}")
+        previous = record.draft
+        if previous is not None:
+            self._stop_session(previous.session, sessions.get(previous.session))
+        n = previous.n + 1 if previous is not None else 1
+        session = draft_session_name(job_id, n)
+        if answers is None:
+            mode, prompt = DraftMode.WRITE, f"draft {job_id}"
+        else:
+            mode, prompt = DraftMode.APPLY, f"apply {job_id} @{self.store.write_answers(job_id, n, answers)}"
+        claude_args = ["--add-dir", str(record.dir), "--agent", GOAL_WRITER,
+                       *GoalWriterSettings(self.plugin_root, record.dir, record.handoff.repos, config_dir).arguments(),
+                       *(claude_args or ["--permission-mode", "dontAsk"])]
+        unknown = None
+        try:
+            self.claude.start(session, record.handoff.launch_dir, prompt, claude_args)
+        except ClaudeOutcomeUnknown as e:
+            # The session may exist. Recorded, it derives drafting, then draft-lost.
+            unknown = e
+        try:
+            self.store.append_event(job_id, DraftStarted(n, session, mode, self.clock()))
+        except StoreError as e:
+            raise StoreError(f"job {job_id}: session {session} may be running and is not recorded; "
+                             f"stop it before a retry: {e}") from e
+        if unknown is not None:
+            raise ClaudeOutcomeUnknown(f"{unknown}; recorded as draft {n}, session {session}: "
+                                       "list shows it drafting, then draft-lost") from unknown
+        return session
+
+    def drafted(self, job_id: str, summary: Sequence[str]) -> tuple[Path, int]:
+        """End the open draft of ``job_id`` and return the goal path and its ``## Open`` item count.
+
+        Reads only this job.
+        """
+        record = self.store.load(job_id)
+        if not record.draft_open:
+            raise JobStateError(f"job {job_id} has no open draft; drafted ends the draft that cure-job draft started")
+        if not record.has_goal:
+            raise JobStateError(f"job {job_id} has no goal file: {self.store.goal_path(job_id)} does not exist")
+        self.store.append_event(job_id, DraftEnded(record.draft.n, record.open_items, tuple(summary), self.clock()))
+        return self.store.goal_path(job_id), record.open_items
 
     def claim(self, job_id: str, names: Sequence[str], wait: float = 0) -> None:
         """Add ``names`` to the resources ``job_id`` names. Returns when the job holds every one.
@@ -366,7 +431,7 @@ class JobsProvider:
         return True
 
     def remove_sessions(self, job_id: str) -> list[str]:
-        """Stop and delete the session of every run of a done or abandoned job and return the deleted names.
+        """Stop and delete the session of every run and draft of a done or abandoned job; return the deleted names.
 
         A failed job keeps its sessions for the user, and an open job may still use them.
         Records ``sessions-removed`` once no session of the job is listed.
@@ -378,7 +443,9 @@ class JobsProvider:
             raise JobStateError(f"job {job_id} is {view.state.value}; remove-sessions needs "
                                 f"{State.DONE.value} or {State.ABANDONED.value}")
         # A resumed run records the session of the run before it, so a name can repeat.
-        names = list(dict.fromkeys(launched.session for launched in view.record.launches))
+        record = view.record
+        drafts = [event.session for event in record.events if isinstance(event, DraftStarted)]
+        names = list(dict.fromkeys([*(launched.session for launched in record.launches), *drafts]))
         listed = {name: sessions[name] for name in names if name in sessions}
         for name, session in listed.items():
             if not session.all_ids or "" in session.all_ids:
@@ -475,6 +542,13 @@ def _resource_held(listing: Listing, record: JobRecord) -> ResourceHeld:
     held = holders(view.record for view in listing.views)
     name = next(name for name in sorted(record.resources) if held.get(name) not in (None, record.id))
     return ResourceHeld(name, held[name])
+
+
+def _refuse_open_draft(record: JobRecord, operation: str) -> None:
+    draft = record.draft
+    if record.draft_open:
+        raise JobStateError(f"job {record.id}: draft {draft.n} (session {draft.session}) has not ended; "
+                            f"{operation} needs a complete draft")
 
 
 def _refuse_invalid(invalid_jobs: Sequence[InvalidJob], operation: str) -> None:

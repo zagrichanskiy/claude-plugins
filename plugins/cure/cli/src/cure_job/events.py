@@ -1,6 +1,7 @@
 """The events of ``dispatch.jsonl``, one compact JSON object per line."""
 from __future__ import annotations
 
+import enum
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -73,7 +74,32 @@ class SessionsRemoved:
     at: datetime
 
 
-Event = Union[Launched, Claim, Release, Approved, Closed, Origin, Reported, StopIssued, SessionsRemoved]
+class DraftMode(enum.Enum):
+    """What a goal-writer session does: write ``goal.md``, or apply the user's answers to it."""
+    WRITE = "write"
+    APPLY = "apply"
+
+
+@dataclass(frozen=True)
+class DraftStarted:
+    """``cure-job draft`` started goal-writer session ``session`` as draft ``n`` of the job."""
+    n: int
+    session: str
+    mode: DraftMode
+    at: datetime
+
+
+@dataclass(frozen=True)
+class DraftEnded:
+    """``cure-job drafted`` ended draft ``n`` with ``open`` items under ``## Open`` and a 3-line summary."""
+    n: int
+    open: int
+    summary: tuple[str, ...]
+    at: datetime
+
+
+Event = Union[Launched, Claim, Release, Approved, Closed, Origin, Reported, StopIssued, SessionsRemoved,
+              DraftStarted, DraftEnded]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
@@ -84,6 +110,8 @@ _ORIGIN = "origin"
 _REPORTED = "reported"
 _STOPPED = "stopped"
 _SESSIONS_REMOVED = "sessions-removed"
+_DRAFT_STARTED = "draft-started"
+_DRAFT_ENDED = "draft-ended"
 
 
 def encode(event: Event) -> str:
@@ -105,6 +133,12 @@ def encode(event: Event) -> str:
         fields = {"event": _STOPPED, "run": event.run, "at": format_local(event.at)}
     elif isinstance(event, SessionsRemoved):
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
+    elif isinstance(event, DraftStarted):
+        fields = {"event": _DRAFT_STARTED, "n": event.n, "session": event.session, "mode": event.mode.value,
+                  "at": format_local(event.at)}
+    elif isinstance(event, DraftEnded):
+        fields = {"event": _DRAFT_ENDED, "n": event.n, "open": event.open, "summary": list(event.summary),
+                  "at": format_local(event.at)}
     else:
         fields = {"event": _CLOSED, "reason": event.reason}
     return json.dumps(fields, separators=(",", ":"))
@@ -117,15 +151,26 @@ def decode(line: str) -> Event | None:
         raise ValueError("not a JSON object")
     kind = fields.get("event")
     if kind == _LAUNCHED:
-        return Launched(_run(fields), _text(fields, "session"), parse_local(_text(fields, "at")))
+        return Launched(_int(fields, "run"), _text(fields, "session"), parse_local(_text(fields, "at")))
     if kind == _REPORTED:
-        return Reported(_run(fields), parse_local(_text(fields, "at")))
+        return Reported(_int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _STOPPED:
-        return StopIssued(_run(fields), parse_local(_text(fields, "at")))
+        return StopIssued(_int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _SESSIONS_REMOVED:
         return SessionsRemoved(parse_local(_text(fields, "at")))
+    if kind == _DRAFT_STARTED:
+        try:
+            mode = DraftMode(fields.get("mode"))
+        except ValueError:
+            raise ValueError("mode is missing or not one of " + ", ".join(m.value for m in DraftMode)) from None
+        return DraftStarted(_int(fields, "n"), _text(fields, "session"), mode, parse_local(_text(fields, "at")))
+    if kind == _DRAFT_ENDED:
+        summary = fields.get("summary")
+        if not isinstance(summary, list) or not all(isinstance(line, str) for line in summary):
+            raise ValueError("summary is missing or not a list of strings")
+        return DraftEnded(_int(fields, "n"), _int(fields, "open"), tuple(summary), parse_local(_text(fields, "at")))
     if kind == _CLAIM:
-        return Claim(_text(fields, "resource"), None if "run" not in fields else _run(fields))
+        return Claim(_text(fields, "resource"), None if "run" not in fields else _int(fields, "run"))
     if kind == _RELEASE:
         return Release(_text(fields, "resource"))
     if kind == _APPROVED:
@@ -137,12 +182,12 @@ def decode(line: str) -> Event | None:
     return None
 
 
-def _run(fields: dict) -> int:
-    run = fields.get("run")
-    # bool is an int subclass, and `true` is not a run number.
-    if not isinstance(run, int) or isinstance(run, bool):
-        raise ValueError("run is missing or not an integer")
-    return run
+def _int(fields: dict, key: str) -> int:
+    value = fields.get(key)
+    # bool is an int subclass, and `true` is not a number.
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{key} is missing or not an integer")
+    return value
 
 
 def _text(fields: dict, key: str) -> str:

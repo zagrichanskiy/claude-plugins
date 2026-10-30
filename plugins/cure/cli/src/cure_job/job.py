@@ -6,9 +6,19 @@ from datetime import datetime
 from pathlib import Path
 
 from . import resource
-from .events import Approved, Claim, Closed, Event, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
+from .events import (Approved, Claim, Closed, DraftEnded, DraftMode, DraftStarted, Event, Launched, Origin, Release,
+                     Reported, SessionsRemoved, StopIssued)
 from .handoff import Handoff
-from .result import Result
+from .result import Result, ResultStatus
+
+
+def answers_name(n: int) -> str:
+    """The file in the job directory that holds the answers draft ``n`` applies."""
+    return f"answers-{n}.md"
+
+
+def draft_session_name(job_id: str, n: int) -> str:
+    return f"draft-{job_id}-{n}"
 
 
 @dataclass(frozen=True)
@@ -74,6 +84,44 @@ class JobRecord:
         """The latest origin event's address, else the handoff's ``origin``."""
         origins = [event for event in self.events if isinstance(event, Origin)]
         return origins[-1].address if origins else self.handoff.origin
+
+    @property
+    def draft(self) -> DraftStarted | None:
+        """The latest draft."""
+        return next((event for event in reversed(self.events) if isinstance(event, DraftStarted)), None)
+
+    @property
+    def draft_end(self) -> DraftEnded | None:
+        """The end of the latest draft, or ``None`` while it is open."""
+        draft = self.draft
+        if draft is None:
+            return None
+        return next((event for event in self.events if isinstance(event, DraftEnded) and event.n == draft.n), None)
+
+    @property
+    def draft_open(self) -> bool:
+        """A draft started and ``cure-job drafted`` has not ended it."""
+        return self.draft is not None and self.draft_end is None
+
+    @property
+    def drafts_unended(self) -> int:
+        """The drafts started since the last ``cure-job drafted``."""
+        count = 0
+        for event in self.events:
+            if isinstance(event, DraftStarted):
+                count += 1
+            elif isinstance(event, DraftEnded):
+                count = 0
+        return count
+
+    @property
+    def answers_applied(self) -> bool:
+        """An apply draft that started after the needs-input result was recorded has ended."""
+        if self.result is None or self.result.status is not ResultStatus.NEEDS_INPUT or self.result_mtime is None:
+            return False
+        ended = {event.n for event in self.events if isinstance(event, DraftEnded)}
+        return any(isinstance(event, DraftStarted) and event.mode is DraftMode.APPLY and event.n in ended
+                   and event.at > self.result_mtime for event in self.events)
 
     @property
     def resources(self) -> frozenset[str]:

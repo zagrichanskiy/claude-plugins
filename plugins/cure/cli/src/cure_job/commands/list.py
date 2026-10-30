@@ -55,7 +55,7 @@ def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
             "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
-            "after": None, "after-state": None}
+            "after": None, "after-state": None, "draft": None}
 
 
 def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
@@ -63,6 +63,8 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
     waiting_for = None
     if view.state is State.BLOCKED:
         waiting_for = sessions[record.session].waiting_for
+    elif view.state is State.DRAFT_BLOCKED:
+        waiting_for = sessions[record.draft.session].waiting_for
     return {
         "id": record.id,
         "state": view.state.value,
@@ -82,4 +84,13 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "prs": list(record.result.prs) if record.result else [],
         "after": view.after.id if view.after else None,
         "after-state": view.after.state.value if view.after else None,
+        "draft": _draft_row(view),
     }
+
+
+def _draft_row(view: JobView) -> dict | None:
+    draft, end = view.record.draft, view.record.draft_end
+    if draft is None:
+        return None
+    return {"n": draft.n, "mode": draft.mode.value, "state": "ended" if end else (view.draft or view.state).value,
+            "session": draft.session, "summary": list(end.summary) if end else None}

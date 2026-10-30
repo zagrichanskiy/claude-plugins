@@ -8,7 +8,7 @@ import pytest
 
 from cure_job.actions import STALLED_CONFIRM_SECONDS, Action, actions
 from cure_job.claude import SessionStatus
-from cure_job.events import Closed, Reported, SessionsRemoved
+from cure_job.events import Closed, DraftEnded, DraftMode, DraftStarted, Reported, SessionsRemoved
 from cure_job.handoff import Device, Handoff
 from cure_job.result import Result, ResultStatus
 from cure_job.state import State, derive
@@ -162,3 +162,60 @@ def test_held_job_with_an_unapproved_goal_after_an_invalid_predecessor_gets_no_a
 
 def test_held_job_after_an_invalid_predecessor_gets_no_draft():
     assert successor_names(successor(), invalid=frozenset({A})) == []
+
+
+# --- drafts -------------------------------------------------------------------------------------------
+
+DRAFT = f"draft-{A}-1"
+
+
+def draft_actions(record, sessions=None):
+    view = derive([record], sessions or {}, NOW, frozenset())[0]
+    return actions(view, {"waiting-for": "permission"})
+
+
+def started(n=1, mode=DraftMode.WRITE, age=timedelta(hours=1)):
+    return DraftStarted(n, f"draft-{A}-{n}", mode, NOW - age)
+
+
+def test_drafting_job_gets_no_action():
+    assert draft_actions(make_record(A, events=(started(),)), {DRAFT: SessionStatus.BUSY}) == []
+
+
+def test_draft_blocked_job_gets_tell_blocked():
+    assert draft_actions(make_record(A, events=(started(),)), {DRAFT: SessionStatus.WAITING}) == [
+        Action("tell-blocked", {"waiting-for": "permission"})]
+
+
+@pytest.mark.parametrize("mode, answers", [(DraftMode.WRITE, None), (DraftMode.APPLY, f"/state/jobs/{A}/answers-2.md")])
+def test_draft_lost_job_gets_redraft_with_the_mode_the_answers_and_the_lost_count(mode, answers):
+    events = (started(1), DraftEnded(1, 0, ("a", "b", "c"), NOW), started(2, mode))
+    assert draft_actions(make_record(A, goal=True, events=events)) == [
+        Action("redraft", {"mode": mode.value, "answers": answers, "lost": 1})]
+    assert draft_actions(make_record(A, goal=True, events=(*events, started(3, mode))))[0].args["lost"] == 2
+
+
+@pytest.mark.parametrize("open_items, expected", [(0, [Action("resume")]), (2, [Action("ask-open", {"open": 2})])])
+def test_needs_input_after_applied_answers_gets_resume_or_ask_open(open_items, expected):
+    record = finished(ResultStatus.NEEDS_INPUT, Reported(1, NOW), started(1, DraftMode.APPLY, timedelta(minutes=1)),
+                      DraftEnded(1, open_items, ("a", "b", "c"), NOW), goal=True, result_mtime=NOW - timedelta(minutes=2))
+    assert draft_actions(replace(record, open_items=open_items)) == expected
+
+
+def test_needs_input_after_answers_applied_before_the_latest_run_gets_ask_input():
+    record = make_record(A, goal=True, result=result_of(ResultStatus.NEEDS_INPUT),
+                         events=(launched(A), started(1, DraftMode.APPLY), DraftEnded(1, 0, ("a", "b", "c"), NOW),
+                                 launched(A, 2), Reported(2, NOW)))
+    assert names(record) == ["ask-input"]
+
+
+def test_needs_input_after_answers_applied_before_the_result_gets_ask_input():
+    record = finished(ResultStatus.NEEDS_INPUT, started(1, DraftMode.APPLY, timedelta(minutes=3)),
+                      DraftEnded(1, 0, ("a", "b", "c"), NOW), Reported(1, NOW), goal=True,
+                      result_mtime=NOW - timedelta(minutes=2))
+    assert names(record) == ["ask-input"]
+
+
+def test_held_job_after_a_predecessor_with_an_open_draft_gets_no_draft():
+    predecessor = make_record(A, goal=True, events=(DraftStarted(1, DRAFT, DraftMode.APPLY, NOW),))
+    assert successor_names(successor(), [predecessor]) == []

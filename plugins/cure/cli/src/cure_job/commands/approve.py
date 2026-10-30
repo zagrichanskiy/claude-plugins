@@ -15,8 +15,9 @@ class ApproveCommand(Command):
     usage = "cure-job approve ID --by user|auto"
     help = "approve the goal of a job before its first launch"
     description = ("Approve the current goal.md of a job that has no launched run and no result. A goal.md "
-                   "with items under ## Open is refused. An edit of goal.md revokes the approval. A second call "
-                   "for the same goal does nothing. --by auto exits 1 while config.json has an error")
+                   "with items under ## Open is refused, and so is a job whose draft has not ended. An edit of "
+                   "goal.md revokes the approval. A second call for the same goal does nothing. --by auto exits 1 "
+                   "while config.json has an error")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("id", metavar="ID", type=job_id_arg, help="job id")

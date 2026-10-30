@@ -26,7 +26,7 @@ Each row is a rule the implementation follows, with the reason for it.
 | A job holds `build:<dir>` only during a bitbake step and `device:bench` only during a verify step, through `claim --wait` and `release`. | Builds and the bench are serialised; edits and reviews of other jobs keep running. |
 | Short holds end with the run: when the job finishes or a new run starts. A `lost` session keeps them until relaunch or close. | A forgotten `release` is bounded. The bench state after a crash is unknown. |
 | Of two jobs that want the same repository, a launched job wins, then the lower id. | A fixed order: jobs run in the order they were queued. |
-| The dispatcher drafts the goal and asks for approval while a job is `held`. An approved job launches when its resources free. | The user approves once; the job runs later without the user present. |
+| The dispatcher starts a goal-writer session (`drafting`) that drafts the goal while a job is `held`, and asks for approval. A draft session that ends without `cure-job drafted` leaves the job `draft-lost`. An approved job launches when its resources free. | The user approves once; the job runs later without the user present. |
 | `after: <id>` in the handoff. The job waits until the predecessor is `done` and bases its branch on it. | A stacked change needs the predecessor's commits in the tree. They exist only after `done`. |
 | `cure-job next --json` returns the action each job needs. It is the only place scheduling decisions are made. The dispatcher maps actions to procedures. | Conditions become tested code; the dispatcher prompt shrinks. |
 | Settings live in a validated `config.json`. A config error makes every key with an error take its default; a file that does not parse makes every key take its default. `config check` exits 1. `next` exits 0 with a `config-error` element. `prune` removes no job and exits 1. `approve --by auto` exits 1. Other commands use defaults and warn. | A typo never stops a running job. |
@@ -72,7 +72,14 @@ stateDiagram-v2
     state "awaiting-approval" as AA
     state "needs-input" as NI
     [*] --> queued: cure-job new
-    queued --> AA: goal drafted
+    queued --> drafting: draft
+    drafting --> AA: drafted
+    drafting --> draft_lost: session gone
+    draft_lost --> drafting: redraft
+    drafting --> draft_blocked: prompt
+    draft_blocked --> drafting: answered
+    NI --> drafting: answers
+    drafting --> NI: drafted
     AA --> approved: approve
     queued --> held: blocked
     AA --> held: blocked
@@ -99,9 +106,11 @@ any state without a live session.
 
 | State | Holds repositories |
 |---|---|
-| `queued`, `awaiting-approval`, `held` | no |
+| `queued`, `drafting`, `draft-blocked`, `draft-lost`, `awaiting-approval`, `held` | no |
 | `approved`, `launched`, `running`, `needs-input`, `lost` | yes |
 | `done`, `failed`, `abandoned` | released |
+
+A draft keeps the hold of a job that held its resources before it.
 
 ## Short holds in one run
 

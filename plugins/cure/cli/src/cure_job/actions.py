@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import Mapping
 
 from .config import DEFAULTS, Config
+from .events import DraftMode
+from .job import answers_name
 from .result import short_hold_timeout
 from .state import JobView, PredecessorGone, State
 
@@ -40,7 +42,9 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
         found.append(Action("remove-sessions"))
     if state is State.NEEDS_INPUT:
         timeout = short_hold_timeout(record.result) if record.result else None
-        if timeout:
+        if record.answers_applied:
+            found.append(Action("ask-open", {"open": record.open_items}) if record.open_items else Action("resume"))
+        elif timeout:
             found.append(Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder}))
         else:
             found.append(Action("ask-input"))
@@ -48,8 +52,12 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
         found.append(Action("confirm-stalled", {"stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]}))
     elif state is State.LOST:
         found.append(Action("ask-relaunch"))
-    elif state is State.BLOCKED:
+    elif state in (State.BLOCKED, State.DRAFT_BLOCKED):
         found.append(Action("tell-blocked", {"waiting-for": row["waiting-for"]}))
+    elif state is State.DRAFT_LOST:
+        draft = record.draft
+        answers = str(record.dir / answers_name(draft.n)) if draft.mode is DraftMode.APPLY else None
+        found.append(Action("redraft", {"mode": draft.mode.value, "answers": answers, "lost": record.drafts_unended}))
     elif state is State.HELD and view.after is not None and view.after.state in CLOSING_PREDECESSOR:
         found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
     elif state is State.QUEUED or (state is State.HELD and not record.has_goal):

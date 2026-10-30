@@ -1,14 +1,15 @@
-"""The ``claude`` arguments of a worker session beyond its name and prompt.
+"""The ``claude`` arguments of a worker or goal-writer session beyond its name and prompt.
 
-The caller of ``launch`` and ``resume`` may choose only the permission mode
-(:class:`RunArguments`). The CLI adds the permission rules the worker needs to
-report back (:class:`WorkerSettings`).
+The caller of ``launch``, ``resume`` and ``draft`` may choose only the permission
+mode (:class:`RunArguments`). The CLI adds the permission rules the worker needs
+to report back (:class:`WorkerSettings`), and those the goal-writer needs to
+write one goal and nothing else (:class:`GoalWriterSettings`).
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Sequence
+from typing import Iterable, Sequence
 
 from .errors import CureJobError
 
@@ -59,3 +60,58 @@ class WorkerSettings:
 
     def arguments(self) -> list[str]:
         return ["--settings", json.dumps({"permissions": {"allow": self.rules()}}, separators=(",", ":"))]
+
+
+class GoalWriterSettings:
+    """The ``--settings`` of a goal-writer session: run ``cure:goal``, read, edit only the job's ``goal.md``.
+
+    Each ``cure-job`` rule names the bare command, which the plugin's ``bin/`` puts on the PATH, and the
+    absolute path. The deny rules keep every decision the dispatcher makes out of the session.
+    """
+
+    BARE = "cure-job"
+    READS = ("config get", "list")
+    DENIED = ("approve", "launch", "resume", "close", "draft", "new")
+    #: The read-only commands ``cure:goal`` runs in job mode, and the Tools check.
+    COMMANDS = ("git -C * symbolic-ref --short refs/remotes/origin/HEAD", "git -C * branch --show-current",
+                "gh repo view --json defaultBranchRef -q .defaultBranchRef.name", "command -v *")
+    #: The permission rules the Permissions check reads, and the trust entries the Trust check reads.
+    CLAUDE_FILES = ("~/.claude.json", "~/.claude/settings.json", "//etc/claude-code/managed-settings.json",
+                    "//Library/Application Support/ClaudeCode/managed-settings.json")
+
+    def __init__(self, plugin_root: Path, job_dir: Path, repos: Iterable[str], config_dir: Path):
+        self.plugin_root = Path(plugin_root)
+        self.cure_job = self.plugin_root / CURE_JOB
+        self.job_dir = Path(job_dir)
+        self.repos = tuple(repos)
+        self.config_dir = Path(config_dir)
+
+    def allow(self) -> list[str]:
+        job_id = self.job_dir.name
+        goal = self.job_dir / "goal.md"
+        return ([f"Bash({cure_job} drafted {job_id} *)" for cure_job in self._cure_jobs()]
+                + [f"Bash({cure_job} drafted --help)" for cure_job in self._cure_jobs()]
+                + [f"Bash({cure_job} {command} *)" for cure_job in self._cure_jobs() for command in self.READS]
+                + [f"Bash({command})" for command in self.COMMANDS]
+                + ["Bash(wc -c *)", "Skill(cure:goal)", "SendMessage", f"Edit({_absolute(goal)})"]
+                + [f"Read({_absolute(directory)}/**)"
+                   for directory in (self.job_dir.parent, self.plugin_root, *map(Path, self.repos))]
+                + [f"Read({_absolute(self.config_dir / 'question-policies.md')})"]
+                + [f"Read({path})" for path in self.CLAUDE_FILES])
+
+    def deny(self) -> list[str]:
+        return (["Bash(claude *)"]
+                + [f"Bash({cure_job} {command} *)" for cure_job in self._cure_jobs() for command in self.DENIED]
+                + [f"Edit({_absolute(Path(repo))}/**)" for repo in self.repos])
+
+    def arguments(self) -> list[str]:
+        settings = {"permissions": {"allow": self.allow(), "deny": self.deny()}}
+        return ["--settings", json.dumps(settings, separators=(",", ":"))]
+
+    def _cure_jobs(self) -> tuple[str, ...]:
+        return self.BARE, str(self.cure_job)
+
+
+def _absolute(path: Path) -> str:
+    """``path`` in a permission rule, where a single leading ``/`` is relative to the settings file."""
+    return "/" + str(path)
