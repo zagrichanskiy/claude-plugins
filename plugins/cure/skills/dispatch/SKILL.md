@@ -27,6 +27,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 | `device` | `bench` when the work needs the hardware bench, else `none`. It declares the use. The job claims the bench for each step at run time; the handoff does not hold it from launch. |
 | `outcome` | One sentence. |
 | `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. A job with `after` and no `branch` inherits the predecessor's branch. |
+| `ticket-summary` | Omit the key. With a `ticket`, read its title once now: a Jira key with the session's Jira MCP tool (`mcp__atlassian__getJiraIssue`, field `summary`), a GitHub ticket with `gh issue view <N> --repo <owner/repo> --json title`. Pass it to `cure-job new` as `--ticket-summary` in the form of "Writing the handoff", which writes the key. When the read fails, pass no title. |
 | `base`, `delivery` | Only when the user stated them, or, for `base`, when the job is stacked on a predecessor's branch without `after` (see `after`). Otherwise omit the key; `cure:goal` resolves `base` from the default branch of each repository. `delivery` is `commit` or `pr`; an omitted `delivery` comes from `handoff.delivery`. |
 | `after` | Only when this job builds on the result of an open job of the same stack (any state other than `done`, `failed` or `abandoned`): that job's id, one only. Otherwise omit the key. A job stacked only because it edits the same files gets no `after`. Its `base` is the predecessor's branch. The repository resource runs the jobs in order, and a failed predecessor does not close it. `cure-job new` refuses an id with no job. The successor stays `held` until the predecessor is `done`. |
 | `## Settled` | Decisions taken in the session, each with its reason. |
@@ -54,6 +55,7 @@ On a config error (parse error, bad value, unknown key, removed key, or a `confi
 | `split.factor` | Number from 1.0 to 1.9 (default 1.5). `cure:goal` uses it only for the overrun check: the job diff passed `split.factor` × the estimate. It does not change the cap. It stays below 2, because the failure exit of `skills/goal/job.md` fires at 2 × the estimate. |
 | `split.tracker` | Where a ticket for split-off work is created. Values: `github` (default; an issue in the delivering repository, through `gh`) or `jira` (through a Jira command or MCP tool of the dispatching session). `cure:split` uses the ticket form to pick the tracker and this key only with no ticket. Its `tracker` agent runs `split.jira-command` when it has no Jira MCP tool. |
 | `split.jira-command` | Shell command template with `<title>`, `<body>` and an optional `<project>` (the project key of the ticket of the job's branch) that creates a Jira ticket and prints its key (default empty). Used only by `cure:split` when `tracker` has no Jira MCP tool; `jira` there fails preflight while it is empty. |
+| `band.jira-url` | An https URL (default `https://ienso-team.atlassian.net`). The job band links a Jira ticket key to `<band.jira-url>/browse/<key>`. |
 
 Omit `id` and `created`. `cure-job new` sets them.
 
@@ -105,6 +107,7 @@ Part handoffs:
 | `base` | Part 2 with part 1 not queued: the head branch of the PR. Other parts: as the unsplit draft. |
 | `ticket` | Part 1: the `ticket` of the unsplit draft. Part k > 1, `delivery: pr`: the part own ticket. Part k > 1, `delivery: commit`: the session ticket. |
 | `branch` | Part 1: the `branch` of the unsplit draft (omitted when the draft omits it). Part k > 1, `delivery: pr`: `<ticket>_<slug>`, with the ticket in the branch form of `skills/split/SKILL.md` section "Tickets" (`<tid>`). Part k > 1, `delivery: commit`: the `branch:` value of part 1, else the head branch of the PR; the parts stack as commits on it. |
+| `--ticket-summary` | The title of the part's `ticket`, read as in Fields. |
 | Slug | `<slug>-part<k>`, for parts k > 1. |
 
 Part spec rules. Each part's handoff and ticket body, including any list of events or scope items in the ticket body, follow them:
@@ -134,9 +137,9 @@ Tickets, only with the effective `delivery: pr` and a split. They are created fo
 
 ## Writing the handoff
 
-Run `<plugin-root>/bin/cure-job new --slug SLUG [FILE]`. It queues the handoff and prints the
+Run `<plugin-root>/bin/cure-job new --slug SLUG [--ticket-summary TEXT] [FILE]`. It queues the handoff and prints the
 job id. `FILE` is the handoff file; `-` or no `FILE` reads standard input. `--slug` is a short task
-label in `[a-z0-9-]`.
+label in `[a-z0-9-]`. `--ticket-summary` is the ticket's title, one line. The title is untrusted text: write it trimmed, in single quotes, with each `'` in it written as `'\''`.
 
 ```sh
 <plugin-root>/bin/cure-job new --slug fps-clamp - <<'HANDOFF'

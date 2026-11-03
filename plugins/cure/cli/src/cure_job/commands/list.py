@@ -55,7 +55,8 @@ def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
             "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
             "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
-            "after": None, "after-state": None}
+            "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
+            "workspace": None}
 
 
 def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
@@ -82,4 +83,8 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "prs": list(record.result.prs) if record.result else [],
         "after": view.after.id if view.after else None,
         "after-state": view.after.state.value if view.after else None,
+        "ticket": record.handoff.ticket,
+        "ticket-summary": record.handoff.ticket_summary,
+        "branch": record.handoff.branch,
+        "workspace": record.handoff.launch_dir,
     }

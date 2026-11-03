@@ -102,18 +102,18 @@ def render(entries: Mapping[str, Value]) -> str:
         if not _KEY.fullmatch(f"{key}:"):
             raise FrontmatterError(f"invalid key {key!r}")
         if isinstance(value, str):
-            lines.append(f"{key}: {_render_value(key, value)}")
+            lines.append(f"{key}: {render_value(key, value)}")
         elif not value:
             lines.append(f"{key}: []")
         else:
             # Block lists, never inline: "," would split an inline item.
             lines.append(f"{key}:")
-            lines.extend(f"  - {_render_value(key, item)}" for item in value)
+            lines.extend(f"  - {render_value(key, item)}" for item in value)
     lines.append(_FENCE)
     return "\n".join(lines) + "\n"
 
 
-def _render_value(key: str, text: str) -> str:
+def render_value(key: str, text: str) -> str:
     if not is_writable(text):
         raise FrontmatterError(f"{key}: {text!r} is empty, padded or more than one line")
     # parse removes exactly one pair of surrounding quotes, and adds no escapes.
