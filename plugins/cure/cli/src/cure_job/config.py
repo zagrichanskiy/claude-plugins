@@ -43,7 +43,7 @@ DEFAULTS: dict[str, object] = {
     "short-hold.wait-seconds": 540,
     "short-hold.wait-total-minutes": 120,
     "prune.failed-days": 30,
-    "band.jira-url": "https://ienso-team.atlassian.net",
+    "band.tracker-url": "https://ienso-team.atlassian.net/browse/<key>",
     "launch-grace-seconds": 60,
 }
 
@@ -55,6 +55,7 @@ REMOVED = {
     ("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch",
     ("prune", "done-days"): "a done job is pruned once its finish is reported and its sessions are removed",
     ("prune", "abandoned-days"): "an abandoned job is pruned once its sessions are removed",
+    ("band", "jira-url"): 'write it as "tracker-url": "<jira-url>/browse/<key>"',
 }
 
 
@@ -223,7 +224,9 @@ def _delivery(value: object) -> str | None:
 
 
 def _tracker(value: object) -> str | None:
-    return None if value in ("github", "jira") else f"expected \"github\" or \"jira\", got {json.dumps(value)}"
+    if value in ("github", "jira", "clickup"):
+        return None
+    return f"expected \"github\", \"jira\" or \"clickup\", got {json.dumps(value)}"
 
 
 def _text(value: object) -> str | None:
@@ -234,6 +237,12 @@ def _https_url(value: object) -> str | None:
     if not isinstance(value, str) or not re.fullmatch(r"https://[^\s/]+(/\S*)?", value):
         return f"expected an https URL, got {json.dumps(value)}"
     return None
+
+
+def _key_url(value: object) -> str | None:
+    if problem := _https_url(value):
+        return problem
+    return None if "<key>" in value else f"expected a URL with <key>, got {json.dumps(value)}"
 
 
 def _tiers(value: object) -> str | None:
@@ -274,7 +283,7 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "short-hold.wait-seconds": _int_range(10, 540),
     "short-hold.wait-total-minutes": _int_range(10, 1440),
     "prune.failed-days": _int_range(1, 365),
-    "band.jira-url": _https_url,
+    "band.tracker-url": _key_url,
     "launch-grace-seconds": _int_range(10, 600),
 }
 

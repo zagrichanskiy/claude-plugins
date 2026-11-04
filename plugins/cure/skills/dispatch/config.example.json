@@ -30,7 +30,7 @@
     "failed-days": 30
   },
   "band": {
-    "jira-url": "https://ienso-team.atlassian.net"
+    "tracker-url": "https://ienso-team.atlassian.net/browse/<key>"
   },
   "launch-grace-seconds": 60
 }

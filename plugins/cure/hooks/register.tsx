@@ -30,12 +30,12 @@ const run = async ($: EngineInterface, argv: string[]): Promise<string | null> =
 const cureJobArgv = ($: EngineInterface, args: string[]) => [`${$.plugin.root}/bin/cure-job`, ...args]
 const cureJob = ($: EngineInterface, args: string[]) => run($, cureJobArgv($, args))
 
-const JIRA_KEY = /^[A-Z]+-[0-9]+$/
+const TRACKER_KEY = /^[A-Z]+-[0-9]+$/
 
-const jiraSite = async ($: EngineInterface): Promise<string | null> => {
-  const site = await cureJob($, ['config', 'get', 'band.jira-url'])
+const trackerUrl = async ($: EngineInterface): Promise<string | null> => {
+  const url = await cureJob($, ['config', 'get', 'band.tracker-url'])
   try {
-    return site === null ? null : (JSON.parse(site) as string).replace(/\/+$/, '')
+    return url === null ? null : (JSON.parse(url) as string)
   } catch {
     return null
   }
@@ -55,10 +55,10 @@ const githubRepo = async ($: EngineInterface, dir: string | null) => {
   return remote?.match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?$/)?.[1] ?? null
 }
 
-const ticketUrl = async ($: EngineInterface, job: Job, jira: string | null): Promise<string | null> => {
+const ticketUrl = async ($: EngineInterface, job: Job, tracker: string | null): Promise<string | null> => {
   const ticket = job.ticket ?? ''
   if (/^https?:\/\/\S+$/.test(ticket)) return ticket
-  if (JIRA_KEY.test(ticket)) return jira === null ? null : `${jira}/browse/${ticket}`
+  if (TRACKER_KEY.test(ticket)) return tracker === null ? null : tracker.replaceAll('<key>', ticket)
   const issue = ticket.match(/^([\w.-]+\/[\w.-]+)?#([0-9]+)$/)
   if (issue === null) return null
   const repo = issue[1] ?? (await githubRepo($, job.workspace))
@@ -84,10 +84,10 @@ export const register: Register = on => {
     )
     if (jobs.length === 0) return next(e)
 
-    const jira = jobs.some(job => JIRA_KEY.test(job.ticket ?? '')) ? await jiraSite($) : null
+    const tracker = jobs.some(job => TRACKER_KEY.test(job.ticket ?? '')) ? await trackerUrl($) : null
     const rows: Row[] = []
     for (const job of jobs) {
-      const url = await ticketUrl($, job, jira)
+      const url = await ticketUrl($, job, tracker)
       if (isBoard) {
         rows.push({ job, url, branch: job.branch, dir: job.workspace })
         continue

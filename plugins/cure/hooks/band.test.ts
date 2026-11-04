@@ -15,12 +15,13 @@ const JOB = {
   prs: ['https://github.com/o/r/pull/7'], branch: 'fix-boot' as string | null, workspace: '/src/r',
 }
 
-const engine = (on: On, job: Partial<typeof JOB>, calls: string[][] = [], prompts: string[] = []) => {
+const engine = (on: On, job: Partial<typeof JOB>, calls: string[][] = [], prompts: string[] = [],
+  trackerUrl = 'https://jira.example.com/browse/<key>') => {
   on('process.run', (_, e) => {
     const argv = [e.argv[0]?.split('/').pop() ?? '', ...e.argv.slice(1)]
     calls.push(argv)
     const stdout = argv.includes('list') ? JSON.stringify([{ ...JOB, ...job }])
-      : argv.includes('config') ? '"https://jira.example.com"'
+      : argv.includes('config') ? JSON.stringify(trackerUrl)
       : argv.includes('remote') ? 'git@github.com:o/r.git\n'
       : argv.includes('--show-current') ? 'wt-branch\n' : ''
     return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -62,6 +63,17 @@ for (const [ticket, href] of [
     }
   })
 }
+
+test('a tracker key links through band.tracker-url', async ($, on) => {
+  mock.env(on, { CURE_JOB_ID: 'j1' })
+  engine(on, { ticket: 'RND-537', prs: [] }, [], [], 'https://app.clickup.com/t/9015/<key>')
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+    expect((await ui.findAll({ type: 'Link' })).map(link => link.props.href))
+      .toEqual(['https://app.clickup.com/t/9015/RND-537'])
+    await ui.unmount()
+  }
+})
 
 for (const [name, env, isDispatcher] of [
   ['the dispatcher with no job awaiting approval', {}, true],

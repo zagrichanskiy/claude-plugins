@@ -104,24 +104,37 @@ def test_config_get_split_factor_without_a_file_prints_1_5(h):
     assert h.lines == ["1.5"]
 
 
-def test_config_get_band_jira_url_without_a_file_prints_the_default(h):
-    assert h.run("config", "get", "band.jira-url") == 0
-    assert h.lines == ['"https://ienso-team.atlassian.net"']
+def test_config_get_band_tracker_url_without_a_file_prints_the_default(h):
+    assert h.run("config", "get", "band.tracker-url") == 0
+    assert h.lines == ['"https://ienso-team.atlassian.net/browse/<key>"']
 
 
-def test_config_get_band_jira_url_prints_the_file_value(h):
-    configure(h, {"band": {"jira-url": "https://example.atlassian.net"}})
-    assert h.run("config", "get", "band.jira-url") == 0
-    assert h.lines == ['"https://example.atlassian.net"']
+def test_config_get_band_tracker_url_prints_the_file_value(h):
+    configure(h, {"band": {"tracker-url": "https://app.clickup.com/t/9015/<key>"}})
+    assert h.run("config", "get", "band.tracker-url") == 0
+    assert h.lines == ['"https://app.clickup.com/t/9015/<key>"']
 
 
-@pytest.mark.parametrize("value", ["http://example.atlassian.net", "example.atlassian.net", "", 5])
-def test_config_check_rejects_a_band_jira_url_that_is_not_https(h, capsys, value):
-    configure(h, {"band": {"jira-url": value}})
+@pytest.mark.parametrize("value", ["http://example.atlassian.net/browse/<key>", "example.atlassian.net/<key>", "", 5])
+def test_config_check_rejects_a_band_tracker_url_that_is_not_https(h, capsys, value):
+    configure(h, {"band": {"tracker-url": value}})
     assert h.run("config", "check") == 1
-    assert "config.json: band.jira-url: expected an https URL" in capsys.readouterr().err
-    assert h.run("config", "get", "band.jira-url") == 0
-    assert h.lines[-1] == '"https://ienso-team.atlassian.net"'
+    assert "config.json: band.tracker-url: expected an https URL" in capsys.readouterr().err
+    assert h.run("config", "get", "band.tracker-url") == 0
+    assert h.lines[-1] == '"https://ienso-team.atlassian.net/browse/<key>"'
+
+
+def test_config_check_rejects_a_band_tracker_url_without_the_key_placeholder(h, capsys):
+    configure(h, {"band": {"tracker-url": "https://example.atlassian.net/browse"}})
+    assert h.run("config", "check") == 1
+    assert "config.json: band.tracker-url: expected a URL with <key>" in capsys.readouterr().err
+
+
+def test_config_check_names_the_replacement_of_band_jira_url(h, capsys):
+    configure(h, {"band": {"jira-url": "https://example.atlassian.net"}})
+    assert h.run("config", "check") == 1
+    assert ('config.json: band: "jira-url" is removed; write it as "tracker-url": "<jira-url>/browse/<key>"'
+            in capsys.readouterr().err)
 
 
 def test_config_get_handoff_branch_without_a_file_prints_new(h):
@@ -371,7 +384,7 @@ def test_a_rejected_value_is_named_by_check_and_replaced_by_its_default_elsewher
     {"dispatcher": {"auto-approve-tiers": []}},
     {"handoff": {"resource-risk": [RISK, {"scope": "repo: /work/a", "text": "t"}]}},
     {"launch-grace-seconds": 30}, {"split": {"limit": 900}},
-    {"split": {"tracker": "github"}}, {"split": {"tracker": "jira"}},
+    {"split": {"tracker": "github"}}, {"split": {"tracker": "jira"}}, {"split": {"tracker": "clickup"}},
     {"split": {"jira-command": "jira-create <title> <body>"}},
     {"split": {"factor": 1}}, {"split": {"factor": 1.0}}, {"split": {"factor": 1.5}}, {"split": {"factor": 1.9}}])
 def test_an_accepted_value_passes_check(h, data):
