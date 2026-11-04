@@ -25,7 +25,7 @@ below.
 | Estimate | The estimated changed lines of the task. The report compares the diff with it. |
 | Cap | `split.limit`, in changed lines (default 1200). In a job, the caller passes the value from Settled. Without one: `<plugin-root>/bin/cure-job config get split.limit`. |
 | R | The required move: the PR diff before the split minus the cap, in changed lines. In a job, the caller passes it. By hand: measure the PR diff (below) and subtract the cap. R is the trigger guard only; section "Plan the chain" decides what moves. |
-| Ticket | In a job, the handoff `ticket`. By hand, the ticket parsed from the branch name or given by the user. `<orig>` is its id (`<N>` of a GitHub `#N`, or the Jira key). The ticket form picks the tracker: `#N`, `owner/repo#N` or a github.com URL is GitHub, `KEY-N` is Jira. `split.tracker` applies only with no ticket; then the Jira project comes from the task context. `<ticket-repo>` is the repository the ticket names, else the remote; it is the `--repo` of every command on `<orig>`. With no ticket, the rewrite and the link are skipped. |
+| Ticket | In a job, the handoff `ticket`. By hand, the ticket parsed from the branch name or given by the user. `<orig>` is its id (`<N>` of a GitHub `#N`, the Jira key, or the ClickUp custom id). The ticket form picks the tracker: `#N`, `owner/repo#N` or a github.com URL is GitHub, an app.clickup.com URL is ClickUp, `KEY-N` is ClickUp when `split.tracker` is `clickup`, else Jira. `split.tracker` applies only with no ticket; then the Jira project or the ClickUp list comes from the task context. `<ticket-repo>` is the repository the ticket names, else the remote; it is the `--repo` of every command on `<orig>`. With no ticket, the rewrite and the link are skipped. |
 | Items | The packing units: the job's work items, each with its files and tests (from `git diff --stat`). By hand, the features of the diff that the user names or the diff shows. |
 | Rewrite | By hand only: `yes` or `no` (default `no`). `yes` allows a re-cut across commit boundaries and `--force-with-lease` on an unmerged pull request branch, in section "Publish" only. A job never rewrites a published branch. |
 | Delivery | `pr` or `commit`, as the caller passes it (the job's handoff `delivery`). Without one, as when run by hand: `<plugin-root>/bin/cure-job config get handoff.delivery` (default `commit`). |
@@ -81,7 +81,7 @@ Every exit leaves `<branch>` checked out. Stage with explicit paths; never `git 
 Under `delivery: pr` check the tracker before any change, so that no step leaves a ticket or a
 branch without the other. The tracker comes from the ticket form (section "Inputs"), else `split.tracker`
 (`<plugin-root>/bin/cure-job config get split.tracker`, default `github`). Dispatch `tracker` with the brief `check`: it reports
-`github: ok | no-auth | issues-disabled` and `jira: mcp | command | none`. `none`, `no-auth` or `issues-disabled` for the chosen tracker stops the skill.
+`github: ok | no-auth | issues-disabled`, `jira: mcp | command | none` and `clickup: mcp | none`. `none`, `no-auth` or `issues-disabled` for the chosen tracker stops the skill.
 Under `pr` also dispatch `delivery` with the brief `preflight`: it lists the sibling pull requests and the delivery requirements.
 
 A failed check stops the skill with nothing changed. The report names the check. The skill also stops with nothing changed when `git branch --show-current` is not `<branch>`, or when `git status --porcelain` lists a staged entry, or lists a path that is in `git diff --name-only --no-renames <base-commit> <branch>` or in the files of any item. The skill never
@@ -179,7 +179,7 @@ Only under `delivery: pr`, in step 5, after every scratch part passes. `tracker`
 |---|---|
 | Title, description | The part's scope: what it does, its commands, options, files, formats and acceptance criteria. No "Split from" line, no reference to the original ticket. |
 | Fields, links | Copied from `<orig>` as the `tracker` prompt lists. The previous part's ticket blocks this one. |
-| Branch name | `<tid>_<slug>`; `<tid>` is `issue-<N>` for a GitHub `#N`, the key for Jira. |
+| Branch name | `<tid>_<slug>`; `<tid>` is `issue-<N>` for a GitHub `#N`, the key for Jira, the custom id for ClickUp. |
 
 If a create fails, or any stop rolls back after the tickets exist, the report names every ticket already created (ids and URLs).
 

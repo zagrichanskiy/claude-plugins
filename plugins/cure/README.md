@@ -35,6 +35,7 @@ Old layouts:
 
 - A flat dotted key is the error `config.json: handoff.delivery: flat key; write it as {"handoff": {"delivery": ...}}`.
 - `base` in the `handoff` group is the error `config.json: handoff: "base" is removed; a job's base is the base stated in the handoff, else the repository's default branch`.
+- `jira-url` in the `band` group is the error `config.json: band: "jira-url" is removed; write it as "tracker-url": "<jira-url>/browse/<key>"`. The dispatcher's rewrite writes that `band.tracker-url`.
 - The dispatcher rewrites a file with only these problems to the nested layout.
 - `config init` drops a `base` row of `defaults.md` with the note `defaults.md: handoff: "base" is removed; row dropped; ...`.
 
@@ -57,7 +58,7 @@ The hooks module `hooks/register.tsx` draws a band above the prompt. It reads `c
 
 Ticket links:
 
-- A Jira key (`ABC-12`) links to `<band.jira-url>/browse/<key>`. `band.jira-url` defaults to `https://ienso-team.atlassian.net`.
+- A tracker key (`ABC-12`, a Jira key or a ClickUp custom id) links to `band.tracker-url` with `<key>` replaced by the key. `band.tracker-url` defaults to `https://ienso-team.atlassian.net/browse/<key>`; for ClickUp it is `https://app.clickup.com/t/<workspace-id>/<key>`.
 - `owner/repo#N` links to that GitHub issue. `#N` links to an issue of the workspace's GitHub `origin`, else shows as text.
 - An http(s) URL links to itself.
 

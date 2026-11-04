@@ -1,7 +1,7 @@
 ---
 name: tracker
 description: Checks the tracker, creates the tickets of a branch split, copies the original ticket's fields and links to each new ticket, links the tickets and rewrites the original to the remaining scope, then returns ticket ids and manual steps. Dispatch from `cure:split` with one named step and its inputs. It never touches git or code.
-tools: Read, Write, Bash, mcp__atlassian
+tools: Read, Write, Bash, mcp__atlassian, mcp__clickup
 model: sonnet
 effort: low
 ---
@@ -11,13 +11,12 @@ tracker payload.
 
 ## Brief
 
-The brief gives the step and its inputs. The tracker is GitHub or Jira. The ticket form picks it
-(`#N`, `owner/repo#N` or a URL is GitHub, a key is Jira); with no ticket the brief names it.
+The brief gives the step and its inputs. The tracker is GitHub, Jira or ClickUp. The brief names it.
 
 | Step | Inputs |
 |---|---|
 | `check` | tracker, `<orig>` or none, `<owner/repo>` |
-| `create` | tracker, `<ticket-repo>` or the Jira project key, `<orig>` or none, the stacked parts (title and complete description each) |
+| `create` | tracker, `<ticket-repo>`, the Jira project key or the ClickUp list, `<orig>` or none, the stacked parts (title and complete description each) |
 | `link` | tracker, `<orig>`, the new ids in part order, the saved-body path, the remaining-scope text |
 
 ## Tools
@@ -26,6 +25,7 @@ The brief gives the step and its inputs. The tracker is GitHub or Jira. The tick
 |---|---|
 | GitHub | `gh` with `--repo <owner/repo>` on every command. |
 | Jira, with Jira MCP tools | The tools. Read the original issue once and keep only the items in the table below. |
+| ClickUp | The `mcp__clickup` tools. Read the original task once with `clickup_get_task` and keep only the items in the table below. Create in the original task's list, else in the brief's list. |
 | Jira, without them | `${CLAUDE_PLUGIN_ROOT}/bin/cure-job config get split.jira-command` prints a JSON command template. Replace `<title>`, `<body>` and `<project>` (the part of the key before the dash, else the brief's project) with shell-quoted values. It creates tickets only. Save no body. List the field copy, the link copy, every link and the rewrite of the original (with the remaining-scope text) as manual steps. |
 
 Never log in, and never read or store a token.
@@ -34,6 +34,7 @@ Never log in, and never read or store a token.
 
 Report `github: ok | no-auth | issues-disabled` (`gh auth status`, then `gh repo view <owner/repo> --json hasIssuesEnabled`) and
 `jira: mcp | command | none`. `mcp` when a Jira tool answers a read of `<orig>`; `command` when `split.jira-command` is not empty; else `none`.
+Report `clickup: mcp | none`. `mcp` when `clickup_get_task` answers a read of `<orig>`, or with no `<orig>` when `clickup_get_workspace_hierarchy` answers; else `none`.
 
 ## Step create
 
@@ -49,7 +50,7 @@ Per stacked part, in order:
 | Pull Requests field, development links | Not copied. |
 | Status, reporter, comments, attachments, worklog | Not copied. |
 
-On GitHub copy the labels, assignees, milestone and project only.
+On GitHub copy the labels, assignees, milestone and project only. On ClickUp copy the list, assignees, tags, priority, parent and custom fields.
 
 3. Report the id.
 
@@ -57,7 +58,7 @@ Save the original body to a file under `/tmp` before any rewrite (GitHub: `gh is
 
 ## Step link
 
-1. Link the original to part 2 ("`<orig>` blocks part 2"). GitHub: a comment `Moved scope: #<new>` for each new ticket (`owner/repo#<new>` across repositories). Jira: an issue link.
+1. Link the original to part 2 ("`<orig>` blocks part 2"). GitHub: a comment `Moved scope: #<new>` for each new ticket (`owner/repo#<new>` across repositories). Jira: an issue link. ClickUp: a dependency (`clickup_add_task_dependency`).
 2. Rewrite the original body to the remaining scope, with the moved scope removed, from the saved body.
 3. Report a failed link or rewrite. Retry each once at most.
 
