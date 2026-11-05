@@ -27,7 +27,8 @@ from ..clock import Clock
 from ..config import Config
 from ..errors import (ClaudeError, ClaudeOutcomeUnknown, CureJobError, HandoffError, JobStateError, PluginError,
                       ResourceHeld, SessionGone, StoreError, UnknownJob)
-from ..events import Approved, Claim, Closed, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
+from ..events import (WORK, Approved, Claim, Closed, Origin, Release, Reported, SessionsRemoved, SessionStarted,
+                      SessionStopped)
 from ..goal import PLUGIN_ROOT, RULES, missing_paths, retarget, tier
 from ..handoff import parse_submitted, stamp
 from ..job_id import make_id, session_name
@@ -211,7 +212,7 @@ class JobsProvider:
                 self.store.restore_result(job_id, record.run)
             raise
         try:
-            self.store.append_event(job_id, Launched(run, session, self.clock()))
+            self.store.append_event(job_id, SessionStarted(WORK, run, session, self.clock(), run))
         except StoreError as e:
             raise StoreError(f"job {job_id}: session {session} may be running and is not recorded; "
                              f"stop it before a retry: {e}") from e
@@ -227,7 +228,7 @@ class JobsProvider:
         record = self.store.load(job_id)
         if record.closed is not None:
             raise JobStateError(f"job {job_id} is abandoned; approve needs an open job")
-        if record.launches:
+        if record.run > 0:
             raise JobStateError(f"job {job_id} has a launched run; approve applies only before the first launch")
         if record.result is not None:
             raise JobStateError(f"job {job_id} has a result; approve needs a job without one")
@@ -271,7 +272,7 @@ class JobsProvider:
         record = self._find_record(snapshot, job_id)
         if record.closed is not None:
             raise JobStateError(f"job {job_id} is abandoned; claim needs a launched run")
-        if not record.launches:
+        if record.run == 0:
             raise JobStateError(f"job {job_id} has no launched run; claim needs a launched run")
         # A relaunch archives result.md before it records the next run.
         if record.result is not None or record.run in record.archived_runs:
@@ -288,7 +289,7 @@ class JobsProvider:
             if holder not in (None, job_id):
                 other = open_records[holder]
                 # A launched holder keeps the resource even against a lower id.
-                if other.launches or lock_rank(other) < lock_rank(record):
+                if other.run > 0 or lock_rank(other) < lock_rank(record):
                     return name, holder
         self.store.append_events(job_id, [Claim(name, record.run) for name in dict.fromkeys(names)
                                           if name not in record.resources])
@@ -324,7 +325,7 @@ class JobsProvider:
         view = self._find(self.listing(), job_id)
         if view.record.origin is not None:
             raise JobStateError(f"job {job_id} already has origin {view.record.origin}; an origin is never replaced")
-        if view.record.launches:
+        if view.record.run > 0:
             raise JobStateError(f"job {job_id} has a launched run; origin is recorded only before the first launch")
         self.store.append_event(job_id, Origin(address, self.clock()))
 
@@ -339,14 +340,15 @@ class JobsProvider:
         # Always read: the answer is about the session, whatever the job state.
         sessions = self.claude.sessions()
         record = self._find(self._listing(snapshot, sessions), job_id).record
-        if not record.launches:
+        latest = record.latest(WORK)
+        if latest is None:
             raise JobStateError(f"job {job_id} has no launched run; nothing to stop")
-        name = record.session
+        name = latest.name
         was_live = self._stop_session(name, sessions.get(name))
         # Recorded even when the session was already down: a session listed
         # stopped inside the launch grace is then lost, not launched.
-        if not record.stop_issued:
-            self.store.append_event(job_id, StopIssued(record.run, self.clock()))
+        if not latest.stop_recorded:
+            self.store.append_event(job_id, SessionStopped(WORK, latest.n, self.clock()))
         return Stopped(name, was_live=was_live)
 
     def _stop_session(self, name: str, session: Session | None) -> bool:
@@ -378,8 +380,7 @@ class JobsProvider:
         if view.state not in (State.DONE, State.ABANDONED):
             raise JobStateError(f"job {job_id} is {view.state.value}; remove-sessions needs "
                                 f"{State.DONE.value} or {State.ABANDONED.value}")
-        # A resumed run records the session of the run before it, so a name can repeat.
-        names = list(dict.fromkeys(launched.session for launched in view.record.launches))
+        names = list(view.record.session_names)
         listed = {name: sessions[name] for name in names if name in sessions}
         for name, session in listed.items():
             if not session.all_ids or "" in session.all_ids:
@@ -403,7 +404,7 @@ class JobsProvider:
         Reads only this job. A second call for the same run writes nothing.
         """
         record = self.store.load(job_id)
-        if not record.launches:
+        if record.run == 0:
             raise JobStateError(f"job {job_id} has no launched run; nothing to report")
         if record.result is None:
             raise JobStateError(f"job {job_id} has no result: {self.store.result_path(job_id)} does not exist")
@@ -423,7 +424,7 @@ class JobsProvider:
             raise JobStateError(f"job {job_id} is abandoned; finish needs an open launched job")
         if record.result is not None:
             raise JobStateError(f"job {job_id} already has {path}")
-        if not record.launches:
+        if record.run == 0:
             raise JobStateError(f"job {job_id} has no launched event; finish needs a launched job")
         if not self.store.write_result(job_id, render_result(report)):
             raise JobStateError(f"job {job_id} already has {path}")

@@ -8,7 +8,7 @@ import pytest
 
 from cure_job.errors import (ClaudeError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob)
 from cure_job.claude import SessionStatus
-from cure_job.events import Claim, Closed, Launched, Reported, SessionsRemoved
+from cure_job.events import Claim, Closed, Reported, SessionsRemoved, SessionStarted
 from cure_job.frontmatter import parse
 from cure_job.providers.jobs import JobsProvider
 from cure_job.resource import DEVICE_BENCH
@@ -226,7 +226,8 @@ def test_launch_puts_the_orchestrator_before_user_arguments_and_the_prompt_last(
 def test_launch_records_a_launched_event(jobs, store, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
-    assert store.load(job_id).launches == (Launched(1, job_id, clock.now),)
+    assert tuple(event for event in store.load(job_id).events if isinstance(event, SessionStarted)) == (
+        SessionStarted("work", 1, job_id, clock.now, 1),)
 
 
 def test_launch_leaves_the_job_launched_then_running(jobs, claude, clock):
@@ -322,7 +323,7 @@ def test_launch_retry_after_a_failed_start_reuses_the_run_number(jobs, claude, c
     claude.fail_start = ClaudeError("cannot start")
     with pytest.raises(ClaudeError):
         jobs.launch(job_id)
-    assert jobs.store.load(job_id).launches == ()
+    assert jobs.store.load(job_id).sessions == ()
     claude.fail_start = None
     assert jobs.launch(job_id) == job_id
     assert jobs.store.load(job_id).run == 1
@@ -333,7 +334,7 @@ def test_launch_start_failure_records_no_event(jobs, claude, store, clock):
     claude.fail_start = ClaudeError("cannot start")
     with pytest.raises(ClaudeError):
         jobs.launch(job_id)
-    assert store.load(job_id).launches == ()
+    assert store.load(job_id).sessions == ()
 
 
 def test_launch_event_write_failure_names_the_unrecorded_session(jobs, claude, store, clock, monkeypatch):
@@ -528,7 +529,7 @@ def finish(store, job_id, status, age, now=NOW):
 
 
 def launch_and_finish(jobs, store, clock, job_id, status, age=timedelta(0)):
-    jobs.store.append_event(job_id, Launched(1, job_id, clock.now))
+    jobs.store.append_event(job_id, SessionStarted("work", 1, job_id, clock.now, 1))
     finish(store, job_id, status, age, clock.now)
 
 

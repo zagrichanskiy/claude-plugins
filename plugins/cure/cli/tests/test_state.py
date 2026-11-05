@@ -8,7 +8,7 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Approved, Claim, Closed, Launched, Reported, SessionsRemoved, StopIssued
+from cure_job.events import Approved, Claim, Closed, Reported, SessionsRemoved, SessionStarted, SessionStopped
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
@@ -21,9 +21,9 @@ B = "261013-1001-video-core-b"
 C = "261013-1002-video-core-c"
 
 
-def launched(job_id: str, run: int = 1, age: timedelta = timedelta(minutes=5)) -> Launched:
+def launched(job_id: str, run: int = 1, age: timedelta = timedelta(minutes=5)) -> SessionStarted:
     from cure_job.job_id import session_name
-    return Launched(run, session_name(job_id, run), NOW - age)
+    return SessionStarted("work", run, session_name(job_id, run), NOW - age, run)
 
 
 def state_of(record, sessions=None, now=NOW):
@@ -81,12 +81,12 @@ def test_row_6_stopped_session_is_launched_inside_the_grace_period():
 
 
 def test_row_6_stopped_session_is_lost_inside_the_grace_period_after_cure_job_stop():
-    record = make_record(A, events=(launched(A, age=timedelta(seconds=1)), StopIssued(1, NOW)))
+    record = make_record(A, events=(launched(A, age=timedelta(seconds=1)), SessionStopped("work", 1, NOW)))
     assert state_of(record, {A: STOPPED}) is State.LOST
 
 
 def test_row_6_stop_of_an_earlier_run_does_not_end_the_grace_of_the_latest():
-    record = make_record(A, events=(launched(A, 1), StopIssued(1, NOW), launched(A, 2, age=timedelta(seconds=1))))
+    record = make_record(A, events=(launched(A, 1), SessionStopped("work", 1, NOW), launched(A, 2, age=timedelta(seconds=1))))
     assert state_of(record, {A + "-r2": STOPPED}) is State.LAUNCHED
 
 
