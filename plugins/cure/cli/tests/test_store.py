@@ -62,7 +62,7 @@ def test_create_on_collision_uses_the_next_suffix(store):
 def test_create_skips_every_suffix_that_ends_in_a_goal_marker(store):
     base = BASE + "-goal"
     assert store.create(base, render) == base
-    with pytest.raises(StoreError):
+    with pytest.raises(StoreError, match="end in a session name marker"):
         store.create(base, render)
     assert [p.name for p in store.job_dir(base).parent.iterdir()] == [base]
 

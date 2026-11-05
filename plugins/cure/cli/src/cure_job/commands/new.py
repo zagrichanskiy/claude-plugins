@@ -55,6 +55,9 @@ def _slug_arg(text: str) -> str:
         raise argparse.ArgumentTypeError(f"ends in -r<digits>, the run marker of a session name: {text!r}")
     if job_id.ends_in_goal_marker(text):
         raise argparse.ArgumentTypeError(f"ends in -goal-<digits>, the marker of a goal session name: {text!r}")
+    if job_id.ends_in_goal_word(text):
+        raise argparse.ArgumentTypeError(f"ends in -goal; its collision suffix -<n> is the marker of a goal "
+                                         f"session name: {text!r}")
     return text
 
 

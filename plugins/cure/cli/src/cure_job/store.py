@@ -321,8 +321,10 @@ class JobStore:
 
     def _reserve(self, base_id: str) -> str:
         candidates = [base_id] + [ids.with_suffix(base_id, n) for n in range(2, ids.MAX_SUFFIX + 1)]
+        marked = 0
         for candidate in candidates:
             if ids.ends_in_run_marker(candidate) or ids.ends_in_goal_marker(candidate):
+                marked += 1
                 continue
             path = self.job_dir(candidate)
             try:
@@ -334,6 +336,9 @@ class JobStore:
                     continue
                 raise
             return candidate
+        if marked:
+            raise StoreError(f"no free job id: {self.job_dir(base_id)} and its suffixes up to -{ids.MAX_SUFFIX} "
+                             f"exist or end in a session name marker ({marked} of them); use another slug")
         raise StoreError(f"no free job id: {self.job_dir(base_id)} and its suffixes up to "
                          f"-{ids.MAX_SUFFIX} exist")
 

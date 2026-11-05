@@ -113,7 +113,18 @@ def test_slug_ending_in_a_goal_session_marker_exits_two(h, tmp_path, capsys, slu
     assert f"ends in -goal-<digits>, the marker of a goal session name: {slug!r}" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("slug", ["goal", "x-goal", "goal-x", "x-goals-1"])
+@pytest.mark.parametrize("slug", ["goal", "x-goal", "X Goal"])
+def test_slug_ending_in_goal_exits_two(h, tmp_path, capsys, slug):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text(), encoding="utf-8")
+    with pytest.raises(SystemExit) as caught:
+        h.cli.run(["new", "--slug", slug, str(source)])
+    assert caught.value.code == 2
+    assert f"ends in -goal; its collision suffix -<n> is the marker of a goal session name: {slug!r}" \
+        in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("slug", ["goal-x", "x-goals-1", "x-goals"])
 def test_slug_with_goal_but_no_goal_session_marker_is_accepted(h, tmp_path, slug):
     h.new(tmp_path, slug=slug)
 
@@ -162,14 +173,6 @@ def test_new_refuses_stdin_that_is_not_utf8(h, monkeypatch, capsys):
     assert h.run("new", "--slug", "x") == 1
     assert "cannot read -: 'utf-8' codec can't decode" in capsys.readouterr().err
     assert not (h.root / "jobs").exists()
-
-
-def test_new_never_creates_an_id_that_ends_in_a_goal_marker_by_the_collision_suffix(h, tmp_path):
-    source = tmp_path / "handoff.md"
-    source.write_text(handoff_text(), encoding="utf-8")
-    assert [h.run("new", "--slug", slug, str(source)) for slug in ("a", "a-goal", "a-goal")] == [0, 0, 1]
-    assert sorted(p.name for p in (h.root / "jobs").iterdir()) == ["261013-1800-video-core-a",
-                                                                    "261013-1800-video-core-a-goal"]
 
 
 def test_new_with_invalid_handoff_returns_one(h, tmp_path, capsys):
