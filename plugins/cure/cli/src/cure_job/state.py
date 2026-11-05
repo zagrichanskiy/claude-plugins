@@ -41,15 +41,6 @@ class State(enum.Enum):
     def is_open(self) -> bool:
         return self not in (State.DONE, State.FAILED, State.ABANDONED)
 
-    @property
-    def has_session(self) -> bool:
-        """The job's session may be alive, so the job cannot be closed or launched."""
-        return self in (State.LAUNCHED, State.RUNNING, State.STALLED, State.BLOCKED)
-
-    @property
-    def is_launchable(self) -> bool:
-        return self in (State.APPROVED, State.LOST, State.NEEDS_INPUT)
-
 
 class Phase(enum.Enum):
     """Where a job stands, from its files and events alone."""

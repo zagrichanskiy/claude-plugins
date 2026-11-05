@@ -52,9 +52,8 @@ def test_a_waiting_session_is_blocked_inside_and_after_the_grace_period(age):
     assert state_of(age) is State.BLOCKED
 
 
-def test_blocked_is_open_has_a_session_and_is_not_launchable():
-    assert State.BLOCKED.is_open and State.BLOCKED.has_session
-    assert not State.BLOCKED.is_launchable
+def test_blocked_is_open():
+    assert State.BLOCKED.is_open
 
 
 def test_a_waiting_session_with_a_result_is_needs_input_not_blocked():
