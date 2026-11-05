@@ -92,8 +92,9 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
 def _answers_session(record: JobRecord, kinds: Mapping[str, SessionKind]) -> JobSession | None:
     """The latest goal session, where it started in the current run with answers to ``result.md``.
 
-    Premise: a lost job's relaunch runs ``cure-job stop`` first, so no goal session of the lost run stays open
-    into the next run. A goal session of the current run on a needs-input job therefore follows ``result.md``.
+    Premise: ``_goal_settled`` (rules.py) refuses launch and resume while a goal session is open, so no goal
+    session of one run stays open into the next; a lost work session is assumed to write no ``result.md``.
+    A goal session of the current run on a needs-input job therefore follows ``result.md``.
     """
     latest = latest_goal_writer(record, kinds)
     if latest is None or latest.run != record.run or record.result is None or not latest.inputs:
