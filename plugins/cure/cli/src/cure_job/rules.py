@@ -43,6 +43,13 @@ class Reads(enum.Enum):
     LISTING = "listing"
 
 
+class Fact(enum.Enum):
+    """A fact of :class:`Check` beside the record and the view that a row reads."""
+    KIND = "kind"
+    KINDS = "kinds"
+    SESSIONS = "sessions"
+
+
 class Artifact(enum.Enum):
     """A job file a session kind writes."""
     GOAL = "goal.md"
@@ -77,6 +84,13 @@ Guard = Callable[[Check], CureJobError | None]
 class Rule:
     reads: Reads
     guards: tuple[Guard, ...]
+    needs: frozenset[Fact] = frozenset()
+
+
+def _given(facts: Check, fact: Fact) -> bool:
+    if fact is Fact.KINDS:
+        return bool(facts.kinds)
+    return getattr(facts, fact.value) is not None
 
 
 def check(op: Op, facts: Check) -> None:
@@ -84,6 +98,9 @@ def check(op: Op, facts: Check) -> None:
     rule = RULES[op]
     if rule.reads is Reads.LISTING and facts.view is None:
         raise AssertionError(f"{op.value} reads the listing and got no view")
+    missing = [fact.value for fact in Fact if fact in rule.needs and not _given(facts, fact)]
+    if missing:
+        raise AssertionError(f"{op.value} needs {', '.join(missing)} and got none")
     for guard in rule.guards:
         refusal = guard(facts)
         if refusal is not None:
@@ -204,11 +221,14 @@ def _kind_start_guards(facts: Check) -> CureJobError | None:
 
 
 def _goal_settled(facts: Check) -> CureJobError | None:
+    """A kind that writes the goal starts without one, and its own open session does not block it."""
     record = facts.record
-    if not record.has_goal:
+    starting = facts.kind
+    if not record.has_goal and Artifact.GOAL not in starting.writes:
         return goal_exists(facts)
-    if not goal_settled(record, facts.kinds):
-        writer = next(session for session in record.open_sessions() if _writes_goal(facts.kinds, session.kind))
+    writer = next((session for session in record.open_sessions()
+                   if session.kind != starting.name and _writes_goal(facts.kinds, session.kind)), None)
+    if writer is not None:
         return JobStateError(f"job {record.id}: its {writer.kind} session {writer.name} writes the goal; "
                              f"{facts.operation} needs a settled goal")
     return None
@@ -381,10 +401,14 @@ def _reported_has_result(facts: Check) -> CureJobError | None:
     return None
 
 
+#: Every row that starts a session ends with these.
+_GENERIC_START: tuple[Guard, ...] = (_goal_settled, _no_other_live_session)
+_START_NEEDS = frozenset({Fact.KIND, Fact.KINDS, Fact.SESSIONS})
+
 RULES: Mapping[Op, Rule] = {
-    Op.START: Rule(Reads.LISTING, (_kind_start_guards, _goal_settled, _no_other_live_session)),
+    Op.START: Rule(Reads.LISTING, (_kind_start_guards, *_GENERIC_START), _START_NEEDS),
     Op.CONTINUE: Rule(Reads.LISTING, (_resume_needs_input, _kept_session_listed, goal_exists, not_blocked,
-                                      no_invalid_job)),
+                                      no_invalid_job, *_GENERIC_START), _START_NEEDS),
     Op.CLOSE: Rule(Reads.LISTING, (_no_live_session, _open)),
     Op.STOP: Rule(Reads.LISTING, (_has_session,)),
     Op.REMOVE_SESSIONS: Rule(Reads.LISTING, (_done_or_abandoned,)),
@@ -393,6 +417,6 @@ RULES: Mapping[Op, Rule] = {
                                   no_invalid_job)),
     Op.APPROVE: Rule(Reads.RECORD, (_approve_open, _approve_unlaunched, _approve_no_result, goal_exists,
                                     _no_open_items)),
-    Op.END: Rule(Reads.RECORD, (_kind_end_guards, _session_open, _summary_lines)),
+    Op.END: Rule(Reads.RECORD, (_kind_end_guards, _session_open, _summary_lines), frozenset({Fact.KIND})),
     Op.REPORTED: Rule(Reads.RECORD, (_reported_launched, _reported_has_result)),
 }

@@ -10,7 +10,7 @@ import pytest
 from cure_job.claude import SessionStatus
 from cure_job.errors import PluginError
 from cure_job.events import SessionStarted
-from cure_job.kinds import KINDS, WORK, End, StartContext, settings_arguments
+from cure_job.kinds import WORK, End, StartContext, settings_arguments
 from cure_job.providers.jobs import JobsProvider
 from cure_job.runner import SessionRunner
 from cure_job.store import JobStore
@@ -39,8 +39,10 @@ def test_work_settings_are_byte_identical_to_main():
     assert settings_arguments(WORK, context()) == ["--settings", MAIN_WORK_SETTINGS]
 
 
-def test_only_work_ends_with_the_result():
-    assert [kind.name for kind in KINDS.values() if kind.end is End.RESULT] == ["work"]
+@pytest.mark.parametrize("changes", [{"name": "probe"}, {"end": End.EVENT}])
+def test_only_work_ends_with_the_result(changes):
+    with pytest.raises(ValueError, match="only work ends with result.md"):
+        replace(WORK, **changes)
 
 
 @pytest.mark.parametrize("deny, expected_deny", [

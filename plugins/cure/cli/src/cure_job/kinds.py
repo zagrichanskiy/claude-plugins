@@ -85,6 +85,11 @@ class SessionKind:
     #: Raises the refusals that read files, makes idempotent edits and returns the prompt.
     prepare: Callable[[StartContext], str]
 
+    def __post_init__(self) -> None:
+        # The event fold and codec decide the end rule by the name work, the runner by End.RESULT.
+        if (self.end is End.RESULT) != (self.name == events.WORK):
+            raise ValueError(f"kind {self.name}: end {self.end.value}; only work ends with result.md")
+
 
 def settings_arguments(kind: SessionKind, ctx: StartContext) -> list[str]:
     """The ``--settings`` pair of a session of ``kind``: its permission rules and :data:`JOB_ID_VARIABLE`."""
@@ -132,7 +137,7 @@ WORK = SessionKind(
     start_guards=(approved_first, after_satisfied, ready_not_held, state_in_start_states, kept_session_not_live,
                   goal_exists, not_blocked, no_invalid_job),
     end_guards=(finish_open, finish_no_result, finish_launched),
-    writes=frozenset({Artifact.RESULT}),
+    writes=frozenset(),
     end=End.RESULT,
     recovery=Recovery.ASK,
     resumable=True,

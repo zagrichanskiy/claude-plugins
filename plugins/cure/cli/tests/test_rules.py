@@ -157,9 +157,21 @@ def test_a_kind_prints_its_own_start_states_in_state_order():
     assert str(raised) == f"job {B} is queued; start needs approved, lost"
 
 
-def test_work_is_the_only_kind_and_writes_only_the_result():
-    assert WORK.writes == frozenset({Artifact.RESULT})
+def test_work_is_the_only_kind_and_declares_no_artifact():
+    assert WORK.writes == frozenset()
     assert KINDS == {"work": WORK}
+
+
+@pytest.mark.parametrize("op, given, fact", [
+    (Op.START, replace(facts(LOST), kinds={}), "kinds"),
+    (Op.START, replace(facts(LOST), kind=None), "kind"),
+    (Op.START, replace(facts(LOST), sessions=None), "sessions"),
+    (Op.CONTINUE, replace(facts(NEEDS_INPUT, operation="resume", listing=LIVE_B), kinds={}), "kinds"),
+    (Op.END, record_facts(LOST, "finish"), "kind"),
+])
+def test_a_row_refuses_to_run_without_a_fact_it_needs(op, given, fact):
+    with pytest.raises(AssertionError, match=f"needs {fact} "):
+        check(op, given)
 
 
 # --- a settled goal -------------------------------------------------------------------------------------------------
@@ -180,6 +192,26 @@ def test_start_refuses_while_a_session_that_writes_the_goal_is_open():
     assert type(raised) is JobStateError
     assert str(raised) == (f"job {B}: its {GOAL_KIND.name} session {B}-{GOAL_KIND.name} writes the goal; "
                            "launch needs a settled goal")
+
+
+def test_a_kind_that_writes_the_goal_starts_on_a_queued_job_without_one():
+    check(Op.START, facts(make_record(B), kind=GOAL_KIND, operation="start"))
+
+
+def test_a_kind_that_writes_the_goal_restarts_past_its_own_open_session():
+    record = make_record(B, goal=True, events=(other(GOAL_KIND.name, B),))
+    check(Op.START, facts(record, kind=GOAL_KIND, operation="start"))
+
+
+def test_resume_refuses_while_a_session_that_writes_the_goal_is_open():
+    record = replace(NEEDS_INPUT, events=NEEDS_INPUT.events + (other(GOAL_KIND.name, B),))
+    raised = refusal(Op.CONTINUE, facts(record, operation="resume", listing=LIVE_B))
+    assert str(raised) == (f"job {B}: its {GOAL_KIND.name} session {B}-{GOAL_KIND.name} writes the goal; "
+                           "resume needs a settled goal")
+
+
+def test_resume_of_a_needs_input_job_whose_kept_session_is_listed_live_goes_ahead():
+    check(Op.CONTINUE, facts(NEEDS_INPUT, operation="resume", listing=LIVE_B))
 
 
 # --- one live session per job ---------------------------------------------------------------------------------------
