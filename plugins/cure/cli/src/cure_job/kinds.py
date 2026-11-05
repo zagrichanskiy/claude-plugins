@@ -32,6 +32,8 @@ JOB_ID_VARIABLE = "CURE_JOB_ID"
 #: recognised tier, runs in a plain session.
 ORCHESTRATOR = "cure:orchestrator"
 ORCHESTRATED_TIERS = ("Light", "Full")
+#: The agent a goal session runs as.
+GOAL_WRITER = "cure:goal-writer"
 
 
 class End(enum.Enum):
@@ -118,7 +120,7 @@ def _work_prepare(ctx: StartContext) -> str:
     missing = missing_paths(retarget(ctx.store.read_goal(job_id), ctx.plugin_root), ctx.plugin_root)
     if missing:
         raise PluginError(f"{ctx.operation} refused: the goal file names {', '.join(missing)}, which does not exist; "
-                          "write the goal again with cure:goal")
+                          f"write the goal again: cure-job start {job_id} goal --input - with this message as the input")
     ctx.store.rewrite_goal(job_id, lambda text: retarget(text, ctx.plugin_root))
     return f"/goal @{ctx.store.goal_path(job_id)}"
 
@@ -145,7 +147,41 @@ WORK = SessionKind(
     prepare=_work_prepare,
 )
 
-KINDS: Mapping[str, SessionKind] = {WORK.name: WORK}
+
+def _goal_prepare(ctx: StartContext) -> str:
+    job_id = ctx.record.id
+    prompt = f"job {job_id}: write the goal; handoff @{ctx.store.handoff_path(job_id)}"
+    answers = ctx.inputs.get(GOAL.input)
+    return prompt if answers is None else f"{prompt}; apply the answers in @{answers}"
+
+
+def _goal_session_name(job_id: str, n: int) -> str:
+    return f"{job_id}-goal-{n}"
+
+
+GOAL = SessionKind(
+    name="goal",
+    agent=lambda ctx: GOAL_WRITER,
+    # A file rule is absolute only with a leading "//"; "/" is relative to the settings source. job_dir starts with "/".
+    allow=("Bash({cure_job} list *)", "Bash({cure_job} config get *)", "Write(/{job_dir}/goal.md)",
+           "Edit(/{job_dir}/goal.md)", "Bash(wc -c {job_dir}/goal.md)", "Bash(git -C * symbolic-ref *)",
+           "Bash(gh repo view *)"),
+    deny=("Bash(claude *)", "Bash({cure_job} approve *)"),
+    start_states=frozenset({State.QUEUED, State.HELD, State.AWAITING_APPROVAL, State.APPROVED, State.LOST,
+                             State.NEEDS_INPUT}),
+    start_guards=(state_in_start_states,),
+    end_guards=(goal_exists,),
+    writes=frozenset({Artifact.GOAL}),
+    end=End.EVENT,
+    summary_lines=3,
+    recovery=Recovery.RESTART,
+    resumable=False,
+    input="answers",
+    session_name=_goal_session_name,
+    prepare=_goal_prepare,
+)
+
+KINDS: Mapping[str, SessionKind] = {WORK.name: WORK, GOAL.name: GOAL}
 
 
 def event_kinds(kinds: Mapping[str, SessionKind]) -> dict[str, SessionKind]:

@@ -129,7 +129,8 @@ class JobsProvider:
         """Start the next session of ``kind`` for ``job_id`` and return the session name."""
         listing = self.listing()
         view = self._find(listing, job_id)
-        check(Op.START, self._check(listing, view, "start", functools.cache(self.claude.sessions), kind))
+        check(Op.START, self._check(listing, view, "start", functools.cache(self.claude.sessions), kind,
+                                    has_input=input_text is not None))
         return self.runner.start(view.record, kind, "start", claude_args, input_text)
 
     def end(self, job_id: str, kind: SessionKind, summary: Sequence[str] = ()) -> None:
@@ -139,9 +140,10 @@ class JobsProvider:
         self.runner.end(record, kind, summary)
 
     def _check(self, listing: Listing, view: JobView, operation: str,
-               sessions: Callable[[], Mapping[str, Session]] | None = None, kind: SessionKind | None = None) -> Check:
+               sessions: Callable[[], Mapping[str, Session]] | None = None, kind: SessionKind | None = None,
+               has_input: bool = False) -> Check:
         return Check(view.record, operation, view=view, views=listing.views, invalid=listing.invalid,
-                     sessions=sessions, kind=kind, kinds=self.kinds)
+                     sessions=sessions, kind=kind, kinds=self.kinds, has_input=has_input)
 
     def approve(self, job_id: str, by: str = "user") -> None:
         """Record the approval of the current ``goal.md`` of an unlaunched job without open items.

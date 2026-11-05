@@ -8,7 +8,7 @@ import pytest
 
 from cure_job.actions import STALLED_CONFIRM_SECONDS, Action, actions
 from cure_job.claude import SessionStatus
-from cure_job.events import Closed, Reported, SessionsRemoved
+from cure_job.events import Closed, Reported, SessionEnded, SessionsRemoved, SessionStarted
 from cure_job.handoff import Device, Handoff
 from cure_job.result import Result, ResultStatus
 from cure_job.state import State, derive
@@ -99,6 +99,16 @@ def test_awaiting_approval_job_gets_ask_approval():
     assert names(make_record(A, goal=True)) == ["ask-approval"]
 
 
+def test_awaiting_approval_job_with_open_items_gets_ask_open():
+    assert names(replace(make_record(A, goal=True), open_items=2)) == ["ask-open"]
+
+
+@pytest.mark.parametrize("open_items, expected", [(2, ["ask-open"]), (0, ["ask-approval"])])
+def test_held_job_with_an_unapproved_goal_gets_ask_open_while_it_has_open_items(open_items, expected):
+    record = replace(successor(goal=True), open_items=open_items)
+    assert successor_names(record, [make_record(A)]) == expected
+
+
 def test_timeout_as_only_question_gets_ask_timeout_with_resource_and_holder():
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), (TIMEOUT,)))
@@ -162,3 +172,75 @@ def test_held_job_with_an_unapproved_goal_after_an_invalid_predecessor_gets_no_a
 
 def test_held_job_after_an_invalid_predecessor_gets_no_draft():
     assert successor_names(successor(), invalid=frozenset({A})) == []
+
+
+def goal_session(*, age=timedelta(minutes=5), ended=False, run=1, inputs=()):
+    started = SessionStarted("goal", 1, "g", NOW - age, run, inputs)
+    return (started, SessionEnded("goal", 1, ("a", "b", "c"), NOW)) if ended else (started,)
+
+
+@pytest.mark.parametrize("held", [False, True])
+@pytest.mark.parametrize("ended, expected", [(False, []), (True, ["draft"])])
+def test_draft_waits_while_a_goal_session_is_open(held, ended, expected):
+    if held:
+        record = successor(events=goal_session(ended=ended, run=0))
+        view = {v.record.id: v for v in derive([make_record(A, goal=True), record], listed({"g": SessionStatus.BUSY}),
+                                               NOW, frozenset())}[B]
+        assert view.state is State.HELD
+        assert [action.name for action in actions(view, {})] == expected
+    else:
+        assert names(make_record(A, events=goal_session(ended=ended, run=0)), {"g": SessionStatus.BUSY}) == expected
+
+
+ANSWERS = ("answers-1.md",)
+
+
+def answered(*, ended, open_items=0, inputs=ANSWERS, result=None):
+    record = finished(ResultStatus.NEEDS_INPUT, Reported(1, NOW), *goal_session(ended=ended, inputs=inputs))
+    record = replace(record, open_items=open_items)
+    return record if result is None else replace(record, result=result)
+
+
+def test_ask_input_waits_while_a_goal_session_is_open():
+    assert names(answered(ended=False), {"g": SessionStatus.BUSY}) == []
+
+
+@pytest.mark.parametrize("open_items, expected", [(2, ["ask-open"]), (0, ["resume"])])
+def test_an_ended_answers_session_gets_ask_open_or_resume(open_items, expected):
+    assert names(answered(ended=True, open_items=open_items)) == expected
+
+
+def test_a_goal_session_without_inputs_on_a_needs_input_job_is_not_the_answers_session():
+    assert names(answered(ended=True, inputs=())) == ["ask-input"]
+
+
+@pytest.mark.parametrize("inputs", [(), ANSWERS])
+@pytest.mark.parametrize("open_items", [0, 2])
+def test_only_a_goal_session_given_answers_leads_to_ask_open_or_resume(inputs, open_items):
+    found = names(answered(ended=True, inputs=inputs, open_items=open_items))
+    assert bool({"ask-open", "resume"} & set(found)) == bool(inputs)
+
+
+TIMEOUT_RESULT = Result(ResultStatus.NEEDS_INPUT, (), None, (), (TIMEOUT,))
+
+
+def test_a_timeout_job_with_an_open_answers_session_gets_no_ask_timeout():
+    assert names(answered(ended=False, result=TIMEOUT_RESULT), {"g": SessionStatus.BUSY}) == []
+
+
+def test_a_timeout_job_with_an_ended_answers_session_gets_resume():
+    assert names(answered(ended=True, result=TIMEOUT_RESULT)) == ["resume"]
+
+
+@pytest.mark.parametrize("ended, expected", [(False, []), (True, ["ask-relaunch"])])
+def test_ask_relaunch_waits_while_a_goal_session_is_open(ended, expected):
+    record = make_record(A, events=(launched(A), *goal_session(ended=ended)))
+    assert names(record, {A: SessionStatus.STOPPED, "g": SessionStatus.BUSY}) == expected
+
+
+@pytest.mark.parametrize("ended, expected", [(False, []), (True, ["close-successor"])])
+def test_close_successor_waits_while_a_goal_session_is_open(ended, expected):
+    records = [make_record(A, events=(Closed("x"),)), successor(events=goal_session(ended=ended, run=0))]
+    view = {v.record.id: v for v in derive(records, listed({"g": SessionStatus.BUSY}), NOW, frozenset())}[B]
+    assert view.state is State.HELD
+    assert [action.name for action in actions(view, {})] == expected

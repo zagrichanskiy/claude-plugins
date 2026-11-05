@@ -10,7 +10,7 @@ from .base import Command, job_id_arg, kind_arg
 class StopCommand(Command):
     name = "stop"
     usage = "cure-job stop ID [KIND]"
-    help = "stop the live session of a job"
+    help = "stop the latest session of a job, of one kind or of every kind"
     description = ("Stop the latest session of a job's KIND, or without KIND of every kind the job has, work first. "
                    "Wait until each is down and print its name, one line each. A session that is already down "
                    "prints \"<session> not live\" and also exits 0")

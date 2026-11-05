@@ -201,4 +201,4 @@ def test_old_location_config_json_fails_check_and_is_safe_mode_for_next(root, tm
     assert h.run("next", "--json") == 0
     entry = json.loads(h.lines[-1])[-1]
     assert entry["id"] is None and entry["actions"] == ["config-error"]
-    assert line in entry["args"]["errors"]
+    assert line in entry["args"][0]["errors"]

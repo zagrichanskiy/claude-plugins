@@ -239,7 +239,7 @@ def test_done_when_2_config_check_exits_one_and_next_reports_a_config_error_nami
         assert h.run("next", "--json") == 0
         element = json.loads(h.lines[-1])[-1]
         assert element["id"] is None and element["actions"] == ["config-error"]
-        assert any(error.startswith(f"config.json: {key}: ") for error in element["args"]["errors"])
+        assert any(error.startswith(f"config.json: {key}: ") for error in element["args"][0]["errors"])
 
 
 def test_config_check_without_a_file_exits_zero(h):
@@ -332,7 +332,7 @@ def test_done_when_4_check_and_next_report_both_dropped_prune_keys(h, capsys, ar
     configure(h, {"prune": {"done-days": 7, "abandoned-days": 7}})
     if argv[0] == "next":
         assert h.run(*argv) == 0
-        reported = "\n".join(json.loads(h.lines[-1])[-1]["args"]["errors"])
+        reported = "\n".join(json.loads(h.lines[-1])[-1]["args"][0]["errors"])
     else:
         assert h.run(*argv) == 1
         reported = capsys.readouterr().err
@@ -540,7 +540,7 @@ def test_stalled_confirm_seconds_reaches_the_confirm_stalled_args_of_next(h, tmp
     h.clock.advance(timedelta(minutes=5))
     assert run_silently(h, "next", "--json") == 0
     (row,) = json.loads(h.lines[0])
-    assert row["args"]["confirm-stalled"] == {"stalled-confirm-seconds": 120}
+    assert row["args"][row["actions"].index("confirm-stalled")] == {"stalled-confirm-seconds": 120}
 
 
 @pytest.mark.parametrize("seconds, state", [(30, "running"), (31, "stalled")])

@@ -103,6 +103,32 @@ def test_slug_that_slugifies_to_nothing_exits_two(h, tmp_path, capsys):
     assert caught.value.code == 2
 
 
+@pytest.mark.parametrize("slug", ["x-goal-1", "goal-12", "X Goal 3"])
+def test_slug_ending_in_a_goal_session_marker_exits_two(h, tmp_path, capsys, slug):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text(), encoding="utf-8")
+    with pytest.raises(SystemExit) as caught:
+        h.cli.run(["new", "--slug", slug, str(source)])
+    assert caught.value.code == 2
+    assert f"ends in -goal-<digits>, the marker of a goal session name: {slug!r}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("slug", ["goal", "x-goal", "X Goal"])
+def test_slug_ending_in_goal_exits_two(h, tmp_path, capsys, slug):
+    source = tmp_path / "handoff.md"
+    source.write_text(handoff_text(), encoding="utf-8")
+    with pytest.raises(SystemExit) as caught:
+        h.cli.run(["new", "--slug", slug, str(source)])
+    assert caught.value.code == 2
+    assert f"ends in -goal; its collision suffix -<n> is the marker of a goal session name: {slug!r}" \
+        in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("slug", ["goal-x", "x-goals-1", "x-goals"])
+def test_slug_with_goal_but_no_goal_session_marker_is_accepted(h, tmp_path, slug):
+    h.new(tmp_path, slug=slug)
+
+
 def test_domain_error_prints_error_line_on_stderr_and_returns_one(h, capsys):
     assert h.run("close", "261013-1800-video-core-nothing") == 1
     captured = capsys.readouterr()
@@ -129,10 +155,24 @@ def test_new_from_file_prints_the_id_alone(h, tmp_path):
 
 @pytest.mark.parametrize("dash", [True, False])
 def test_new_reads_stdin_when_file_is_dash_or_absent(h, monkeypatch, dash):
-    monkeypatch.setattr(sys, "stdin", io.StringIO(handoff_text()))
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(handoff_text().encode("utf-8"))))
     argv = ["new", "--slug", "x"] + (["-"] if dash else [])
     assert h.cli.run(argv) == 0
     assert h.lines == ["261013-1800-video-core-x", 'notify: SendMessage dispatcher "job 261013-1800-video-core-x"']
+
+
+def test_new_reads_stdin_as_utf8_in_any_locale(h, monkeypatch):
+    text = handoff_text() + "\u2014 \u00e9\n"
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(text.encode("utf-8")), encoding="latin-1"))
+    assert h.run("new", "--slug", "x") == 0
+    assert "\u2014 \u00e9\n" in (h.root / "jobs" / h.lines[0] / "handoff.md").read_text(encoding="utf-8")
+
+
+def test_new_refuses_stdin_that_is_not_utf8(h, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"\xff\xfe"), encoding="latin-1"))
+    assert h.run("new", "--slug", "x") == 1
+    assert "cannot read -: 'utf-8' codec can't decode" in capsys.readouterr().err
+    assert not (h.root / "jobs").exists()
 
 
 def test_new_with_invalid_handoff_returns_one(h, tmp_path, capsys):
@@ -286,7 +326,7 @@ def test_next_json_gives_ask_timeout_the_resource_and_holder(h, tmp_path):
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
     assert item["actions"] == ["ask-timeout"]
-    assert item["args"] == {"ask-timeout": {"resource": "device:bench", "holder": "other-job"}}
+    assert item["args"] == [{"resource": "device:bench", "holder": "other-job"}]
 
 
 def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_question(h, tmp_path):
@@ -295,7 +335,7 @@ def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
     assert item["actions"] == ["ask-timeout"]
-    assert item["args"] == {"ask-timeout": {"resource": "", "holder": None}}
+    assert item["args"] == [{"resource": "", "holder": None}]
 
 
 def test_next_json_lists_jobs_in_lock_order_with_row_fields_actions_and_args(h, tmp_path):

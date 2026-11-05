@@ -1,6 +1,6 @@
 # Job run
 
-The caller invokes the skill with a handoff file and a job directory. The skill never asks the user
+The caller (the goal-writer agent, in a goal session) invokes the skill with a handoff file and a job directory. The skill never asks the user
 in this mode. A worker session then runs the goal and cannot reach the user.
 
 ## Input
@@ -82,7 +82,7 @@ resources. The claimant claims it per step. The goal tells the claimant the foll
 
 A Solo goal has no ledger and no backlog.
 
-Apply the `.notes/` exclusion for the ledger and the backlog, as the `note` skill describes. The job
+Apply the `.notes/` exclusion (append `.notes/` to `.git/info/exclude`) for the ledger and the backlog, as the `note` skill describes. In job mode the goal-writing session does not run this step. Work item 1 of the goal carries it for the worker: write the step `append \`.notes/\` to \`.git/info/exclude\` in each repository when absent` into item 1, before the fact check's other steps. A direct run applies it as before. The job
 directory belongs to the CLI: the goal never deletes it.
 
 ## Questions
@@ -98,7 +98,7 @@ The skill never asks the user in this mode. It records each fork in `<job>/goal.
   the policy's `Do` under Settled as `(policy)`. Do not list it under `## Open`.
 - A fork with no user-visible effect: record its recommended option under Settled as
   `(recommended)`. Do not list it under `## Open`.
-- When the caller passes answers, each answered item moves under Settled with its answer. When no
+- When the caller passes answers (the goal session's answers input file), each answered item moves under Settled with its answer. When no
   item is left, remove the `## Open` heading.
 
 After `needs-input`, add the user's answers under Settled the same way. Then add one line under
@@ -188,4 +188,4 @@ with outcome `failed`", the report clause as (c) and the final-message clause as
 
 ## Launch line
 
-Report the absolute path of `<job>/goal.md` and its `wc -c` count.
+Report the absolute path of `<job>/goal.md` and its `wc -c` count in the end summary.

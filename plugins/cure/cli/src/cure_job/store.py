@@ -80,6 +80,9 @@ class JobStore:
             raise ValueError(f"invalid job id {job_id!r}")
         return self._jobs / job_id
 
+    def handoff_path(self, job_id: str) -> Path:
+        return self.job_dir(job_id) / _HANDOFF
+
     def goal_path(self, job_id: str) -> Path:
         return self.job_dir(job_id) / _GOAL
 
@@ -90,7 +93,8 @@ class JobStore:
         return self.job_dir(job_id) / f"{stem}-{n}.md"
 
     def create(self, base_id: str, render: Callable[[str], str]) -> str:
-        """Reserve the first free id from ``base_id`` on, write ``render(id)`` as its handoff."""
+        """Reserve the first free id from ``base_id`` on that ends in no session marker, write ``render(id)``
+        as its handoff."""
         self._make_jobs()
         job_id = self._reserve(base_id)
         reserved = self.job_dir(job_id)
@@ -317,7 +321,11 @@ class JobStore:
 
     def _reserve(self, base_id: str) -> str:
         candidates = [base_id] + [ids.with_suffix(base_id, n) for n in range(2, ids.MAX_SUFFIX + 1)]
+        marked = 0
         for candidate in candidates:
+            if ids.ends_in_run_marker(candidate) or ids.ends_in_goal_marker(candidate):
+                marked += 1
+                continue
             path = self.job_dir(candidate)
             try:
                 with _store_errors(path):
@@ -328,6 +336,9 @@ class JobStore:
                     continue
                 raise
             return candidate
+        if marked:
+            raise StoreError(f"no free job id: {self.job_dir(base_id)} and its suffixes up to -{ids.MAX_SUFFIX} "
+                             f"exist or end in a session name marker ({marked} of them); use another slug")
         raise StoreError(f"no free job id: {self.job_dir(base_id)} and its suffixes up to "
                          f"-{ids.MAX_SUFFIX} exist")
 

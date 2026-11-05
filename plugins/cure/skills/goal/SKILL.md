@@ -117,7 +117,7 @@ N. `ls <ledger path> <working files>` reports "No such file" for each.
 - Waiting: <job mode: the mode file's Waiting line. Direct mode: takes the `waiting:` exit of direct.md>.
 ```
 
-A goal runs in auto mode. Its Rules get a "Permission mode" line only when the user chose a mode in the leave-auto-mode question (job runs: the caller passes the mode; direct runs: `rules.md` "All tiers").
+A goal runs in auto mode. Its Rules get a "Permission mode" line only when the user chose a mode in the leave-auto-mode question (job runs: the answers input of the goal session carries the mode; direct runs: `rules.md` "All tiers").
 
 ## Writing the done-when list
 
