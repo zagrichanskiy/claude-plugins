@@ -11,7 +11,7 @@ from cure_job.claude import Session, SessionStatus
 from cure_job.errors import CureJobError, JobStateError, ResourceHeld, SessionGone, StoreError
 from cure_job.events import Claim, Closed, Origin, SessionStarted
 from cure_job.job_id import session_name
-from cure_job.kinds import KINDS, WORK, SessionKind
+from cure_job.kinds import KINDS, WORK, End
 from cure_job.result import ResultStatus
 from cure_job.rules import RULES, Artifact, Check, Op, Reads, check, goal_settled, state_in_start_states
 from cure_job.state import LAUNCH_GRACE, State, derive
@@ -24,10 +24,10 @@ BAD = "261013-0900-video-core-bad"
 INVALID = (InvalidJob(BAD, Path("/state/jobs") / BAD, "dispatch.jsonl line 1 does not read"),)
 OLD = timedelta(minutes=5)
 
-GOAL_KIND = SessionKind(name="goal-writer", start_states=frozenset({State.QUEUED}), start_guards=(),
-                        writes=frozenset({Artifact.GOAL}))
-PROBE_KIND = SessionKind(name="probe", start_states=frozenset({State.APPROVED}), start_guards=(),
-                         writes=frozenset())
+GOAL_KIND = replace(WORK, name="goal-writer", start_states=frozenset({State.QUEUED}), start_guards=(),
+                    writes=frozenset({Artifact.GOAL}), end=End.EVENT)
+PROBE_KIND = replace(WORK, name="probe", start_states=frozenset({State.APPROVED}), start_guards=(),
+                     writes=frozenset(), end=End.EVENT)
 ALL_KINDS = {**KINDS, GOAL_KIND.name: GOAL_KIND, PROBE_KIND.name: PROBE_KIND}
 
 
