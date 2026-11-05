@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from .claude import Session, SessionStatus
-from .events import WORK, Event, SessionStarted, SessionStopped
+from .events import WORK, Event, SessionEnded, SessionStarted, SessionStopped
 
 
 class Liveness(enum.Enum):
@@ -44,15 +44,20 @@ def fold(events: Sequence[Event], has_result: bool) -> tuple[JobSession, ...]:
     """Every session the events start, in start order.
 
     A work session ends when a later work session starts, or when it is the latest and ``result.md``
-    exists (``has_result``). A session of any other kind has no end yet."""
+    exists (``has_result``). A session of any other kind ends with its ``session-ended`` event."""
     starts = [event for event in events if isinstance(event, SessionStarted)]
     stops = {(event.kind, event.n) for event in events if isinstance(event, SessionStopped)}
+    ends = {(event.kind, event.n): event for event in events if isinstance(event, SessionEnded)}
     last_work = max((index for index, start in enumerate(starts) if start.kind == WORK), default=None)
-    return tuple(
-        JobSession(kind=start.kind, n=start.n, name=start.session, run=start.run, started_at=start.at,
-                   inputs=start.inputs, ended=start.kind == WORK and (index != last_work or has_result),
-                   summary=(), stop_recorded=(start.kind, start.n) in stops)
-        for index, start in enumerate(starts))
+    sessions = []
+    for index, start in enumerate(starts):
+        end = ends.get((start.kind, start.n))
+        ended = (index != last_work or has_result) if start.kind == WORK else end is not None
+        sessions.append(JobSession(kind=start.kind, n=start.n, name=start.session, run=start.run,
+                                   started_at=start.at, inputs=start.inputs, ended=ended,
+                                   summary=end.summary if end is not None else (),
+                                   stop_recorded=(start.kind, start.n) in stops))
+    return tuple(sessions)
 
 
 def listed_live(listed: Session | None) -> bool:

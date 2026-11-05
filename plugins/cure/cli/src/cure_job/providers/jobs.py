@@ -1,8 +1,8 @@
-"""The fourteen job operations.
+"""The sixteen job operations.
 
-Every operation except ``new``, ``approve``, ``finish``, ``reported`` and ``release``
+Every operation except ``new``, ``approve``, ``finish``, ``end``, ``reported`` and ``release``
 reads one snapshot of the state root, derives the job states from it and makes its
-writes. ``approve``, ``finish``, ``reported`` and ``release`` read only their own job.
+writes. ``approve``, ``finish``, ``end``, ``reported`` and ``release`` read only their own job.
 ``claim`` runs its check and its write under :meth:`JobStore.locked` and reads
 no session list. No other operation holds the lock, so their check and write
 are not atomic across processes.
@@ -33,6 +33,7 @@ from ..handoff import parse_submitted, stamp
 from ..job_id import make_id
 from ..result import Report, render_result
 from ..job import JobRecord
+from ..events import WORK
 from ..kinds import KINDS, SessionKind
 from ..kinds import WORK as WORK_KIND
 from ..rules import Check, Op, check
@@ -55,15 +56,16 @@ CLAIM_POLL_SECONDS = 10.0
 class JobsProvider:
     def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path = PLUGIN_ROOT,
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic,
-                 config: Config = Config()):
+                 config: Config = Config(), kinds: Mapping[str, SessionKind] = KINDS):
         self.store = store
+        self.kinds = kinds
         self.config = config
         self.claude = claude
         self.clock = clock
         # The wait of ``claim --wait``; a test passes a fake pair so that it never waits.
         self.sleep = sleep
         self.monotonic = monotonic
-        self.runner = SessionRunner(store, claude, clock, plugin_root, sleep, monotonic)
+        self.runner = SessionRunner(store, claude, clock, plugin_root, sleep, monotonic, kinds)
 
     def new(self, text: str, slug: str, origin: str | None = None, ticket_summary: str | None = None) -> str:
         """Queue the handoff ``text`` as a new job reporting back to ``origin`` and return the job id.
@@ -119,12 +121,27 @@ class JobsProvider:
         record = view.record
         check(Op.CONTINUE, self._check(listing, view, "resume", lambda: sessions, WORK_KIND))
         name = record.session
-        return self.runner.start(record, WORK_KIND, "resume", claude_args, Continuation(name, sessions[name]))
+        return self.runner.start(record, WORK_KIND, "resume", claude_args,
+                                 continuation=Continuation(name, sessions[name]))
+
+    def start(self, job_id: str, kind: SessionKind, claude_args: Sequence[str] = (),
+              input_text: str | None = None) -> str:
+        """Start the next session of ``kind`` for ``job_id`` and return the session name."""
+        listing = self.listing()
+        view = self._find(listing, job_id)
+        check(Op.START, self._check(listing, view, "start", functools.cache(self.claude.sessions), kind))
+        return self.runner.start(view.record, kind, "start", claude_args, input_text)
+
+    def end(self, job_id: str, kind: SessionKind, summary: Sequence[str] = ()) -> None:
+        """Record the end of the open session of ``kind`` with ``summary``. Reads only this job."""
+        record = self.store.load(job_id)
+        check(Op.END, Check(record, "end", kind=kind, summary=summary))
+        self.runner.end(record, kind, summary)
 
     def _check(self, listing: Listing, view: JobView, operation: str,
                sessions: Callable[[], Mapping[str, Session]] | None = None, kind: SessionKind | None = None) -> Check:
         return Check(view.record, operation, view=view, views=listing.views, invalid=listing.invalid,
-                     sessions=sessions, kind=kind, kinds=KINDS)
+                     sessions=sessions, kind=kind, kinds=self.kinds)
 
     def approve(self, job_id: str, by: str = "user") -> None:
         """Record the approval of the current ``goal.md`` of an unlaunched job without open items.
@@ -208,10 +225,11 @@ class JobsProvider:
         check(Op.ORIGIN, self._check(listing, self._find(listing, job_id), "origin"))
         self.store.append_event(job_id, Origin(address, self.clock()))
 
-    def stop(self, job_id: str) -> Stopped:
-        """Stop the live session of the latest run of ``job_id``.
+    def stop(self, job_id: str, kind: SessionKind | None = None) -> list[Stopped]:
+        """Stop the latest session of ``kind`` of ``job_id``, or without ``kind`` that of every kind
+        the job has, work first.
 
-        Returns when the binary lists no live entry under the session name. A
+        Returns when the binary lists no live entry under any of the session names. A
         session that is already not live is not an error: relaunch and abandon
         of a lost job start with ``stop``.
         """
@@ -220,8 +238,13 @@ class JobsProvider:
         sessions = self.claude.sessions()
         listing = self._listing(snapshot, sessions)
         view = self._find(listing, job_id)
-        check(Op.STOP, self._check(listing, view, "stop", lambda: sessions))
-        return self.runner.stop(view.record, [WORK_KIND], sessions)[0]
+        check(Op.STOP, self._check(listing, view, "stop", lambda: sessions, kind))
+        if kind is not None:
+            kinds = [kind.name]
+        else:
+            kinds = sorted(dict.fromkeys(session.kind for session in view.record.sessions),
+                           key=lambda name: name != WORK)
+        return self.runner.stop(view.record, kinds, sessions)
 
     def remove_sessions(self, job_id: str) -> list[str]:
         """Stop and delete the session of every run of a done or abandoned job and return the deleted names.
