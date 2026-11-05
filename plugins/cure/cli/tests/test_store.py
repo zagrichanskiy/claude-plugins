@@ -8,7 +8,7 @@ import pytest
 
 from cure_job.errors import HandoffError, StoreError, UnknownJob
 from cure_job.events import Claim, Closed, SessionStarted
-from cure_job.job_id import MAX_SUFFIX, with_suffix
+from cure_job.job_id import MAX_SUFFIX, ends_in_goal_marker, ends_in_run_marker, make_id, with_suffix
 from cure_job.result import ResultStatus
 from cure_job.store import JobStore
 from tests.builders import NOW, handoff_text
@@ -57,6 +57,24 @@ def test_create_on_collision_uses_the_next_suffix(store):
     second = store.create(BASE, render)
     third = store.create(BASE, render)
     assert (first, second, third) == (BASE, BASE + "-2", BASE + "-3")
+
+
+def test_create_skips_every_suffix_that_ends_in_a_goal_marker(store):
+    base = BASE + "-goal"
+    assert store.create(base, render) == base
+    with pytest.raises(StoreError):
+        store.create(base, render)
+    assert [p.name for p in store.job_dir(base).parent.iterdir()] == [base]
+
+
+@pytest.mark.parametrize("cut", ["-goal-2", "-r2"])
+def test_create_skips_a_base_whose_truncation_ends_in_a_session_marker(store, cut):
+    prefix = f"{NOW:%y%m%d-%H%M}-claude-plugins-"
+    base = make_id(NOW, "claude-plugins", "x" * (60 - len(prefix) - len(cut)) + cut + "y")
+    assert base.endswith(cut)
+    created = store.create(base, render)
+    assert created != base
+    assert not ends_in_goal_marker(created) and not ends_in_run_marker(created)
 
 
 def test_create_renders_with_the_final_id(store):

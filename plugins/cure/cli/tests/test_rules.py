@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from cure_job import rules
 from cure_job.claude import Session, SessionStatus
 from cure_job.errors import CureJobError, JobStateError, ResourceHeld, SessionGone, StoreError
 from cure_job.events import Claim, Closed, Origin, SessionStarted
@@ -178,14 +179,22 @@ def test_a_row_refuses_to_run_without_a_fact_it_needs(op, given, fact):
 
 # --- a settled goal -------------------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("record, settled", [
+SETTLED = pytest.mark.parametrize("record, settled", [
     (make_record(B, approved=True), True),
     (make_record(B), False),
     (make_record(B, goal=True, events=(other(GOAL_KIND.name, B),)), False),
     (make_record(B, goal=True, events=(other(PROBE_KIND.name, B),)), True),
 ])
+
+
+@SETTLED
 def test_a_goal_is_settled_when_no_open_session_writes_it(record, settled):
     assert goal_settled(record, ALL_KINDS) is settled
+
+
+@SETTLED
+def test_goal_settled_agrees_with_the_settled_goal_guard_of_a_kind_that_writes_no_goal(record, settled):
+    assert (rules._goal_settled(facts(record, kind=PROBE_KIND, operation="start")) is None) is settled
 
 
 def test_start_refuses_while_a_session_that_writes_the_goal_is_open():
@@ -214,6 +223,27 @@ def test_resume_refuses_while_a_session_that_writes_the_goal_is_open():
 
 def test_resume_of_a_needs_input_job_whose_kept_session_is_listed_live_goes_ahead():
     check(Op.CONTINUE, facts(NEEDS_INPUT, operation="resume", listing=LIVE_B))
+
+
+# --- an input ------------------------------------------------------------------------------------------------------
+
+def test_start_refuses_an_input_for_a_kind_without_one():
+    given = replace(facts(make_record(B, approved=True), kind=PROBE_KIND, operation="start"), has_input=True)
+    raised = refusal(Op.START, given)
+    assert type(raised) is CureJobError
+    assert str(raised) == "a probe session takes no input"
+
+
+def test_start_takes_an_input_for_a_kind_with_one():
+    kind = replace(PROBE_KIND, input="input")
+    check(Op.START, replace(facts(make_record(B, approved=True), kind=kind, operation="start"), has_input=True))
+
+
+def test_another_start_refusal_precedes_the_input_refusal():
+    record = make_record(B, approved=True, events=(other(PROBE_KIND.name, B),))
+    given = replace(facts(record, listing={f"{B}-probe": Session(SessionStatus.BUSY)}, kind=PROBE_KIND,
+                          operation="start"), has_input=True)
+    assert str(refusal(Op.START, given)).startswith(f"job {B} has live probe session")
 
 
 # --- one live session per job ---------------------------------------------------------------------------------------

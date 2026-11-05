@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from ..errors import CureJobError
 from ..kinds import event_kinds
 from ..providers.jobs import JobsProvider
 from ..worker import RunArguments
-from .base import Command, job_id_arg, kind_arg
+from .base import Command, job_id_arg, kind_arg, read_stdin
 from .launch import claude_args
 
 _STDIN = "-"
@@ -44,9 +43,9 @@ class StartCommand(Command):
 def _read_input(source: str | None) -> str | None:
     if source is None:
         return None
-    if source == _STDIN:
-        return sys.stdin.read()
     try:
+        if source == _STDIN:
+            return read_stdin()
         with open(source, encoding="utf-8") as text:
             return text.read()
     except (OSError, UnicodeDecodeError) as e:

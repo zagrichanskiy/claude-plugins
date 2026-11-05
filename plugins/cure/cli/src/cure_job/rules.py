@@ -75,6 +75,8 @@ class Check:
     names: Sequence[str] = ()
     #: The summary lines an ``end`` reports.
     summary: Sequence[str] = ()
+    #: A ``start`` was given an input.
+    has_input: bool = False
 
 
 Guard = Callable[[Check], CureJobError | None]
@@ -109,7 +111,7 @@ def check(op: Op, facts: Check) -> None:
 
 def goal_settled(record: JobRecord, kinds: Mapping[str, SessionKind]) -> bool:
     """The job has a goal, and no open session of a kind that writes the goal."""
-    return record.has_goal and not goal_writing(record, kinds)
+    return _goal_settled(Check(record, "next", kinds=kinds)) is None
 
 
 def goal_writing(record: JobRecord, kinds: Mapping[str, SessionKind]) -> bool:
@@ -231,13 +233,15 @@ def _kind_start_guards(facts: Check) -> CureJobError | None:
 
 
 def _goal_settled(facts: Check) -> CureJobError | None:
-    """A kind that writes the goal starts without one, and its own open session does not block it."""
+    """A kind that writes the goal starts without one, and its own open session does not block it.
+    Without a kind, every open session that writes the goal blocks."""
     record = facts.record
     starting = facts.kind
-    if not record.has_goal and Artifact.GOAL not in starting.writes:
+    if not record.has_goal and (starting is None or Artifact.GOAL not in starting.writes):
         return goal_exists(facts)
     writer = next((session for session in record.open_sessions()
-                   if session.kind != starting.name and _writes_goal(facts.kinds, session.kind)), None)
+                   if (starting is None or session.kind != starting.name)
+                   and _writes_goal(facts.kinds, session.kind)), None)
     if writer is not None:
         return JobStateError(f"job {record.id}: its {writer.kind} session {writer.name} writes the goal; "
                              f"{facts.operation} needs a settled goal")
@@ -263,6 +267,12 @@ def _session_open(facts: Check) -> CureJobError | None:
     latest = record.latest(facts.kind.name)
     if latest is None or latest.ended:
         return JobStateError(f"job {record.id} has no open {facts.kind.name} session; nothing to end")
+    return None
+
+
+def _takes_input(facts: Check) -> CureJobError | None:
+    if facts.has_input and facts.kind.input is None:
+        return CureJobError(f"a {facts.kind.name} session takes no input")
     return None
 
 
@@ -416,7 +426,7 @@ _GENERIC_START: tuple[Guard, ...] = (_goal_settled, _no_other_live_session)
 _START_NEEDS = frozenset({Fact.KIND, Fact.KINDS, Fact.SESSIONS})
 
 RULES: Mapping[Op, Rule] = {
-    Op.START: Rule(Reads.LISTING, (_kind_start_guards, *_GENERIC_START), _START_NEEDS),
+    Op.START: Rule(Reads.LISTING, (_kind_start_guards, *_GENERIC_START, _takes_input), _START_NEEDS),
     Op.CONTINUE: Rule(Reads.LISTING, (_resume_needs_input, _kept_session_listed, goal_exists, not_blocked,
                                       no_invalid_job, *_GENERIC_START), _START_NEEDS),
     Op.CLOSE: Rule(Reads.LISTING, (_no_live_session, _open)),

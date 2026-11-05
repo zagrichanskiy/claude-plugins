@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from .. import job_id
+from ..errors import CureJobError
 from ..frontmatter import is_writable
 from ..providers.jobs import JobsProvider
-from .base import Command, notify_line
+from .base import Command, notify_line, read_stdin
 
 _STDIN = "-"
 
@@ -37,7 +37,10 @@ class NewCommand(Command):
 
     def _read(self, path: str) -> str:
         if path == _STDIN:
-            return sys.stdin.read()
+            try:
+                return read_stdin()
+            except (OSError, UnicodeDecodeError) as e:
+                raise CureJobError(f"cannot read {path}: {e}") from e
         try:
             with open(path, encoding="utf-8") as source:
                 return source.read()
@@ -50,6 +53,8 @@ def _slug_arg(text: str) -> str:
         raise argparse.ArgumentTypeError(f"no character in [a-z0-9]: {text!r}")
     if job_id.ends_in_run_marker(text):
         raise argparse.ArgumentTypeError(f"ends in -r<digits>, the run marker of a session name: {text!r}")
+    if job_id.ends_in_goal_marker(text):
+        raise argparse.ArgumentTypeError(f"ends in -goal-<digits>, the marker of a goal session name: {text!r}")
     return text
 
 

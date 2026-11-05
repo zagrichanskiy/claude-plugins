@@ -73,7 +73,7 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
             found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
         if settled and (view.after is None or view.after.state is not PredecessorGone.INVALID):
-            found.append(Action("ask-approval"))
+            found.append(Action("ask-open" if record.open_items else "ask-approval"))
     elif state is State.APPROVED:
         if settled:
             found.append(Action("launch"))

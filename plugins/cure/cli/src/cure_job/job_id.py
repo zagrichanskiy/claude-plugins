@@ -14,6 +14,7 @@ MAX_SUFFIX = 99
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
 _VALID = re.compile(r"[0-9]{6}-[0-9]{4}(-[a-z0-9]+)+")
 _RUN_MARKER = re.compile(r"(^|-)r[0-9]+$")
+_GOAL_MARKER = re.compile(r"(^|-)goal-[0-9]+$")
 
 
 def slugify(text: str) -> str:
@@ -21,10 +22,16 @@ def slugify(text: str) -> str:
     return _NOT_SLUG.sub("-", text.lower()).strip("-")
 
 
-def ends_in_run_marker(slug: str) -> bool:
-    """True when ``slugify(slug)`` ends as a session name of a later run does.
-    The id would then equal the session name of another job: ``<id>-r<n>``."""
-    return _RUN_MARKER.search(slugify(slug)) is not None
+def ends_in_run_marker(text: str) -> bool:
+    """True when ``slugify(text)`` ends as a session name of a later run does: ``<id>-r<n>``.
+    An id that ends so can equal the session name of another job."""
+    return _RUN_MARKER.search(slugify(text)) is not None
+
+
+def ends_in_goal_marker(text: str) -> bool:
+    """True when ``slugify(text)`` ends as the name of a goal session does: ``<id>-goal-<n>``.
+    An id that ends so can equal a goal session name of another job."""
+    return _GOAL_MARKER.search(slugify(text)) is not None
 
 
 def make_id(created: datetime, repo: str, slug: str) -> str:

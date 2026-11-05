@@ -99,6 +99,16 @@ def test_awaiting_approval_job_gets_ask_approval():
     assert names(make_record(A, goal=True)) == ["ask-approval"]
 
 
+def test_awaiting_approval_job_with_open_items_gets_ask_open():
+    assert names(replace(make_record(A, goal=True), open_items=2)) == ["ask-open"]
+
+
+@pytest.mark.parametrize("open_items, expected", [(2, ["ask-open"]), (0, ["ask-approval"])])
+def test_held_job_with_an_unapproved_goal_gets_ask_open_while_it_has_open_items(open_items, expected):
+    record = replace(successor(goal=True), open_items=open_items)
+    assert successor_names(record, [make_record(A)]) == expected
+
+
 def test_timeout_as_only_question_gets_ask_timeout_with_resource_and_holder():
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), (TIMEOUT,)))

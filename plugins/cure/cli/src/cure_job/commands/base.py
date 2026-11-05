@@ -7,6 +7,8 @@ prints through the output sink of the owning :class:`~cure_job.cli.Cli`.
 from __future__ import annotations
 
 import argparse
+import io
+import sys
 from typing import TYPE_CHECKING, Callable, Mapping
 
 from .. import job_id, resource
@@ -51,6 +53,16 @@ DISPATCHER = "dispatcher"
 def notify_line(job_id: str) -> str:
     """The line that names the message to send once the job changed."""
     return f'notify: SendMessage {DISPATCHER} "job {job_id}"'
+
+
+def read_stdin() -> str:
+    """Standard input decoded as UTF-8 with universal newlines, as a file opened in text mode reads."""
+    text = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
+    try:
+        return text.read()
+    finally:
+        # Without detach, the collected wrapper would close sys.stdin.buffer.
+        text.detach()
 
 
 def job_id_arg(text: str) -> str:
