@@ -186,7 +186,7 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
         "problem": None, "origin": None, "open": 0,
         "waiting-for": None, "reported": False, "sessions-removed": False,
         "prs": [], "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
-        "workspace": "/work/video-core"}
+        "workspace": "/work/video-core", "phase": "approved", "sessions": {}}
     assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
 
 
