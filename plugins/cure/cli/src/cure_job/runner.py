@@ -10,8 +10,8 @@ from typing import Callable, Iterable, Mapping, NamedTuple, Sequence
 
 from .claude import Claude, Session
 from .clock import Clock
-from .errors import ClaudeError, ClaudeOutcomeUnknown, StoreError
-from .events import SessionsRemoved, SessionStarted, SessionStopped
+from .errors import ClaudeError, ClaudeOutcomeUnknown, CureJobError, StoreError
+from .events import SessionEnded, SessionsRemoved, SessionStarted, SessionStopped
 from .job import JobRecord
 from .kinds import KINDS, End, SessionKind, StartContext, settings_arguments
 from .sessions import listed_live
@@ -49,12 +49,17 @@ class SessionRunner:
         self.kinds = kinds
 
     def start(self, record: JobRecord, kind: SessionKind, operation: str, claude_args: Sequence[str] = (),
-              continuation: Continuation | None = None) -> str:
-        """Start the next session of ``kind`` for ``record``, or continue ``continuation``; return its name."""
+              input_text: str | None = None, continuation: Continuation | None = None) -> str:
+        """Start the next session of ``kind`` for ``record``, or continue ``continuation``; return its name.
+
+        ``input_text`` is copied to the kind's input file of this session before the start."""
         job_id = record.id
         n = sum(1 for session in record.sessions if session.kind == kind.name) + 1
         name = continuation.name if continuation is not None else kind.session_name(job_id, n)
-        ctx = StartContext(record, self.store, self.plugin_root, operation, n, name, {})
+        if input_text is not None and kind.input is None:
+            raise CureJobError(f"a {kind.name} session takes no input")
+        inputs = {kind.input: self.store.input_path(job_id, kind.input, n)} if input_text is not None else {}
+        ctx = StartContext(record, self.store, self.plugin_root, operation, n, name, inputs)
         prompt = kind.prepare(ctx)
         agent = kind.agent(ctx)
         arguments = [*(["--agent", agent] if agent is not None else []), *settings_arguments(kind, ctx),
@@ -66,6 +71,8 @@ class SessionRunner:
         result_kind = kind.end is End.RESULT
         # result-<run>.md takes the number of the run that wrote it.
         archived = result_kind and self.store.archive_result(job_id, record.run)
+        for stem in inputs:
+            self.store.write_input(job_id, stem, n, input_text)
         cwd = record.handoff.launch_dir
         unknown = None
         try:
@@ -85,7 +92,8 @@ class SessionRunner:
             raise
         try:
             self.store.append_event(job_id, SessionStarted(kind.name, n, name, self.clock(),
-                                                           n if result_kind else record.run))
+                                                           n if result_kind else record.run,
+                                                           tuple(path.name for path in inputs.values())))
         except StoreError as e:
             what = f"session {name}" if result_kind else f"{kind.name} session {n}, {name},"
             raise StoreError(f"job {job_id}: {what} may be running and is not recorded; "
@@ -97,29 +105,36 @@ class SessionRunner:
             raise ClaudeOutcomeUnknown(f"{unknown}; recorded as {kind.name} session {n}, {name}") from unknown
         return name
 
+    def end(self, record: JobRecord, kind: SessionKind, summary: Sequence[str]) -> None:
+        """Record the end of the latest session of ``kind``, an ``End.EVENT`` kind."""
+        latest = record.latest(kind.name)
+        self.store.append_event(record.id, SessionEnded(kind.name, latest.n, tuple(summary), self.clock()))
+
     def _stop_ended(self, record: JobRecord) -> None:
-        """Stop each ended session of a kind that is not resumable and is still live."""
+        """Stop each ended session of a kind that is not resumable and is still live.
+
+        A kind this version does not know is left running: its own version decides."""
         names = [session.name for session in record.sessions
-                 if session.ended and not self.kinds[session.kind].resumable]
+                 if session.ended and session.kind in self.kinds and not self.kinds[session.kind].resumable]
         if not names:
             return
         listed = self.claude.sessions()
         for name in dict.fromkeys(names):
             self._stop_session(name, listed.get(name))
 
-    def stop(self, record: JobRecord, kinds: Iterable[SessionKind], listed: Mapping[str, Session]) -> list[Stopped]:
-        """Stop the latest session of each of ``kinds`` that ``record`` has, live or not.
+    def stop(self, record: JobRecord, kinds: Iterable[str], listed: Mapping[str, Session]) -> list[Stopped]:
+        """Stop the latest session of each kind named in ``kinds`` that ``record`` has, live or not.
 
         Records a stop for each that has none, even when the session was already down: a session
         listed stopped inside the launch grace is then lost, not launched."""
         stopped = []
         for kind in kinds:
-            latest = record.latest(kind.name)
+            latest = record.latest(kind)
             if latest is None:
                 continue
             was_live = self._stop_session(latest.name, listed.get(latest.name))
             if not latest.stop_recorded:
-                self.store.append_event(record.id, SessionStopped(kind.name, latest.n, self.clock()))
+                self.store.append_event(record.id, SessionStopped(kind, latest.n, self.clock()))
             stopped.append(Stopped(latest.name, was_live=was_live))
         return stopped
 

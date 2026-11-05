@@ -1,9 +1,9 @@
 """The kinds of session a job runs, as data.
 
-A kind declares the job states it may start in, its own start refusals, the job files it writes,
-its permission rules and how it prepares a start. The START rule of :mod:`cure_job.rules` runs the
-refusals of the kind, then the generic ones. :class:`~cure_job.runner.SessionRunner` starts a session
-of any kind by one protocol.
+A kind declares the job states it may start in, its own start and end refusals, the job files it
+writes, its permission rules and how it prepares a start. The START and END rules of
+:mod:`cure_job.rules` run the refusals of the kind, then the generic ones.
+:class:`~cure_job.runner.SessionRunner` starts a session of any kind by one protocol.
 """
 from __future__ import annotations
 
@@ -18,8 +18,9 @@ from .errors import PluginError
 from .goal import RULES, missing_paths, retarget, tier
 from .job import JobRecord
 from .job_id import session_name
-from .rules import (Artifact, Guard, after_satisfied, approved_first, goal_exists, kept_session_not_live,
-                    no_invalid_job, not_blocked, ready_not_held, state_in_start_states)
+from .rules import (Artifact, Guard, after_satisfied, approved_first, finish_launched, finish_no_result, finish_open,
+                    goal_exists, kept_session_not_live, no_invalid_job, not_blocked, ready_not_held,
+                    state_in_start_states)
 from .state import State
 from .store import JobStore
 
@@ -50,7 +51,7 @@ class StartContext:
     record: JobRecord
     store: JobStore
     plugin_root: Path
-    #: The operation word in the refusal texts: ``launch``, ``resume``.
+    #: The operation word in the refusal texts: ``launch``, ``resume``, ``start``.
     operation: str
     n: int
     session: str
@@ -69,6 +70,8 @@ class SessionKind:
     start_states: frozenset[State]
     #: Run in order before the generic start guards; the first refusal wins.
     start_guards: tuple[Guard, ...]
+    #: Run in order before the generic end guards; the first refusal wins.
+    end_guards: tuple[Guard, ...]
     writes: frozenset[Artifact]
     end: End
     #: The number of summary lines the end of a session reports.
@@ -90,6 +93,9 @@ def settings_arguments(kind: SessionKind, ctx: StartContext) -> list[str]:
     fields = {"cure_job": cure_job, "job_id": job_id, "job_dir": ctx.record.dir}
     allow = [rule.format(**fields) for rule in kind.allow]
     if kind.end is End.EVENT:
+        # A rule ending in " *" needs an argument after the kind, so an end without a summary needs its own rule.
+        if kind.summary_lines == 0:
+            allow.append(f"Bash({cure_job} end {job_id} {kind.name})")
         allow.append(f"Bash({cure_job} end {job_id} {kind.name} *)")
     permissions: dict[str, list[str]] = {"allow": allow}
     if kind.deny:
@@ -125,6 +131,7 @@ WORK = SessionKind(
     start_states=frozenset({State.APPROVED, State.LOST, State.NEEDS_INPUT}),
     start_guards=(approved_first, after_satisfied, ready_not_held, state_in_start_states, kept_session_not_live,
                   goal_exists, not_blocked, no_invalid_job),
+    end_guards=(finish_open, finish_no_result, finish_launched),
     writes=frozenset({Artifact.RESULT}),
     end=End.RESULT,
     recovery=Recovery.ASK,
@@ -134,3 +141,8 @@ WORK = SessionKind(
 )
 
 KINDS: Mapping[str, SessionKind] = {WORK.name: WORK}
+
+
+def event_kinds(kinds: Mapping[str, SessionKind]) -> dict[str, SessionKind]:
+    """The kinds ``start`` and ``end`` take. Work starts with ``launch`` and ends with ``finish``."""
+    return {name: kind for name, kind in kinds.items() if kind.end is End.EVENT}

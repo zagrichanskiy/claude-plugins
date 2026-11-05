@@ -7,14 +7,16 @@ prints through the output sink of the owning :class:`~cure_job.cli.Cli`.
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Mapping
 
 from .. import job_id, resource
+from ..events import WORK
 from ..help import HelpFormatter, style
 from ..providers.jobs import JobsProvider
 
 if TYPE_CHECKING:
     from ..cli import Cli
+    from ..kinds import SessionKind
 
 
 class Command:
@@ -55,6 +57,17 @@ def job_id_arg(text: str) -> str:
     if not job_id.is_valid(text):
         raise argparse.ArgumentTypeError(f"invalid job id: {text!r}")
     return text
+
+
+def kind_arg(kinds: Mapping[str, "SessionKind"], work: str | None = None) -> Callable[[str], "SessionKind"]:
+    """The parser of a session kind among ``kinds``. ``work`` is the refusal of the work kind when it is not one."""
+    def parse(text: str) -> "SessionKind":
+        if text in kinds:
+            return kinds[text]
+        if text == WORK and work is not None:
+            raise argparse.ArgumentTypeError(work)
+        raise argparse.ArgumentTypeError(f"unknown session kind {text!r}; expected {', '.join(kinds) or 'none'}")
+    return parse
 
 
 #: The resource names ``claim`` and ``release`` accept, for help and errors.

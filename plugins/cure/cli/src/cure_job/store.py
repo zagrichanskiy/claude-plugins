@@ -86,6 +86,9 @@ class JobStore:
     def result_path(self, job_id: str) -> Path:
         return self.job_dir(job_id) / _RESULT
 
+    def input_path(self, job_id: str, stem: str, n: int) -> Path:
+        return self.job_dir(job_id) / f"{stem}-{n}.md"
+
     def create(self, base_id: str, render: Callable[[str], str]) -> str:
         """Reserve the first free id from ``base_id`` on, write ``render(id)`` as its handoff."""
         self._make_jobs()
@@ -237,6 +240,21 @@ class JobStore:
                     os.unlink(temp)
                 raise
         return True
+
+    def write_input(self, job_id: str, stem: str, n: int, text: str) -> Path:
+        """Publish ``text`` as ``<stem>-<n>.md`` in one step, replacing the copy of a failed start."""
+        target = self.input_path(job_id, stem, n)
+        with _store_errors(target):
+            descriptor, temp = tempfile.mkstemp(prefix=f".{stem}-", suffix=".tmp", dir=target.parent)
+            try:
+                with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+                    sink.write(text)
+                os.replace(temp, target)
+            except BaseException:
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(temp)
+                raise
+        return target
 
     def restore_result(self, job_id: str, run: int) -> None:
         directory = self.job_dir(job_id)

@@ -9,8 +9,13 @@ from dataclasses import dataclass, field
 from typing import Mapping
 
 from .config import DEFAULTS, Config
+from .events import WORK
+from .job import JobRecord
+from .kinds import KINDS, Recovery, SessionKind
 from .result import short_hold_timeout
-from .state import JobView, PredecessorGone, State
+from .rules import goal_settled
+from .sessions import Liveness
+from .state import JobView, PredecessorGone, SessionView, State
 
 STALLED_CONFIRM_SECONDS = DEFAULTS["dispatcher.stalled-confirm-seconds"]
 
@@ -25,14 +30,17 @@ class Action:
     args: Mapping[str, object] = field(default_factory=dict)
 
 
-def actions(view: JobView | None, row: Mapping[str, object], config: Config = Config()) -> list[Action]:
-    """The actions of one job, in the order the dispatcher takes them.
+def actions(view: JobView | None, row: Mapping[str, object], config: Config = Config(),
+            kinds: Mapping[str, SessionKind] = KINDS) -> list[Action]:
+    """The actions of one job, in the order the dispatcher takes them: those of the work session and
+    the job's state, then those of each other session by its kind's recovery.
 
     ``row`` is the job's ``list --json`` row. ``view`` is ``None`` for an invalid job.
     """
     if view is None:
         return [Action("repair", {"problem": row["problem"]})]
     record, state = view.record, view.state
+    settled = goal_settled(record, kinds)
     found = []
     if state in (State.DONE, State.FAILED, State.NEEDS_INPUT) and not record.reported:
         found.append(Action("report"))
@@ -56,12 +64,33 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
         if view.after is None or view.after.goal:
             found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
-        if view.after is None or view.after.state is not PredecessorGone.INVALID:
+        if settled and (view.after is None or view.after.state is not PredecessorGone.INVALID):
             found.append(Action("ask-approval"))
     elif state is State.APPROVED:
-        found.append(Action("launch"))
+        if settled:
+            found.append(Action("launch"))
     elif (state is State.HELD and (view.after is None or view.after.satisfied)
           and any(holder > record.id for holder in view.blocked_by)):
         # A held approved job that a higher id blocks can wait with no bound.
         found.append(Action("note-starved"))
+    for name, session in view.sessions.items():
+        kind = kinds.get(name)
+        # A kind this version does not know gets no action.
+        if name != WORK and kind is not None:
+            found.extend(_session_actions(record, kind, session, config))
     return found
+
+
+def _session_actions(record: JobRecord, kind: SessionKind, view: SessionView, config: Config) -> list[Action]:
+    named = {"kind": kind.name, "session": view.session.name}
+    if view.liveness is Liveness.WAITING:
+        return [Action("tell-blocked", {**named, "waiting-for": view.waiting_for})]
+    if view.liveness not in (Liveness.STALLED, Liveness.GONE):
+        return []
+    if kind.recovery is Recovery.RESTART:
+        return [Action("restart-session", {"kind": kind.name, "inputs": list(view.session.inputs),
+                                           "restarts": record.restarts(kind.name)})]
+    if view.liveness is Liveness.STALLED:
+        return [Action("confirm-stalled",
+                       {**named, "stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]})]
+    return [Action("ask-relaunch", named)]

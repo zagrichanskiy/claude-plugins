@@ -66,6 +66,8 @@ class Check:
     kinds: Mapping[str, SessionKind] = field(default_factory=dict)
     #: The resources a ``claim`` asks for.
     names: Sequence[str] = ()
+    #: The summary lines an ``end`` reports.
+    summary: Sequence[str] = ()
 
 
 Guard = Callable[[Check], CureJobError | None]
@@ -90,8 +92,13 @@ def check(op: Op, facts: Check) -> None:
 
 def goal_settled(record: JobRecord, kinds: Mapping[str, SessionKind]) -> bool:
     """The job has a goal, and no open session of a kind that writes the goal."""
-    return record.has_goal and not any(Artifact.GOAL in kinds[session.kind].writes
-                                       for session in record.open_sessions())
+    return record.has_goal and not any(_writes_goal(kinds, session.kind) for session in record.open_sessions())
+
+
+def _writes_goal(kinds: Mapping[str, SessionKind], name: str) -> bool:
+    """A kind this version does not know declares no artifact, so it writes nothing it knows of."""
+    kind = kinds.get(name)
+    return kind is not None and Artifact.GOAL in kind.writes
 
 
 def _path(record: JobRecord, artifact: Artifact) -> str:
@@ -169,6 +176,27 @@ def no_invalid_job(facts: Check) -> CureJobError | None:
                       f"fix or remove {invalid.dir}: {invalid.problem}")
 
 
+# --- end guards a kind may declare ------------------------------------------------------------------------------------
+
+def finish_open(facts: Check) -> CureJobError | None:
+    if facts.record.closed is not None:
+        return JobStateError(f"job {facts.record.id} is abandoned; finish needs an open launched job")
+    return None
+
+
+def finish_no_result(facts: Check) -> CureJobError | None:
+    record = facts.record
+    if record.result is not None:
+        return JobStateError(f"job {record.id} already has {_path(record, Artifact.RESULT)}")
+    return None
+
+
+def finish_launched(facts: Check) -> CureJobError | None:
+    if facts.record.run == 0:
+        return JobStateError(f"job {facts.record.id} has no launched event; finish needs a launched job")
+    return None
+
+
 # --- generic guards ---------------------------------------------------------------------------------------------------
 
 def _kind_start_guards(facts: Check) -> CureJobError | None:
@@ -180,8 +208,7 @@ def _goal_settled(facts: Check) -> CureJobError | None:
     if not record.has_goal:
         return goal_exists(facts)
     if not goal_settled(record, facts.kinds):
-        writer = next(session for session in record.open_sessions()
-                      if Artifact.GOAL in facts.kinds[session.kind].writes)
+        writer = next(session for session in record.open_sessions() if _writes_goal(facts.kinds, session.kind))
         return JobStateError(f"job {record.id}: its {writer.kind} session {writer.name} writes the goal; "
                              f"{facts.operation} needs a settled goal")
     return None
@@ -194,6 +221,26 @@ def _no_other_live_session(facts: Check) -> CureJobError | None:
         if session.liveness is not None and session.liveness.is_live:
             return JobStateError(f"job {job_id} has live {kind} session {session.session.name}; "
                                  f"stop it first: cure-job stop {job_id}")
+    return None
+
+
+def _kind_end_guards(facts: Check) -> CureJobError | None:
+    return next((refusal for guard in facts.kind.end_guards if (refusal := guard(facts)) is not None), None)
+
+
+def _session_open(facts: Check) -> CureJobError | None:
+    record = facts.record
+    latest = record.latest(facts.kind.name)
+    if latest is None or latest.ended:
+        return JobStateError(f"job {record.id} has no open {facts.kind.name} session; nothing to end")
+    return None
+
+
+def _summary_lines(facts: Check) -> CureJobError | None:
+    expected = facts.kind.summary_lines
+    if len(facts.summary) != expected:
+        return CureJobError(f"{facts.operation} of a {facts.kind.name} session needs {expected} summary line(s), "
+                            f"got {len(facts.summary)}")
     return None
 
 
@@ -235,8 +282,12 @@ def _open(facts: Check) -> CureJobError | None:
 
 
 def _has_session(facts: Check) -> CureJobError | None:
-    if not facts.record.sessions:
-        return JobStateError(f"job {facts.record.id} has no launched run; nothing to stop")
+    """Without a kind, a session of any kind; with one, a session of that kind."""
+    record = facts.record
+    if facts.kind is None and not record.sessions:
+        return JobStateError(f"job {record.id} has no launched run; nothing to stop")
+    if facts.kind is not None and record.latest(facts.kind.name) is None:
+        return JobStateError(f"job {record.id} has no {facts.kind.name} session; nothing to stop")
     return None
 
 
@@ -317,25 +368,6 @@ def _no_open_items(facts: Check) -> CureJobError | None:
     return None
 
 
-def _finish_open(facts: Check) -> CureJobError | None:
-    if facts.record.closed is not None:
-        return JobStateError(f"job {facts.record.id} is abandoned; finish needs an open launched job")
-    return None
-
-
-def _finish_no_result(facts: Check) -> CureJobError | None:
-    record = facts.record
-    if record.result is not None:
-        return JobStateError(f"job {record.id} already has {_path(record, Artifact.RESULT)}")
-    return None
-
-
-def _finish_launched(facts: Check) -> CureJobError | None:
-    if facts.record.run == 0:
-        return JobStateError(f"job {facts.record.id} has no launched event; finish needs a launched job")
-    return None
-
-
 def _reported_launched(facts: Check) -> CureJobError | None:
     if facts.record.run == 0:
         return JobStateError(f"job {facts.record.id} has no launched run; nothing to report")
@@ -361,6 +393,6 @@ RULES: Mapping[Op, Rule] = {
                                   no_invalid_job)),
     Op.APPROVE: Rule(Reads.RECORD, (_approve_open, _approve_unlaunched, _approve_no_result, goal_exists,
                                     _no_open_items)),
-    Op.END: Rule(Reads.RECORD, (_finish_open, _finish_no_result, _finish_launched)),
+    Op.END: Rule(Reads.RECORD, (_kind_end_guards, _session_open, _summary_lines)),
     Op.REPORTED: Rule(Reads.RECORD, (_reported_launched, _reported_has_result)),
 }

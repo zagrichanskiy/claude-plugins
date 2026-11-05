@@ -47,11 +47,13 @@ def test_only_work_ends_with_the_result():
     ((), None),
     (("Bash(rm {job_dir} *)",), [f"Bash(rm /state/jobs/{JOB} *)"]),
 ])
-def test_an_event_kind_gets_its_end_rule_and_a_deny_key_only_when_it_denies(deny, expected_deny):
-    kind = replace(WORK, name="probe", end=End.EVENT, allow=("Bash({cure_job} list *)",), deny=deny)
+@pytest.mark.parametrize("summary_lines, bare", [(0, [f"Bash(/plugins/cure/bin/cure-job end {JOB} probe)"]), (1, [])])
+def test_an_event_kind_gets_its_end_rule_and_a_deny_key_only_when_it_denies(deny, expected_deny, summary_lines, bare):
+    kind = replace(WORK, name="probe", end=End.EVENT, allow=("Bash({cure_job} list *)",), deny=deny,
+                   summary_lines=summary_lines)
     settings = json.loads(settings_arguments(kind, context())[1])
     assert list(settings) == ["permissions", "env"]
-    assert settings["permissions"]["allow"] == ["Bash(/plugins/cure/bin/cure-job list *)",
+    assert settings["permissions"]["allow"] == ["Bash(/plugins/cure/bin/cure-job list *)", *bare,
                                                 f"Bash(/plugins/cure/bin/cure-job end {JOB} probe *)"]
     assert settings["permissions"].get("deny") == expected_deny
     assert ("deny" in settings["permissions"]) is bool(deny)

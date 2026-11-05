@@ -48,8 +48,8 @@ def facts(record, *, others=(), listing=None, invalid=(), operation="launch", ki
                  kinds=kinds, names=names)
 
 
-def record_facts(record, operation, invalid=(), names=()) -> Check:
-    return Check(record, operation, invalid=invalid, names=names)
+def record_facts(record, operation, invalid=(), names=(), kind=None) -> Check:
+    return Check(record, operation, invalid=invalid, names=names, kind=kind)
 
 
 def refusal(op: Op, given: Check) -> CureJobError:
@@ -112,9 +112,10 @@ LIVE_B = {session_name(B, 1): Session(SessionStatus.BUSY, uuid="u")}
      JobStateError, f"job {B} has a launched run"),
     (Op.APPROVE, record_facts(make_record(B, result=result_of(ResultStatus.DONE)), "approve"),
      JobStateError, f"job {B} has a result"),
-    (Op.END, record_facts(make_record(B, events=(Closed(""),), result=result_of(ResultStatus.DONE)), "finish"),
+    (Op.END, record_facts(make_record(B, events=(Closed(""),), result=result_of(ResultStatus.DONE)), "finish",
+                          kind=WORK),
      JobStateError, f"job {B} is abandoned; finish needs an open launched job"),
-    (Op.END, record_facts(make_record(B, result=result_of(ResultStatus.DONE)), "finish"),
+    (Op.END, record_facts(make_record(B, result=result_of(ResultStatus.DONE)), "finish", kind=WORK),
      JobStateError, f"job {B} already has /state/jobs/{B}/result.md"),
     (Op.REPORTED, record_facts(make_record(B), "reported"),
      JobStateError, f"job {B} has no launched run; nothing to report"),

@@ -31,7 +31,7 @@ class NextCommand(Command):
                         key=lambda entry: entry[0])
         elements = []
         for _, view, row in ranked:
-            found = actions(view, row, jobs.config)
+            found = actions(view, row, jobs.config, jobs.kinds)
             if found:
                 elements.append({**row, "actions": [action.name for action in found],
                                  "args": {action.name: dict(action.args) for action in found if action.args}})

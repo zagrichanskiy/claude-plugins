@@ -84,12 +84,26 @@ class SessionStopped:
 
 
 @dataclass(frozen=True)
+class SessionEnded:
+    """Session ``n`` of kind ``kind`` reported its end with ``summary``. A work session ends with ``result.md``."""
+    kind: str
+    n: int
+    summary: tuple[str, ...]
+    at: datetime
+
+    def __post_init__(self) -> None:
+        if self.kind == WORK:
+            raise ValueError("a work session ends with result.md, not an event")
+
+
+@dataclass(frozen=True)
 class SessionsRemoved:
     """``cure-job remove-sessions`` left no session of the job listed."""
     at: datetime
 
 
-Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, SessionStopped, SessionsRemoved]
+Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, SessionStopped, SessionEnded,
+              SessionsRemoved]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
@@ -100,13 +114,26 @@ _ORIGIN = "origin"
 _REPORTED = "reported"
 _STOPPED = "stopped"
 _SESSIONS_REMOVED = "sessions-removed"
+#: The tags of a session of a kind other than work. A work session keeps ``launched`` and ``stopped``,
+#: which an older version reads.
+_SESSION_STARTED = "session-started"
+_SESSION_STOPPED = "session-stopped"
+_SESSION_ENDED = "session-ended"
 
 
 def encode(event: Event) -> str:
-    if isinstance(event, (SessionStarted, SessionStopped)) and event.kind != WORK:
-        raise ValueError(f"no event line exists for a session of kind {event.kind}")
-    if isinstance(event, SessionStarted):
+    if isinstance(event, SessionStarted) and event.kind == WORK:
         fields = {"event": _LAUNCHED, "run": event.run, "session": event.session, "at": format_local(event.at)}
+    elif isinstance(event, SessionStarted):
+        fields = {"event": _SESSION_STARTED, "kind": event.kind, "n": event.n, "session": event.session,
+                  "run": event.run, "inputs": list(event.inputs), "at": format_local(event.at)}
+    elif isinstance(event, SessionStopped) and event.kind == WORK:
+        fields = {"event": _STOPPED, "run": event.n, "at": format_local(event.at)}
+    elif isinstance(event, SessionStopped):
+        fields = {"event": _SESSION_STOPPED, "kind": event.kind, "n": event.n, "at": format_local(event.at)}
+    elif isinstance(event, SessionEnded):
+        fields = {"event": _SESSION_ENDED, "kind": event.kind, "n": event.n, "summary": list(event.summary),
+                  "at": format_local(event.at)}
     elif isinstance(event, Claim):
         fields = {"event": _CLAIM, "resource": event.resource}
         if event.run is not None:
@@ -119,8 +146,6 @@ def encode(event: Event) -> str:
         fields = {"event": _ORIGIN, "address": event.address, "at": format_local(event.at)}
     elif isinstance(event, Reported):
         fields = {"event": _REPORTED, "run": event.run, "at": format_local(event.at)}
-    elif isinstance(event, SessionStopped):
-        fields = {"event": _STOPPED, "run": event.n, "at": format_local(event.at)}
     elif isinstance(event, SessionsRemoved):
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     else:
@@ -135,16 +160,16 @@ def decode(line: str) -> Event | None:
         raise ValueError("not a JSON object")
     kind = fields.get("event")
     if kind == _LAUNCHED:
-        run = _run(fields)
+        run = _int(fields, "run")
         return SessionStarted(WORK, run, _text(fields, "session"), parse_local(_text(fields, "at")), run)
     if kind == _REPORTED:
-        return Reported(_run(fields), parse_local(_text(fields, "at")))
+        return Reported(_int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _STOPPED:
-        return SessionStopped(WORK, _run(fields), parse_local(_text(fields, "at")))
+        return SessionStopped(WORK, _int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _SESSIONS_REMOVED:
         return SessionsRemoved(parse_local(_text(fields, "at")))
     if kind == _CLAIM:
-        return Claim(_text(fields, "resource"), None if "run" not in fields else _run(fields))
+        return Claim(_text(fields, "resource"), None if "run" not in fields else _int(fields, "run"))
     if kind == _RELEASE:
         return Release(_text(fields, "resource"))
     if kind == _APPROVED:
@@ -153,15 +178,37 @@ def decode(line: str) -> Event | None:
         return Closed(_text(fields, "reason"))
     if kind == _ORIGIN:
         return Origin(_text(fields, "address"), parse_local(_text(fields, "at")))
+    if kind == _SESSION_STARTED:
+        return SessionStarted(_session_kind(fields), _int(fields, "n"), _text(fields, "session"),
+                              parse_local(_text(fields, "at")), _int(fields, "run"), _texts(fields, "inputs"))
+    if kind == _SESSION_STOPPED:
+        return SessionStopped(_session_kind(fields), _int(fields, "n"), parse_local(_text(fields, "at")))
+    if kind == _SESSION_ENDED:
+        return SessionEnded(_session_kind(fields), _int(fields, "n"), _texts(fields, "summary"),
+                            parse_local(_text(fields, "at")))
     return None
 
 
-def _run(fields: dict) -> int:
-    run = fields.get("run")
-    # bool is an int subclass, and `true` is not a run number.
-    if not isinstance(run, int) or isinstance(run, bool):
-        raise ValueError("run is missing or not an integer")
-    return run
+def _int(fields: dict, key: str) -> int:
+    value = fields.get(key)
+    # bool is an int subclass, and `true` is not a number.
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{key} is missing or not an integer")
+    return value
+
+
+def _session_kind(fields: dict) -> str:
+    kind = _text(fields, "kind")
+    if kind == WORK:
+        raise ValueError(f"a work session is never stored as {fields['event']}")
+    return kind
+
+
+def _texts(fields: dict, key: str) -> tuple[str, ...]:
+    values = fields.get(key)
+    if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+        raise ValueError(f"{key} is missing or not a list of strings")
+    return tuple(values)
 
 
 def _text(fields: dict, key: str) -> str:

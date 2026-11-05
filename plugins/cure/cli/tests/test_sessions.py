@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from cure_job.events import Reported, SessionStarted, SessionStopped, decode, encode
+from cure_job.events import Reported, SessionEnded, SessionStarted, SessionStopped, decode, encode
 from cure_job.result import ResultStatus
 from cure_job.sessions import JobSession, fold
 from tests.builders import NOW, make_record, result_of
@@ -44,10 +44,12 @@ def test_a_work_session_needs_n_equal_to_run_and_no_inputs(n, run, inputs):
         SessionStarted("work", n, A, NOW, run, inputs)
 
 
-@pytest.mark.parametrize("event", [goal(1), SessionStopped("goal", 1, NOW)])
-def test_a_session_event_of_another_kind_has_no_line(event):
-    with pytest.raises(ValueError, match="kind goal"):
-        encode(event)
+@pytest.mark.parametrize("event, tag", [(goal(1), "session-started"), (SessionStopped("goal", 1, NOW), "session-stopped"),
+                                        (SessionEnded("goal", 1, ("settled",), NOW), "session-ended")])
+def test_a_session_event_of_another_kind_has_its_own_line_and_decodes_back(event, tag):
+    line = encode(event)
+    assert line.startswith(f'{{"event":"{tag}","kind":"goal",')
+    assert decode(line) == event
 
 
 # --- fold -------------------------------------------------------------------------------------------------------------
