@@ -16,6 +16,7 @@ from typing import AbstractSet, Iterable, Mapping, Sequence
 
 from .claude import SessionStatus
 from .config import DEFAULTS, Config
+from .events import WORK
 from .job import JobRecord
 from .result import ResultStatus
 
@@ -103,7 +104,7 @@ class JobView:
 
 def needs_sessions(records: Iterable[JobRecord]) -> bool:
     """True when the state of some record depends on the session list."""
-    return any(record.launches and record.result is None and record.closed is None for record in records)
+    return any(record.run > 0 and record.result is None and record.closed is None for record in records)
 
 
 def is_open(record: JobRecord) -> bool:
@@ -114,14 +115,14 @@ def is_open(record: JobRecord) -> bool:
 def lock_rank(record: JobRecord) -> tuple[bool, str]:
     """The lock order. A launched job is already using its resources; after a
     backward clock step it can sort above a newer job (local-time ids)."""
-    return (not record.launches, record.id)
+    return (record.run == 0, record.id)
 
 
 def is_ready(record: JobRecord) -> bool:
     """The open job may start its first run: unlaunched, no result, and an approval of its current goal.
 
     The run-1 launch test, and with the ``after`` test the lock rule's test for an unlaunched job."""
-    return not record.launches and record.result is None and record.approved
+    return record.run == 0 and record.result is None and record.approved
 
 
 def holders(records: Iterable[JobRecord]) -> dict[str, str]:
@@ -171,7 +172,7 @@ def expired(view: JobView, now: datetime, kept_for: Mapping[State, timedelta] = 
 def _holders(records: Iterable[JobRecord], terminal: Mapping[str, State | None]) -> dict[str, str]:
     found: dict[str, str] = {}
     for record in sorted((record for record in records if terminal[record.id] is None), key=lock_rank):
-        if record.launches:
+        if record.run > 0:
             for name in record.resources:
                 found.setdefault(name, record.id)
         elif is_ready(record) and not _waits(record, terminal) and not found.keys() & record.resources:
@@ -182,7 +183,7 @@ def _holders(records: Iterable[JobRecord], terminal: Mapping[str, State | None])
 def _waits(record: JobRecord, terminal: Mapping[str, State | None]) -> bool:
     """The unlaunched job's ``after`` predecessor is not done. A missing or invalid one is not done."""
     after = record.handoff.after
-    return after is not None and not record.launches and terminal.get(after) is not State.DONE
+    return after is not None and record.run == 0 and terminal.get(after) is not State.DONE
 
 
 def _after(record: JobRecord, records: Mapping[str, JobRecord], states: Mapping[str, State],
@@ -211,11 +212,10 @@ def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: d
                 blocked_by: tuple[str, ...], waits: bool, launch_grace: timedelta) -> State:
     if record.result is not None:
         return State.NEEDS_INPUT
-    launches = record.launches
-    if launches:
-        latest = launches[-1]
-        status = sessions.get(latest.session)
-        within_grace = now - latest.at <= launch_grace
+    latest = record.latest(WORK)
+    if latest is not None:
+        status = sessions.get(latest.name)
+        within_grace = now - latest.started_at <= launch_grace
         if status is SessionStatus.BUSY:
             return State.RUNNING
         # A session that waits for a permission or an answer needs the user
@@ -227,7 +227,7 @@ def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: d
         # A session can be listed without a pid while it starts or resumes.
         # After `cure-job stop`, a session listed stopped is down for good and
         # gets no grace. An unlisted session keeps the grace.
-        starting = status is None or (status is SessionStatus.STOPPED and not record.stop_issued)
+        starting = status is None or (status is SessionStatus.STOPPED and not latest.stop_recorded)
         if starting and within_grace:
             return State.LAUNCHED
         return State.LOST

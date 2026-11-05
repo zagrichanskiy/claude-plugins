@@ -9,11 +9,26 @@ from typing import Union
 from .clock import format_local, parse_local
 
 
+#: The kind of the session a ``launch`` or ``resume`` starts.
+WORK = "work"
+
+
 @dataclass(frozen=True)
-class Launched:
-    run: int
+class SessionStarted:
+    """A session of kind ``kind`` started as its ``n``-th. ``run`` is the work run current at the start."""
+    kind: str
+    n: int
     session: str
     at: datetime
+    run: int
+    #: The input copies in the job directory.
+    inputs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        # A work start is stored as a ``launched`` line, which holds neither a separate n nor inputs.
+        if self.kind == WORK and (self.n != self.run or self.inputs):
+            raise ValueError(f"a work session needs n == run and no inputs: n {self.n}, run {self.run}, "
+                             f"inputs {list(self.inputs)}")
 
 
 @dataclass(frozen=True)
@@ -61,9 +76,10 @@ class Reported:
 
 
 @dataclass(frozen=True)
-class StopIssued:
-    """``cure-job stop`` ran for run ``run``. The launch grace no longer applies to that run."""
-    run: int
+class SessionStopped:
+    """``cure-job stop`` ran for session ``n`` of kind ``kind``. The launch grace no longer applies to it."""
+    kind: str
+    n: int
     at: datetime
 
 
@@ -73,7 +89,7 @@ class SessionsRemoved:
     at: datetime
 
 
-Event = Union[Launched, Claim, Release, Approved, Closed, Origin, Reported, StopIssued, SessionsRemoved]
+Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, SessionStopped, SessionsRemoved]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
@@ -87,7 +103,9 @@ _SESSIONS_REMOVED = "sessions-removed"
 
 
 def encode(event: Event) -> str:
-    if isinstance(event, Launched):
+    if isinstance(event, (SessionStarted, SessionStopped)) and event.kind != WORK:
+        raise ValueError(f"no event line exists for a session of kind {event.kind}")
+    if isinstance(event, SessionStarted):
         fields = {"event": _LAUNCHED, "run": event.run, "session": event.session, "at": format_local(event.at)}
     elif isinstance(event, Claim):
         fields = {"event": _CLAIM, "resource": event.resource}
@@ -101,8 +119,8 @@ def encode(event: Event) -> str:
         fields = {"event": _ORIGIN, "address": event.address, "at": format_local(event.at)}
     elif isinstance(event, Reported):
         fields = {"event": _REPORTED, "run": event.run, "at": format_local(event.at)}
-    elif isinstance(event, StopIssued):
-        fields = {"event": _STOPPED, "run": event.run, "at": format_local(event.at)}
+    elif isinstance(event, SessionStopped):
+        fields = {"event": _STOPPED, "run": event.n, "at": format_local(event.at)}
     elif isinstance(event, SessionsRemoved):
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     else:
@@ -117,11 +135,12 @@ def decode(line: str) -> Event | None:
         raise ValueError("not a JSON object")
     kind = fields.get("event")
     if kind == _LAUNCHED:
-        return Launched(_run(fields), _text(fields, "session"), parse_local(_text(fields, "at")))
+        run = _run(fields)
+        return SessionStarted(WORK, run, _text(fields, "session"), parse_local(_text(fields, "at")), run)
     if kind == _REPORTED:
         return Reported(_run(fields), parse_local(_text(fields, "at")))
     if kind == _STOPPED:
-        return StopIssued(_run(fields), parse_local(_text(fields, "at")))
+        return SessionStopped(WORK, _run(fields), parse_local(_text(fields, "at")))
     if kind == _SESSIONS_REMOVED:
         return SessionsRemoved(parse_local(_text(fields, "at")))
     if kind == _CLAIM:
