@@ -9,8 +9,8 @@ import pytest
 
 from cure_job.claude import SessionStatus
 from cure_job.cli import Cli, main
-from cure_job.worker import WorkerSettings
-from tests.builders import settings_args
+from cure_job.kinds import WORK, StartContext, settings_arguments
+from tests.builders import make_record, settings_args
 from tests.test_cli import Harness
 
 PR = "https://github.com/acme/video-core/pull/7"
@@ -153,7 +153,7 @@ def test_launch_refuses_a_goal_naming_a_missing_file_under_the_plugin_root(root,
 
 
 def test_worker_rules_allow_finish_claim_and_release_for_their_own_job_only(tmp_path):
-    rules = "\n".join(WorkerSettings(tmp_path, "job-a").rules())
+    rules = settings_arguments(WORK, StartContext(make_record("job-a"), None, tmp_path, "launch", 1, "job-a", {}))[1]
     assert "finish job-a *" in rules
     assert "job-b" not in rules
 
