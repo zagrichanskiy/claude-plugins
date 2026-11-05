@@ -8,7 +8,7 @@ import pytest
 
 from cure_job.actions import STALLED_CONFIRM_SECONDS, Action, actions
 from cure_job.claude import SessionStatus
-from cure_job.events import Closed, Reported, SessionsRemoved
+from cure_job.events import Closed, Reported, SessionEnded, SessionsRemoved, SessionStarted
 from cure_job.handoff import Device, Handoff
 from cure_job.result import Result, ResultStatus
 from cure_job.state import State, derive
@@ -162,3 +162,34 @@ def test_held_job_with_an_unapproved_goal_after_an_invalid_predecessor_gets_no_a
 
 def test_held_job_after_an_invalid_predecessor_gets_no_draft():
     assert successor_names(successor(), invalid=frozenset({A})) == []
+
+
+def goal_session(*, age=timedelta(minutes=5), ended=False, run=1):
+    started = SessionStarted("goal", 1, "g", NOW - age, run)
+    return (started, SessionEnded("goal", 1, ("a", "b", "c"), NOW)) if ended else (started,)
+
+
+@pytest.mark.parametrize("ended, expected", [(False, []), (True, ["draft"])])
+def test_draft_waits_while_a_goal_session_is_open(ended, expected):
+    record = make_record(A, events=goal_session(ended=ended, run=0))
+    assert names(record, {"g": SessionStatus.BUSY}) == expected
+
+
+def answered(*, age, ended, open_items=0):
+    record = finished(ResultStatus.NEEDS_INPUT, Reported(1, NOW), *goal_session(age=age, ended=ended),
+                      result_mtime=NOW - timedelta(minutes=3))
+    return replace(record, open_items=open_items)
+
+
+@pytest.mark.parametrize("age", [timedelta(minutes=1), timedelta(minutes=5)])
+def test_ask_input_waits_while_a_goal_session_is_open(age):
+    assert names(answered(age=age, ended=False), {"g": SessionStatus.BUSY}) == []
+
+
+@pytest.mark.parametrize("open_items, expected", [(2, ["ask-open"]), (0, ["resume"])])
+def test_an_ended_answers_session_gets_ask_open_or_resume(open_items, expected):
+    assert names(answered(age=timedelta(minutes=1), ended=True, open_items=open_items)) == expected
+
+
+def test_a_goal_session_that_started_before_the_result_gets_ask_input_not_resume():
+    assert names(answered(age=timedelta(minutes=5), ended=True)) == ["ask-input"]

@@ -17,7 +17,7 @@ from . import resource as resource_names
 from .claude import Session
 from .errors import CureJobError, JobStateError, ResourceHeld, SessionGone, StoreError
 from .job import JobRecord
-from .sessions import listed_live
+from .sessions import JobSession, listed_live
 from .state import JobView, State, holders, is_ready
 from .store import InvalidJob
 
@@ -109,7 +109,17 @@ def check(op: Op, facts: Check) -> None:
 
 def goal_settled(record: JobRecord, kinds: Mapping[str, SessionKind]) -> bool:
     """The job has a goal, and no open session of a kind that writes the goal."""
-    return record.has_goal and not any(_writes_goal(kinds, session.kind) for session in record.open_sessions())
+    return record.has_goal and not goal_writing(record, kinds)
+
+
+def goal_writing(record: JobRecord, kinds: Mapping[str, SessionKind]) -> bool:
+    """The job has an open session of a kind that writes the goal."""
+    return any(_writes_goal(kinds, session.kind) for session in record.open_sessions())
+
+
+def latest_goal_writer(record: JobRecord, kinds: Mapping[str, SessionKind]) -> JobSession | None:
+    """The latest session of a kind that writes the goal."""
+    return next((session for session in reversed(record.sessions) if _writes_goal(kinds, session.kind)), None)
 
 
 def _writes_goal(kinds: Mapping[str, SessionKind], name: str) -> bool:

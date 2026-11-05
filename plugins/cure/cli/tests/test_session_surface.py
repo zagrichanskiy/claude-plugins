@@ -137,13 +137,13 @@ def test_start_and_end_refuse_work_and_an_unknown_kind_as_usage(h, tmp_path, com
         h.run(*command, job_id, kind)
     assert caught.value.code == 2
     expected = {"work": f"work {command[0]}s with cure-job {'launch' if command == ['start'] else 'finish'}",
-                "nope": "unknown session kind 'nope'; expected probe"}[kind]
+                "nope": "unknown session kind 'nope'; expected goal, probe"}[kind]
     assert expected in capsys.readouterr().err
 
 
 def test_without_a_kind_beside_work_start_names_no_kind(root, capsys):
     with pytest.raises(SystemExit):
-        Harness(root).run("start", A, "probe")
+        Harness(root, kinds={WORK.name: WORK}).run("start", A, "probe")
     assert "unknown session kind 'probe'; expected none" in capsys.readouterr().err
 
 

@@ -11,9 +11,10 @@ from cure_job.claude import Session, SessionStatus
 from cure_job.errors import CureJobError, JobStateError, ResourceHeld, SessionGone, StoreError
 from cure_job.events import Claim, Closed, Origin, SessionStarted
 from cure_job.job_id import session_name
-from cure_job.kinds import KINDS, WORK, End
+from cure_job.kinds import GOAL, KINDS, WORK, End
 from cure_job.result import ResultStatus
-from cure_job.rules import RULES, Artifact, Check, Op, Reads, check, goal_settled, state_in_start_states
+from cure_job.rules import (RULES, Artifact, Check, Op, Reads, check, goal_exists, goal_settled,
+                            state_in_start_states)
 from cure_job.state import LAUNCH_GRACE, State, derive
 from cure_job.store import InvalidJob
 from tests.builders import NOW, REPO, make_record, result_of
@@ -157,9 +158,10 @@ def test_a_kind_prints_its_own_start_states_in_state_order():
     assert str(raised) == f"job {B} is queued; start needs approved, lost"
 
 
-def test_work_is_the_only_kind_and_declares_no_artifact():
-    assert WORK.writes == frozenset()
-    assert KINDS == {"work": WORK}
+def test_work_and_goal_are_the_kinds_and_only_goal_writes_the_goal():
+    assert KINDS == {"work": WORK, "goal": GOAL}
+    assert (WORK.writes, GOAL.writes) == (frozenset(), frozenset({Artifact.GOAL}))
+    assert (GOAL.end, GOAL.start_guards, GOAL.end_guards) == (End.EVENT, (state_in_start_states,), (goal_exists,))
 
 
 @pytest.mark.parametrize("op, given, fact", [

@@ -80,6 +80,9 @@ class JobStore:
             raise ValueError(f"invalid job id {job_id!r}")
         return self._jobs / job_id
 
+    def handoff_path(self, job_id: str) -> Path:
+        return self.job_dir(job_id) / _HANDOFF
+
     def goal_path(self, job_id: str) -> Path:
         return self.job_dir(job_id) / _GOAL
 

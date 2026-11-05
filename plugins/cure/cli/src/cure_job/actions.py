@@ -13,8 +13,8 @@ from .events import WORK
 from .job import JobRecord
 from .kinds import KINDS, Recovery, SessionKind
 from .result import short_hold_timeout
-from .rules import goal_settled
-from .sessions import Liveness
+from .rules import goal_settled, goal_writing, latest_goal_writer
+from .sessions import JobSession, Liveness
 from .state import JobView, PredecessorGone, SessionView, State
 
 STALLED_CONFIRM_SECONDS = DEFAULTS["dispatcher.stalled-confirm-seconds"]
@@ -40,6 +40,7 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     if view is None:
         return [Action("repair", {"problem": row["problem"]})]
     record, state = view.record, view.state
+    writing = goal_writing(record, kinds)
     settled = goal_settled(record, kinds)
     found = []
     if state in (State.DONE, State.FAILED, State.NEEDS_INPUT) and not record.reported:
@@ -47,11 +48,16 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     if state in (State.DONE, State.ABANDONED) and not record.sessions_removed:
         found.append(Action("remove-sessions"))
     if state is State.NEEDS_INPUT:
-        timeout = short_hold_timeout(record.result) if record.result else None
-        if timeout:
-            found.append(Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder}))
-        else:
-            found.append(Action("ask-input"))
+        answers = _answers_session(record, kinds)
+        if answers is not None:
+            if answers.ended:
+                found.append(Action("ask-open" if record.open_items else "resume"))
+        elif not writing:
+            timeout = short_hold_timeout(record.result) if record.result else None
+            if timeout:
+                found.append(Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder}))
+            else:
+                found.append(Action("ask-input"))
     elif state is State.STALLED:
         found.append(Action("confirm-stalled", {"stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]}))
     elif state is State.LOST:
@@ -61,7 +67,7 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     elif state is State.HELD and view.after is not None and view.after.state in CLOSING_PREDECESSOR:
         found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
     elif state is State.QUEUED or (state is State.HELD and not record.has_goal):
-        if view.after is None or view.after.goal:
+        if not writing and (view.after is None or view.after.goal):
             found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
         if settled and (view.after is None or view.after.state is not PredecessorGone.INVALID):
@@ -79,6 +85,14 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
         if name != WORK and kind is not None:
             found.extend(_session_actions(record, kind, session, config))
     return found
+
+
+def _answers_session(record: JobRecord, kinds: Mapping[str, SessionKind]) -> JobSession | None:
+    """The latest goal session, where it started in the current run after ``result.md`` was written."""
+    latest = latest_goal_writer(record, kinds)
+    if latest is None or latest.run != record.run or record.result_mtime is None:
+        return None
+    return latest if latest.started_at > record.result_mtime else None
 
 
 def _session_actions(record: JobRecord, kind: SessionKind, view: SessionView, config: Config) -> list[Action]:
