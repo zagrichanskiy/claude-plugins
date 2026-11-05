@@ -55,6 +55,11 @@ def fold(events: Sequence[Event], has_result: bool) -> tuple[JobSession, ...]:
         for index, start in enumerate(starts))
 
 
+def listed_live(listed: Session | None) -> bool:
+    """The listing has a live entry for the session."""
+    return listed is not None and listed.status is not SessionStatus.STOPPED
+
+
 def liveness(session: JobSession, listed: Session | None, now: datetime, grace: timedelta) -> Liveness:
     """The liveness of ``session``, listed as ``listed`` at ``now``. ``grace`` follows its start."""
     if session.ended:

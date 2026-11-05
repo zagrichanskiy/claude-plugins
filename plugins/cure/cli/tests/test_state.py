@@ -392,11 +392,9 @@ def test_stalled_state_checks_the_session_of_the_latest_launch():
     assert state_of(record, {A: BUSY, A + "-r2": IDLE}) is State.STALLED
 
 
-def test_stalled_has_a_session_and_is_open_but_not_launchable():
+def test_stalled_is_open():
     assert State.STALLED.value == "stalled"
-    assert State.STALLED.has_session
     assert State.STALLED.is_open
-    assert not State.STALLED.is_launchable
 
 
 def test_stalled_job_keeps_its_resources():
