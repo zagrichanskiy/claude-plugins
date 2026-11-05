@@ -26,7 +26,7 @@ class NextCommand(Command):
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
         # An invalid job's work sessions are unknown, so it ranks as launched: it may hold any resource.
-        ranked = sorted([(lock_rank(view.record), view, job_row(view, listing.sessions)) for view in listing.views]
+        ranked = sorted([(lock_rank(view.record), view, job_row(view)) for view in listing.views]
                         + [((False, job.id), None, invalid_row(job)) for job in listing.invalid],
                         key=lambda entry: entry[0])
         elements = []

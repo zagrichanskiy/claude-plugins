@@ -43,8 +43,6 @@ from ..worker import WorkerSettings
 class Listing(NamedTuple):
     views: list[JobView]
     invalid: list[InvalidJob]
-    #: The session list the views were derived from; empty when it was not read.
-    sessions: Mapping[str, Session]
 
 
 class Stopped(NamedTuple):
@@ -110,10 +108,9 @@ class JobsProvider:
         return self._listing(snapshot, sessions)
 
     def _listing(self, snapshot: Snapshot, sessions: Mapping[str, Session]) -> Listing:
-        statuses = {name: session.status for name, session in sessions.items()}
         invalid_ids = {job.id for job in snapshot.invalid}
-        return Listing(derive(snapshot.records, statuses, self.clock(), invalid_ids,
-                              timedelta(seconds=self.config["launch-grace-seconds"])), snapshot.invalid, sessions)
+        return Listing(derive(snapshot.records, sessions, self.clock(), invalid_ids,
+                              timedelta(seconds=self.config["launch-grace-seconds"])), snapshot.invalid)
 
     def launch(self, job_id: str, claude_args: Sequence[str] = ()) -> str:
         """Start the next run of ``job_id`` and return the session name."""

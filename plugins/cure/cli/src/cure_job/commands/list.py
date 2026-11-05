@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Mapping
 
-from ..claude import Session
+from ..events import WORK
+from ..job import JobRecord
 from ..providers.jobs import JobsProvider
-from ..state import JobView, State
+from ..state import JobView, SessionView
 from ..store import InvalidJob
 from .base import Command
 
@@ -24,7 +24,7 @@ class ListCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
-        rows = sorted([job_row(view, listing.sessions) for view in listing.views]
+        rows = sorted([job_row(view) for view in listing.views]
                       + [invalid_row(job) for job in listing.invalid],
                       key=lambda row: row["id"])
         if args.json:
@@ -56,14 +56,12 @@ def invalid_row(job: InvalidJob) -> dict:
             "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
             "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
             "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
-            "workspace": None}
+            "workspace": None, "phase": None, "sessions": {}}
 
 
-def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
+def job_row(view: JobView) -> dict:
     record = view.record
-    waiting_for = None
-    if view.state is State.BLOCKED:
-        waiting_for = sessions[record.session].waiting_for
+    work = view.sessions.get(WORK)
     return {
         "id": record.id,
         "state": view.state.value,
@@ -77,7 +75,7 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "approved": record.approved,
         "open": record.open_items,
         "problem": record.result.problem if record.result else None,
-        "waiting-for": waiting_for,
+        "waiting-for": work.waiting_for if work is not None else None,
         "reported": record.reported,
         "sessions-removed": record.sessions_removed,
         "prs": list(record.result.prs) if record.result else [],
@@ -87,4 +85,20 @@ def job_row(view: JobView, sessions: Mapping[str, Session]) -> dict:
         "ticket-summary": record.handoff.ticket_summary,
         "branch": record.handoff.branch,
         "workspace": record.handoff.launch_dir,
+        "phase": view.phase.value,
+        "sessions": {kind: session_row(record, session) for kind, session in view.sessions.items()},
+    }
+
+
+def session_row(record: JobRecord, view: SessionView) -> dict:
+    session = view.session
+    return {
+        "n": session.n,
+        "session": session.name,
+        "liveness": view.liveness.value if view.liveness is not None else None,
+        "waiting-for": view.waiting_for,
+        "run": session.run,
+        "inputs": list(session.inputs),
+        "restarts": record.restarts(session.kind),
+        "summary": list(session.summary),
     }
