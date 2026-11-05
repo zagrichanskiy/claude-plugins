@@ -220,3 +220,17 @@ def test_a_timeout_job_with_an_open_answers_session_gets_no_ask_timeout():
 
 def test_a_timeout_job_with_an_ended_answers_session_gets_resume():
     assert names(answered(ended=True, result=TIMEOUT_RESULT)) == ["resume"]
+
+
+@pytest.mark.parametrize("ended, expected", [(False, []), (True, ["ask-relaunch"])])
+def test_ask_relaunch_waits_while_a_goal_session_is_open(ended, expected):
+    record = make_record(A, events=(launched(A), *goal_session(ended=ended)))
+    assert names(record, {A: SessionStatus.STOPPED, "g": SessionStatus.BUSY}) == expected
+
+
+@pytest.mark.parametrize("ended, expected", [(False, []), (True, ["close-successor"])])
+def test_close_successor_waits_while_a_goal_session_is_open(ended, expected):
+    records = [make_record(A, events=(Closed("x"),)), successor(events=goal_session(ended=ended, run=0))]
+    view = {v.record.id: v for v in derive(records, listed({"g": SessionStatus.BUSY}), NOW, frozenset())}[B]
+    assert view.state is State.HELD
+    assert [action.name for action in actions(view, {})] == expected

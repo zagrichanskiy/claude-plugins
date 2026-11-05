@@ -120,7 +120,7 @@ def _work_prepare(ctx: StartContext) -> str:
     missing = missing_paths(retarget(ctx.store.read_goal(job_id), ctx.plugin_root), ctx.plugin_root)
     if missing:
         raise PluginError(f"{ctx.operation} refused: the goal file names {', '.join(missing)}, which does not exist; "
-                          f"write the goal again: echo '<refusal>' | cure-job start {job_id} goal --input -")
+                          f"write the goal again: cure-job start {job_id} goal --input - with this message as the input")
     ctx.store.rewrite_goal(job_id, lambda text: retarget(text, ctx.plugin_root))
     return f"/goal @{ctx.store.goal_path(job_id)}"
 

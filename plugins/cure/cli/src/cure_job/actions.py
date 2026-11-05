@@ -61,11 +61,13 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     elif state is State.STALLED:
         found.append(Action("confirm-stalled", {"stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]}))
     elif state is State.LOST:
-        found.append(Action("ask-relaunch"))
+        if not writing:
+            found.append(Action("ask-relaunch"))
     elif state is State.BLOCKED:
         found.append(Action("tell-blocked", {"waiting-for": row["waiting-for"]}))
     elif state is State.HELD and view.after is not None and view.after.state in CLOSING_PREDECESSOR:
-        found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
+        if not writing:
+            found.append(Action("close-successor", {"after": view.after.id, "after-state": view.after.state.value}))
     elif state is State.QUEUED or (state is State.HELD and not record.has_goal):
         if not writing and (view.after is None or view.after.goal):
             found.append(Action("draft"))
@@ -88,7 +90,11 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
 
 
 def _answers_session(record: JobRecord, kinds: Mapping[str, SessionKind]) -> JobSession | None:
-    """The latest goal session, where it started in the current run with answers to ``result.md``."""
+    """The latest goal session, where it started in the current run with answers to ``result.md``.
+
+    Premise: a lost job's relaunch runs ``cure-job stop`` first, so no goal session of the lost run stays open
+    into the next run. A goal session of the current run on a needs-input job therefore follows ``result.md``.
+    """
     latest = latest_goal_writer(record, kinds)
     if latest is None or latest.run != record.run or record.result is None or not latest.inputs:
         return None

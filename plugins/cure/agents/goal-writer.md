@@ -31,6 +31,7 @@ An answers file holds the user's answers and the `(recommended)` and `(policy)` 
 | Step | Action |
 |---|---|
 | Settled | Move each answered item from `## Open` to Settled with its answer, through `cure:goal`. Remove the `## Open` heading when no item is left. |
+| Unanswered questions | On a `needs-input` job, write each question of the run's `result.md` that no Settled line answers as an item under `## Open`, with its options. The dispatcher asks the user through `ask-open` before any resume. |
 | Run line | After a `needs-input` exit, add the one run line that `cure:goal` writes. The line holds for a resume and for a new run. |
 | Permission mode | When the user chose a permission mode, write the Rules "Permission mode" line, then run the Permissions check again. |
 | Missing plugin path | The answers file names a refusal that says the goal names a missing plugin path: rewrite `goal.md` through `cure:goal`, keeping Settled. |

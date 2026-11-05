@@ -114,7 +114,7 @@ def test_launch_with_a_missing_plugin_path_names_the_goal_session_with_the_refus
     h.goal(job_id).write_text(f"goal: read {PLUGIN_ROOT}/agents/missing.md", encoding="utf-8")
     assert h.run("approve", job_id, "--by", "user") == 0
     assert h.run("launch", job_id) == 1
-    assert (f"write the goal again: echo '<refusal>' | cure-job start {job_id} goal --input -"
+    assert (f"write the goal again: cure-job start {job_id} goal --input - with this message as the input"
             in capsys.readouterr().err)
 
 
