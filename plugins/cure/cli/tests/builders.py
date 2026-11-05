@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from cure_job.claude import Session, SessionStatus
 from cure_job.events import Approved, Event
 from cure_job.goal import digest
 from cure_job.goal import PLUGIN_ROOT
@@ -27,6 +28,11 @@ def settings_args(job_id: str, plugin_root: Path = PLUGIN_ROOT) -> tuple[str, ..
     allow.append(f"Bash({cure_job} finish --help)")
     return ("--settings", json.dumps({"permissions": {"allow": allow}, "env": {"CURE_JOB_ID": job_id}},
                                      separators=(",", ":")))
+
+
+def listed(statuses: dict[str, SessionStatus]) -> dict[str, Session]:
+    """A session listing that lists each name with its status."""
+    return {name: Session(status) for name, status in statuses.items()}
 
 
 def handoff_text(repos=(REPO,), device="none", after: str | None = None) -> str:

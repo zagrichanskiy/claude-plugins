@@ -12,14 +12,14 @@ from cure_job.events import Closed, Reported, SessionsRemoved
 from cure_job.handoff import Device, Handoff
 from cure_job.result import Result, ResultStatus
 from cure_job.state import State, derive
-from tests.builders import NOW, make_record, result_of
+from tests.builders import NOW, make_record, result_of, listed
 from tests.test_state import A, B, launched
 
 TIMEOUT = "short-hold timeout: device:bench held by " + B
 
 
 def names(record, sessions=None, row=None):
-    view = derive([record], sessions or {}, NOW, frozenset())[0]
+    view = derive([record], listed(sessions or {}), NOW, frozenset())[0]
     return [action.name for action in actions(view, row or {})]
 
 
@@ -61,7 +61,7 @@ def test_needs_input_reported_job_gets_ask_input_only():
 
 def test_stalled_job_gets_confirm_stalled_with_the_wait():
     record = make_record(A, events=(launched(A, age=timedelta(minutes=5)),))
-    view = derive([record], {A: SessionStatus.IDLE}, NOW, frozenset())[0]
+    view = derive([record], listed({A: SessionStatus.IDLE}), NOW, frozenset())[0]
     assert actions(view, {}) == [Action("confirm-stalled", {"stalled-confirm-seconds": STALLED_CONFIRM_SECONDS})]
 
 
@@ -72,7 +72,7 @@ def test_lost_job_gets_ask_relaunch():
 
 def test_blocked_job_gets_tell_blocked_with_waiting_for():
     record = make_record(A, events=(launched(A),))
-    view = derive([record], {A: SessionStatus.WAITING}, NOW, frozenset())[0]
+    view = derive([record], listed({A: SessionStatus.WAITING}), NOW, frozenset())[0]
     assert view.state is State.BLOCKED
     assert actions(view, {"waiting-for": "a permission"}) == [Action("tell-blocked", {"waiting-for": "a permission"})]
 

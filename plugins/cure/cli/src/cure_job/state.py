@@ -14,11 +14,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import AbstractSet, Iterable, Mapping, Sequence
 
-from .claude import SessionStatus
+from .claude import Session
 from .config import DEFAULTS, Config
 from .events import WORK
 from .job import JobRecord
 from .result import ResultStatus
+from .sessions import JobSession, Liveness, liveness
 
 
 class State(enum.Enum):
@@ -48,6 +49,55 @@ class State(enum.Enum):
     @property
     def is_launchable(self) -> bool:
         return self in (State.APPROVED, State.LOST, State.NEEDS_INPUT)
+
+
+class Phase(enum.Enum):
+    """Where a job stands, from its files and events alone."""
+    QUEUED = "queued"
+    AWAITING_APPROVAL = "awaiting-approval"
+    APPROVED = "approved"
+    WORKING = "working"
+    NEEDS_INPUT = "needs-input"
+    DONE = "done"
+    FAILED = "failed"
+    ABANDONED = "abandoned"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self in (Phase.DONE, Phase.FAILED, Phase.ABANDONED)
+
+
+_PRE_LAUNCH = (Phase.QUEUED, Phase.AWAITING_APPROVAL, Phase.APPROVED)
+
+_WORKING_STATES = {Liveness.STARTING: State.LAUNCHED, Liveness.BUSY: State.RUNNING, Liveness.IDLE: State.RUNNING,
+                   Liveness.WAITING: State.BLOCKED, Liveness.STALLED: State.STALLED, Liveness.GONE: State.LOST}
+
+
+def phase_of(record: JobRecord) -> Phase:
+    if record.closed is not None:
+        return Phase.ABANDONED
+    if record.result is not None:
+        if record.result.status is ResultStatus.FAILED:
+            return Phase.FAILED
+        if record.result.status is ResultStatus.DONE and not record.result.unproven:
+            return Phase.DONE
+        return Phase.NEEDS_INPUT
+    if record.run > 0:
+        return Phase.WORKING
+    if not record.has_goal:
+        return Phase.QUEUED
+    return Phase.APPROVED if record.approved else Phase.AWAITING_APPROVAL
+
+
+def project(phase: Phase, held: bool, work: Liveness | None) -> State:
+    """The ``list --json`` state: the work liveness in ``WORKING``, ``held`` before a launch, else the phase."""
+    if phase is Phase.WORKING:
+        if work is None or work is Liveness.ENDED:
+            raise AssertionError(f"a working job has work liveness {work}")
+        return _WORKING_STATES[work]
+    if held and phase in _PRE_LAUNCH:
+        return State.HELD
+    return State(phase.value)
 
 
 #: `claude --bg` returns before `claude agents` lists the session as live. For
@@ -93,23 +143,41 @@ class After:
 
 
 @dataclass(frozen=True)
+class SessionView:
+    session: JobSession
+    #: ``None`` when the job's phase is done, failed or abandoned.
+    liveness: Liveness | None
+    #: The listed ``waitingFor`` of a waiting session.
+    waiting_for: str | None
+
+
+@dataclass(frozen=True)
 class JobView:
     record: JobRecord
-    state: State
+    phase: Phase
+    #: The latest session of each kind.
+    sessions: Mapping[str, SessionView]
     #: The holders of the resources the job names. An unsatisfied ``after`` is not among them.
     blocked_by: tuple[str, ...]
-    ended_at: datetime | None
+    #: Another job holds a resource the job names, or the job's ``after`` predecessor is not done.
+    held: bool
     after: After | None
+    ended_at: datetime | None
+
+    @property
+    def state(self) -> State:
+        work = self.sessions.get(WORK)
+        return project(self.phase, self.held, work.liveness if work is not None else None)
 
 
 def needs_sessions(records: Iterable[JobRecord]) -> bool:
-    """True when the state of some record depends on the session list."""
-    return any(record.run > 0 and record.result is None and record.closed is None for record in records)
+    """True when the view of some record depends on the session list."""
+    return any(record.open_sessions() and not phase_of(record).is_terminal for record in records)
 
 
 def is_open(record: JobRecord) -> bool:
     """The job is not done, failed or abandoned. Needs no session list."""
-    return _terminal_state(record) is None
+    return not phase_of(record).is_terminal
 
 
 def lock_rank(record: JobRecord) -> tuple[bool, str]:
@@ -133,28 +201,31 @@ def holders(records: Iterable[JobRecord]) -> dict[str, str]:
     return _holders(records, {record.id: _terminal_state(record) for record in records})
 
 
-def derive(records: Sequence[JobRecord], sessions: Mapping[str, SessionStatus], now: datetime,
+def derive(records: Sequence[JobRecord], sessions: Mapping[str, Session], now: datetime,
            invalid_ids: AbstractSet[str], launch_grace: timedelta = LAUNCH_GRACE) -> list[JobView]:
-    """One view per record, ascending id. ``sessions`` maps a session name to its status.
+    """One view per record, ascending id. ``sessions`` maps a session name to its listing.
     ``invalid_ids`` names the jobs whose files do not read."""
     ordered = sorted(records, key=lambda record: record.id)
     # Whether a job is open needs neither sessions nor locks, and the holders
     # need the open set and the done predecessors, so the terminal states are settled first.
     terminal = {record.id: _terminal_state(record) for record in ordered}
-    held = _holders(ordered, terminal)
+    holding = _holders(ordered, terminal)
     by_id = {record.id: record for record in ordered}
+    parts: dict[str, tuple[Phase, dict[str, SessionView], tuple[str, ...], bool]] = {}
     states: dict[str, State] = {}
-    blocked: dict[str, tuple[str, ...]] = {}
     for record in ordered:
-        state = terminal[record.id]
+        phase = phase_of(record)
+        views = _session_views(record, phase, sessions, now, launch_grace)
         blocked_by: tuple[str, ...] = ()
-        if state is None:
-            blocked_by = tuple(sorted({held.get(name) for name in record.resources} - {None, record.id}))
-            state = _open_state(record, sessions, now, blocked_by, _waits(record, terminal), launch_grace)
-        states[record.id] = state
-        blocked[record.id] = blocked_by
-    return [JobView(record, states[record.id], blocked[record.id], _ended_at(record, states[record.id]),
-                    _after(record, by_id, states, invalid_ids))
+        held = False
+        if not phase.is_terminal:
+            blocked_by = tuple(sorted({holding.get(name) for name in record.resources} - {None, record.id}))
+            held = bool(blocked_by) or _waits(record, terminal)
+        parts[record.id] = (phase, views, blocked_by, held)
+        work = views.get(WORK)
+        states[record.id] = project(phase, held, work.liveness if work is not None else None)
+    return [JobView(record, *parts[record.id], _after(record, by_id, states, invalid_ids),
+                    _ended_at(record, states[record.id]))
             for record in ordered]
 
 
@@ -197,45 +268,19 @@ def _after(record: JobRecord, records: Mapping[str, JobRecord], states: Mapping[
 
 
 def _terminal_state(record: JobRecord) -> State | None:
-    if record.closed is not None:
-        return State.ABANDONED
-    if record.result is None:
-        return None
-    if record.result.status is ResultStatus.FAILED:
-        return State.FAILED
-    if record.result.status is ResultStatus.DONE and not record.result.unproven:
-        return State.DONE
-    return None
+    phase = phase_of(record)
+    return State(phase.value) if phase.is_terminal else None
 
 
-def _open_state(record: JobRecord, sessions: Mapping[str, SessionStatus], now: datetime,
-                blocked_by: tuple[str, ...], waits: bool, launch_grace: timedelta) -> State:
-    if record.result is not None:
-        return State.NEEDS_INPUT
-    latest = record.latest(WORK)
-    if latest is not None:
-        status = sessions.get(latest.name)
-        within_grace = now - latest.started_at <= launch_grace
-        if status is SessionStatus.BUSY:
-            return State.RUNNING
-        # A session that waits for a permission or an answer needs the user
-        # now, so no grace applies.
-        if status is SessionStatus.WAITING:
-            return State.BLOCKED
-        if status is SessionStatus.IDLE:
-            return State.RUNNING if within_grace else State.STALLED
-        # A session can be listed without a pid while it starts or resumes.
-        # After `cure-job stop`, a session listed stopped is down for good and
-        # gets no grace. An unlisted session keeps the grace.
-        starting = status is None or (status is SessionStatus.STOPPED and not latest.stop_recorded)
-        if starting and within_grace:
-            return State.LAUNCHED
-        return State.LOST
-    if blocked_by or waits:
-        return State.HELD
-    if not record.has_goal:
-        return State.QUEUED
-    return State.APPROVED if is_ready(record) else State.AWAITING_APPROVAL
+def _session_views(record: JobRecord, phase: Phase, sessions: Mapping[str, Session], now: datetime,
+                   grace: timedelta) -> dict[str, SessionView]:
+    found: dict[str, SessionView] = {}
+    for session in {session.kind: session for session in record.sessions}.values():
+        listed = sessions.get(session.name)
+        state = None if phase.is_terminal else liveness(session, listed, now, grace)
+        waiting_for = listed.waiting_for if state is Liveness.WAITING and listed is not None else None
+        found[session.kind] = SessionView(session, state, waiting_for)
+    return found
 
 
 def _ended_at(record: JobRecord, state: State) -> datetime | None:

@@ -13,7 +13,7 @@ from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
 from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, is_ready, needs_sessions
-from tests.builders import NOW, make_record, result_of
+from tests.builders import NOW, make_record, result_of, listed
 
 BUSY, IDLE, STOPPED = SessionStatus.BUSY, SessionStatus.IDLE, SessionStatus.STOPPED
 A = "261013-1000-video-core-a"
@@ -27,11 +27,11 @@ def launched(job_id: str, run: int = 1, age: timedelta = timedelta(minutes=5)) -
 
 
 def state_of(record, sessions=None, now=NOW):
-    return derive([record], sessions or {}, now, frozenset())[0].state
+    return derive([record], listed(sessions or {}), now, frozenset())[0].state
 
 
 def states(records, sessions=None, now=NOW):
-    return {view.record.id: view.state for view in derive(records, sessions or {}, now, frozenset())}
+    return {view.record.id: view.state for view in derive(records, listed(sessions or {}), now, frozenset())}
 
 
 # --- one test per States row ------------------------------------------------------------------------

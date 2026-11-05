@@ -9,7 +9,7 @@ from cure_job.claude import Session, SessionStatus
 from cure_job.events import SessionStarted
 from cure_job.job_id import session_name
 from cure_job.state import LAUNCH_GRACE, State, derive
-from tests.builders import NOW, make_record
+from tests.builders import NOW, make_record, listed
 from tests.fakes import fake_id
 from tests.test_review_round1 import Harness
 
@@ -26,7 +26,7 @@ def h(root):
 
 def state_of(age):
     record = make_record(A, events=(SessionStarted("work", 1, session_name(A, 1), NOW - age, 1),))
-    return derive([record], {session_name(A, 1): WAITING}, NOW, frozenset())[0].state
+    return derive([record], listed({session_name(A, 1): WAITING}), NOW, frozenset())[0].state
 
 
 def launch(h, tmp_path, **kwargs):
@@ -62,7 +62,7 @@ def test_a_waiting_session_with_a_result_is_needs_input_not_blocked():
     from cure_job.result import ResultStatus
     record = make_record(A, events=(SessionStarted("work", 1, session_name(A, 1), NOW - timedelta(minutes=5), 1),),
                          result=result_of(ResultStatus.NEEDS_INPUT))
-    assert derive([record], {session_name(A, 1): WAITING}, NOW, frozenset())[0].state is State.NEEDS_INPUT
+    assert derive([record], listed({session_name(A, 1): WAITING}), NOW, frozenset())[0].state is State.NEEDS_INPUT
 
 
 def test_close_refuses_a_blocked_job_and_names_the_stop_command(h, tmp_path, capsys):
