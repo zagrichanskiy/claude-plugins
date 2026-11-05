@@ -82,7 +82,7 @@ resources. The claimant claims it per step. The goal tells the claimant the foll
 
 A Solo goal has no ledger and no backlog.
 
-Apply the `.notes/` exclusion for the ledger and the backlog, as the `note` skill describes. The job
+Apply the `.notes/` exclusion (append `.notes/` to `.git/info/exclude`) for the ledger and the backlog, as the `note` skill describes. In job mode the goal-writing session does not run this step: the goal's work item 1 carries it for the worker. A direct run applies it as before. The job
 directory belongs to the CLI: the goal never deletes it.
 
 ## Questions

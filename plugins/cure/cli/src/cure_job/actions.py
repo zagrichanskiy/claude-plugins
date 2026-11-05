@@ -88,11 +88,11 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
 
 
 def _answers_session(record: JobRecord, kinds: Mapping[str, SessionKind]) -> JobSession | None:
-    """The latest goal session, where it started in the current run after ``result.md`` was written."""
+    """The latest goal session, where it started in the current run with answers to ``result.md``."""
     latest = latest_goal_writer(record, kinds)
-    if latest is None or latest.run != record.run or record.result_mtime is None:
+    if latest is None or latest.run != record.run or record.result is None or not latest.inputs:
         return None
-    return latest if latest.started_at > record.result_mtime else None
+    return latest
 
 
 def _session_actions(record: JobRecord, kind: SessionKind, view: SessionView, config: Config) -> list[Action]:

@@ -120,7 +120,7 @@ def _work_prepare(ctx: StartContext) -> str:
     missing = missing_paths(retarget(ctx.store.read_goal(job_id), ctx.plugin_root), ctx.plugin_root)
     if missing:
         raise PluginError(f"{ctx.operation} refused: the goal file names {', '.join(missing)}, which does not exist; "
-                          f"write the goal again: cure-job start {job_id} goal")
+                          f"write the goal again: echo '<refusal>' | cure-job start {job_id} goal --input -")
     ctx.store.rewrite_goal(job_id, lambda text: retarget(text, ctx.plugin_root))
     return f"/goal @{ctx.store.goal_path(job_id)}"
 
@@ -150,7 +150,7 @@ WORK = SessionKind(
 
 def _goal_prepare(ctx: StartContext) -> str:
     job_id = ctx.record.id
-    prompt = f"job {job_id}: write or check the goal; handoff @{ctx.store.handoff_path(job_id)}"
+    prompt = f"job {job_id}: write the goal; handoff @{ctx.store.handoff_path(job_id)}"
     answers = ctx.inputs.get(GOAL.input)
     return prompt if answers is None else f"{prompt}; apply the answers in @{answers}"
 
@@ -162,11 +162,13 @@ def _goal_session_name(job_id: str, n: int) -> str:
 GOAL = SessionKind(
     name="goal",
     agent=lambda ctx: GOAL_WRITER,
-    allow=("Bash({cure_job} list *)", "Bash({cure_job} config get *)", "Write({job_dir}/goal.md)",
-           "Edit({job_dir}/goal.md)", "Bash(wc -c {job_dir}/goal.md)", "Bash(git -C * symbolic-ref *)",
+    # A file rule is absolute only with a leading "//"; "/" is relative to the settings source. job_dir starts with "/".
+    allow=("Bash({cure_job} list *)", "Bash({cure_job} config get *)", "Write(/{job_dir}/goal.md)",
+           "Edit(/{job_dir}/goal.md)", "Bash(wc -c {job_dir}/goal.md)", "Bash(git -C * symbolic-ref *)",
            "Bash(gh repo view *)"),
     deny=("Bash(claude *)", "Bash({cure_job} approve *)"),
-    start_states=frozenset({State.QUEUED, State.HELD, State.AWAITING_APPROVAL, State.APPROVED, State.NEEDS_INPUT}),
+    start_states=frozenset({State.QUEUED, State.HELD, State.AWAITING_APPROVAL, State.APPROVED, State.LOST,
+                             State.NEEDS_INPUT}),
     start_guards=(state_in_start_states,),
     end_guards=(goal_exists,),
     writes=frozenset({Artifact.GOAL}),

@@ -87,7 +87,7 @@ def test_cli_check_scenario(tmp_path, workdir, root, fake_state):
     assert created[1:] == [f'notify: SendMessage dispatcher "job {second}"']
     assert list_states(workdir) == [(first, "queued"), (second, "queued")]
 
-    # Step 2: the dispatcher writes goal.md and approves it.
+    # Step 2: the goal-writer writes goal.md and the dispatcher approves it.
     (root / "jobs" / first / "goal.md").write_text("goal", encoding="utf-8")
     assert list_states(workdir) == [(first, "awaiting-approval"), (second, "queued")]
     assert run(workdir, "approve", first, "--by", "user").returncode == 0
