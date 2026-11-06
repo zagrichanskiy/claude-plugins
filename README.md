@@ -169,7 +169,7 @@ rule does not drop it.
 | Event | Script | Effect |
 |---|---|---|
 | `UserPromptSubmit` | `flat-reminder.sh` | Adds a three-rule reminder (reply length, named references, no soft-offer closer) as hidden context on every prompt. |
-| `PreToolUse` | `flat-artifact-check.sh` | Denies `git commit`, `gh pr`/`gh issue` `create`/`edit`/`comment`, and ClickUp create/update/comment calls whose text has an identifier without its name or a soft-offer closer. Code spans and fenced blocks are not checked. |
+| `PreToolUse` | `flat-artifact-check.sh` | Denies `git commit`, `gh pr`/`gh issue` `create`/`edit`/`comment`, and any MCP call whose action (the last `__` segment of the tool name) starts with `create`, `update`, `edit`, `add`, `post` or `send`, when the text has an identifier without its name or a soft-offer closer. In an MCP call only the prose fields of the input are checked (`comment_text`, `body`, `description`, `markdown_description`, `name`, `title`, `content`, `text`, `message`, at any depth); id parameters and read calls pass. Code spans and fenced blocks are not checked. |
 
 **Status line** — the terminal status line under the input box.
 

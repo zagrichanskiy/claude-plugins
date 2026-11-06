@@ -1,5 +1,5 @@
 #!/bin/sh
-# PreToolUse: deny writing a commit message, pull request, issue or ClickUp task whose text has an
+# PreToolUse: deny writing a commit message, pull request, issue or MCP write whose text has an
 # identifier without its name or a soft-offer closer. These texts outlive the session, so this is
 # where a check can stop the text before anyone reads it. Code spans and fenced blocks are skipped,
 # so quoting a pattern is not a violation.
@@ -21,9 +21,13 @@ case "$tool" in
 $(cat "$file")"
     done
     ;;
-  mcp__*[Cc]lick[Uu]p*)
-    printf '%s' "$tool" | grep -Eiq 'create|update|comment' || exit 0
-    text=$(printf '%s' "$payload" | jq -r '[.tool_input | .. | strings] | join("\n")')
+  mcp__*)
+    # The action is the last `__` segment; only an action that starts with a write verb is checked.
+    printf '%s' "${tool##*__}" | grep -Eq '^(create|update|edit|add|post|send)([_A-Z-]|$)' || exit 0
+    text=$(printf '%s' "$payload" | jq -r '
+      [.tool_input | .. | objects | to_entries[]
+        | select(.key | IN("comment_text", "body", "description", "markdown_description", "name", "title", "content", "text", "message"))
+        | .value | strings] | join("\n")')
     ;;
   *)
     exit 0

@@ -66,6 +66,9 @@ recipes say what they contain. Name the file to read; do not summarise it. What 
 outright is what reading the repository will not tell you — the decisions taken in conversation and
 the reasoning that would otherwise be re-litigated.
 
+A goal or handoff contains a tracker write (comment, field, status change) only when the user
+asked for that write in the session.
+
 ## Anatomy
 
 ```markdown
