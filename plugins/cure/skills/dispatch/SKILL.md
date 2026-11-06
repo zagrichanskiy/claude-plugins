@@ -130,7 +130,7 @@ Tickets, only with the effective `delivery: pr` and a split. They are created fo
 
 | Case | Action |
 |---|---|
-| `split.tracker` is `github` (default), `gh auth status` succeeds, and the session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>" --body-file - <<'BODY'`. The body is complete on its own: what the part does, its scope (commands, options, files, formats) and its acceptance criteria. It has no "Split from" line and no reference to another ticket. The link is a comment on the original ticket: `gh issue comment <N> --repo <owner/repo> --body-file - <<'BODY'` with the body `Moved scope: #<new>`. |
+| `split.tracker` is `github` (default), `gh auth status` succeeds, and the session ticket is `#N`, `owner/repo#N` or a github.com issue URL, or there is none and `hasIssuesEnabled` is true for the delivering repository | `gh issue create --repo <owner/repo> --title "<outcome of the part>" --body-file - <<'BODY'`. The body is complete on its own: what the part does, its scope (commands, options, files, formats) and its acceptance criteria. It has no "Split from" line and no reference to another ticket. GitHub carries no link between the tickets. |
 | `split.tracker` is `jira` and the session has a Jira command or MCP tool | Create each ticket with the session's Jira command or MCP tool. The project comes from the session ticket. The description follows the same rule. A Jira issue link carries the relation. |
 | `split.tracker` is `clickup` and the session has the ClickUp MCP tools | Create each ticket with `mcp__clickup__clickup_create_task` in the list of the session ticket. The description follows the same rule. A ClickUp dependency (`mcp__clickup__clickup_add_task_dependency`) carries the relation. |
 | No tracker the skill can write to, `gh auth status` fails, or issues are disabled (checked before any create) | Create no ticket and do not split: write one handoff with the Estimate line, as step 5 says. The report names the check. The skill never logs in and never reads or stores a token. |
@@ -160,7 +160,8 @@ Write the handoff only through this command. Never create files under the state 
 the command fails, show its error to the user and stop. Do not retry with a changed slug.
 
 A goal or handoff contains a tracker write (comment, field, status change) only when the user
-asked for that write in the session.
+asked for that write in the session. Ticket creation by a branch split is set by the configured
+delivery, not by this rule.
 
 ## Waking the dispatcher
 

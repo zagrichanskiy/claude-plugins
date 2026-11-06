@@ -100,7 +100,8 @@ Write these files with `Bash` heredocs. A heredoc writes only these paths:
   origin. Never use `git switch -C`: it resets the branch and drops earlier commits. In
   Light and Full this step is the orchestrator's, in Solo the session's.
 - A goal or handoff contains a tracker write (comment, field, status change) only when the user
-  asked for that write in the session.
+  asked for that write in the session. Ticket creation by a branch split is set by the configured
+  delivery, not by this rule.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently.
 - A fork whose options differ in nothing the user would see is not a question: take the recommended

@@ -67,7 +67,8 @@ outright is what reading the repository will not tell you — the decisions take
 the reasoning that would otherwise be re-litigated.
 
 A goal or handoff contains a tracker write (comment, field, status change) only when the user
-asked for that write in the session.
+asked for that write in the session. Ticket creation by a branch split is set by the configured
+delivery, not by this rule.
 
 ## Anatomy
 
