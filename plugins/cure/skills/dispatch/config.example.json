@@ -32,5 +32,11 @@
   "band": {
     "tracker-url": "https://ienso-team.atlassian.net/browse/<key>"
   },
+  "dashboard": {
+    "refresh-seconds": 120,
+    "github-owners": [],
+    "clickup-spaces": [],
+    "clickup-lists": []
+  },
   "launch-grace-seconds": 60
 }

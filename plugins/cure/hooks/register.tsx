@@ -1,6 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import { parseTicket } from './ticket'
+import { EMPTY, sessionKind, settle } from './work'
+import type { DashboardConfig } from './work'
+import { cureJob, cureJobArgv, exec, fetchWork, githubRepo, readConfig, run } from './work-fetch'
+import { drawWork } from './work-pane'
+
 type Job = {
   id: string
   state: string
@@ -13,24 +19,10 @@ type Job = {
 }
 
 const isDispatcher = atom({ plugin: 'cure', key: 'isDispatcher' } as const, false)
+const isInteractive = atom({ plugin: 'cure', key: 'isInteractive' } as const, false)
+const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-1' })
 
-const exec = async ($: EngineInterface, argv: string[]) => {
-  try {
-    return await $.process.run(argv)
-  } catch {
-    return null
-  }
-}
-
-const run = async ($: EngineInterface, argv: string[]): Promise<string | null> => {
-  const result = await exec($, argv)
-  return result?.exitCode === 0 ? result.stdout.trim() : null
-}
-
-const cureJobArgv = ($: EngineInterface, args: string[]) => [`${$.plugin.root}/bin/cure-job`, ...args]
-const cureJob = ($: EngineInterface, args: string[]) => run($, cureJobArgv($, args))
-
-const TRACKER_KEY = /^[A-Z]+-[0-9]+$/
+const PANE = 'work'
 
 const trackerUrl = async ($: EngineInterface): Promise<string | null> => {
   const url = await cureJob($, ['config', 'get', 'band.tracker-url'])
@@ -50,19 +42,58 @@ const listJobs = async ($: EngineInterface): Promise<Job[]> => {
   }
 }
 
-const githubRepo = async ($: EngineInterface, dir: string | null) => {
-  const remote = dir === null ? null : await run($, ['git', '-C', dir, 'remote', 'get-url', 'origin'])
-  return remote?.match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?$/)?.[1] ?? null
+const ticketUrl = async ($: EngineInterface, job: Job, tracker: string | null): Promise<string | null> => {
+  const ticket = parseTicket(job.ticket)
+  if (ticket?.kind === 'url') return ticket.url
+  if (ticket?.kind === 'tracker') return tracker === null ? null : tracker.replaceAll('<key>', ticket.key)
+  if (ticket?.kind !== 'issue') return null
+  const repo = ticket.repo ?? (await githubRepo($, job.workspace))
+  return repo === null ? null : `https://github.com/${repo}/issues/${ticket.number}`
 }
 
-const ticketUrl = async ($: EngineInterface, job: Job, tracker: string | null): Promise<string | null> => {
-  const ticket = job.ticket ?? ''
-  if (/^https?:\/\/\S+$/.test(ticket)) return ticket
-  if (TRACKER_KEY.test(ticket)) return tracker === null ? null : tracker.replaceAll('<key>', ticket)
-  const issue = ticket.match(/^([\w.-]+\/[\w.-]+)?#([0-9]+)$/)
-  if (issue === null) return null
-  const repo = issue[1] ?? (await githubRepo($, job.workspace))
-  return repo === null ? null : `https://github.com/${repo}/issues/${issue[2]}`
+let timer: { cancel: () => void } | null = null
+let isRefreshing = false
+
+const refresh = async ($: EngineInterface, config: DashboardConfig) => {
+  if (isRefreshing) return
+  isRefreshing = true
+  try {
+    const fetched = await fetchWork($, config)
+    const now = await $.clock.now()
+    await update($, work, prev => ({
+      tasks: settle(prev.tasks, fetched.tasks, now),
+      prs: settle(prev.prs, fetched.prs, now),
+      jobs: settle(prev.jobs, fetched.jobs, now),
+      checkedAt: now,
+    }))
+  } catch (error) {
+    $.ui.log(`work pane: refresh failed: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    isRefreshing = false
+  }
+}
+
+/** Both start hooks call it: which of them fires first is not known, and each settles part of the session's kind. */
+const startDashboard = async ($: EngineInterface) => {
+  const kind = sessionKind({
+    isDispatcher: await read($, isDispatcher),
+    jobId: await $.env.get('CURE_JOB_ID'),
+    isInteractive: await read($, isInteractive),
+  })
+  if (kind !== 'user') {
+    timer?.cancel()
+    timer = null
+    if ((await $.ui.panes()).some(pane => pane.id === PANE)) await $.ui.close({ id: PANE })
+    return
+  }
+  if (timer !== null) return
+  const starting = { cancel: () => {} }
+  timer = starting
+  const config = await readConfig($)
+  if (timer !== starting) return
+  timer = $.clock.every(config.refreshSeconds * 1000, () => void refresh($, config))
+  void $.ui.open({ id: PANE, title: 'Work' })
+  void refresh($, config)
 }
 
 type Row = { job: Job; url: string | null; branch: string | null; dir: string | null }
@@ -70,7 +101,19 @@ type Row = { job: Job; url: string | null; branch: string | null; dir: string | 
 export const register: Register = on => {
   on('classic.SessionStart', async ($, e, next) => {
     await update($, isDispatcher, () => e.agent_type === 'cure:dispatcher')
+    await startDashboard($)
     return next(e)
+  })
+
+  on('session.start', async ($, e, next) => {
+    await update($, isInteractive, () => e.isInteractive)
+    await startDashboard($)
+    return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const { Box, Text, Link } = $.ui.resolve(e)
+    return drawWork({ Box, Text, Link }, await read($, work), await $.clock.now())
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -84,7 +127,7 @@ export const register: Register = on => {
     )
     if (jobs.length === 0) return next(e)
 
-    const tracker = jobs.some(job => TRACKER_KEY.test(job.ticket ?? '')) ? await trackerUrl($) : null
+    const tracker = jobs.some(job => parseTicket(job.ticket)?.kind === 'tracker') ? await trackerUrl($) : null
     const rows: Row[] = []
     for (const job of jobs) {
       const url = await ticketUrl($, job, tracker)

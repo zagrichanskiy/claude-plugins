@@ -44,6 +44,10 @@ DEFAULTS: dict[str, object] = {
     "short-hold.wait-total-minutes": 120,
     "prune.failed-days": 30,
     "band.tracker-url": "https://ienso-team.atlassian.net/browse/<key>",
+    "dashboard.refresh-seconds": 120,
+    "dashboard.github-owners": [],
+    "dashboard.clickup-spaces": [],
+    "dashboard.clickup-lists": [],
     "launch-grace-seconds": 60,
 }
 
@@ -245,6 +249,13 @@ def _key_url(value: object) -> str | None:
     return None if "<key>" in value else f"expected a URL with <key>, got {json.dumps(value)}"
 
 
+def _names(value: object) -> str | None:
+    if (not isinstance(value, list) or any(not isinstance(item, str) or not re.fullmatch(r"\S+", item) for item in value)
+            or len(set(value)) != len(value)):
+        return f"expected a list of distinct names without spaces, got {json.dumps(value)}"
+    return None
+
+
 def _tiers(value: object) -> str | None:
     if (not isinstance(value, list) or any(tier not in TIERS for tier in value)
             or len(set(value)) != len(value)):
@@ -284,6 +295,10 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "short-hold.wait-total-minutes": _int_range(10, 1440),
     "prune.failed-days": _int_range(1, 365),
     "band.tracker-url": _key_url,
+    "dashboard.refresh-seconds": _int_range(30, 3600),
+    "dashboard.github-owners": _names,
+    "dashboard.clickup-spaces": _names,
+    "dashboard.clickup-lists": _names,
     "launch-grace-seconds": _int_range(10, 600),
 }
 

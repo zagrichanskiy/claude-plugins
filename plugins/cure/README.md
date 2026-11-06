@@ -9,7 +9,7 @@ Config file: `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}
 Question policies: `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md`, beside `config.json`. The dispatcher reads it before each question round and appends a policy when the user calls a question not needed. The CLI does not read it.
 
 - The defaults live only in the key table of `config.py`.
-- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `band`; `launch-grace-seconds` is top-level).
+- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `band`, `dashboard`; `launch-grace-seconds` is top-level).
 - Lookup names stay dotted: `cure-job config get handoff.delivery`.
 
 | Command | Effect |
@@ -63,3 +63,26 @@ Ticket links:
 - An http(s) URL links to itself.
 
 A job session without a handoff `branch` shows `git branch --show-current` of its working directory.
+
+## Work dashboard
+
+The same module opens a pane titled Work in an interactive session that is neither a job session nor the dispatcher. It shows the user's open tracker tasks, their open GitHub pull requests and the cure jobs. The data is fetched once at session start and then every `dashboard.refresh-seconds`, without a model call. The pane is placed at once from 144 terminal columns; narrower, it waits until the terminal widens.
+
+| Source | Fetched with |
+|---|---|
+| Pull requests | `gh search prs --author @me` and `--review-requested @me` (open), then `gh pr view` per PR for the head branch, review decision and checks |
+| Jobs | `cure-job list --json` |
+| Tasks, `split.tracker` `github` | `gh search issues --assignee @me --state open`, once per `dashboard.github-owners` entry with `--owner`, once without when the list is empty |
+| Tasks, `split.tracker` `clickup` | `clickup_filter_tasks` of the session's ClickUp MCP server: assignee `me`, closed tasks left out, narrowed by `dashboard.clickup-spaces` and `dashboard.clickup-lists` (both narrow when both are set) |
+| Tasks, `split.tracker` `jira` | None: the pane says tasks are unavailable |
+
+Each task is one group with the PRs and jobs that belong to it. A PR belongs to a task by its head branch: `ABC-12_…` to the tracker key `ABC-12`, `issue-5-…` or `issue-5_…` to issue 5 of the PR's repository. A job belongs to a task by its `ticket`. A PR or job that matches no task is listed under Unlinked.
+
+A source whose refresh fails keeps its last data and the pane shows how old the data is and the error. A source with no data yet shows why it is unavailable; PRs and jobs still show without tasks.
+
+| Key | Default | Value |
+|---|---|---|
+| `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start |
+| `dashboard.github-owners` | `[]` | GitHub owners whose issues count as tasks; empty means every owner |
+| `dashboard.clickup-spaces` | `[]` | ClickUp space ids that narrow the tasks; empty means no space filter |
+| `dashboard.clickup-lists` | `[]` | ClickUp list ids that narrow the tasks; empty means no list filter |

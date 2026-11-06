@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 17
+    assert len(DEFAULTS) == 21
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -128,6 +128,41 @@ def test_config_check_rejects_a_band_tracker_url_without_the_key_placeholder(h, 
     configure(h, {"band": {"tracker-url": "https://example.atlassian.net/browse"}})
     assert h.run("config", "check") == 1
     assert "config.json: band.tracker-url: expected a URL with <key>" in capsys.readouterr().err
+
+
+DASHBOARD_LISTS = ["dashboard.github-owners", "dashboard.clickup-spaces", "dashboard.clickup-lists"]
+
+
+def test_config_get_dashboard_without_a_file_prints_the_defaults(h):
+    assert h.run("config", "get") == 0
+    assert json.loads(h.lines[0])["dashboard"] == {
+        "refresh-seconds": 120, "github-owners": [], "clickup-spaces": [], "clickup-lists": []}
+
+
+def test_config_check_accepts_dashboard_values_at_their_bounds(h):
+    configure(h, {"dashboard": {"refresh-seconds": 30, "github-owners": ["acme", "o2"], "clickup-spaces": ["9015"]}})
+    assert h.run("config", "check") == 0
+    configure(h, {"dashboard": {"refresh-seconds": 3600}})
+    assert h.run("config", "check") == 0
+
+
+@pytest.mark.parametrize("value", [29, 3601, 0, "120", 90.5, True])
+def test_config_check_rejects_a_dashboard_refresh_outside_30_to_3600(h, capsys, value):
+    configure(h, {"dashboard": {"refresh-seconds": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.refresh-seconds:" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.refresh-seconds") == 0
+    assert h.lines[-1] == "120"
+
+
+@pytest.mark.parametrize("key", DASHBOARD_LISTS)
+@pytest.mark.parametrize("value", ["acme", [1], ["a b"], [""], ["a", "a"]])
+def test_config_check_rejects_a_dashboard_list_that_is_not_distinct_names_without_spaces(h, capsys, key, value):
+    configure(h, {"dashboard": {key.partition(".")[2]: value}})
+    assert h.run("config", "check") == 1
+    assert f"config.json: {key}: expected a list of distinct names without spaces" in capsys.readouterr().err
+    assert h.run("config", "get", key) == 0
+    assert h.lines[-1] == "[]"
 
 
 def test_config_check_names_the_replacement_of_band_jira_url(h, capsys):
