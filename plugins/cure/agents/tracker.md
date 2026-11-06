@@ -58,7 +58,7 @@ Save the original body to a file under `/tmp` before any rewrite (GitHub: `gh is
 
 ## Step link
 
-1. Link the original to part 2 ("`<orig>` blocks part 2"). GitHub: a comment `Moved scope: #<new>` for each new ticket (`owner/repo#<new>` across repositories). Jira: an issue link. ClickUp: a dependency (`clickup_add_task_dependency`).
+1. Link the original to part 2 ("`<orig>` blocks part 2"). GitHub: no link. Jira: an issue link. ClickUp: a dependency (`clickup_add_task_dependency`).
 2. Rewrite the original body to the remaining scope, with the moved scope removed, from the saved body.
 3. Report a failed link or rewrite. Retry each once at most.
 
