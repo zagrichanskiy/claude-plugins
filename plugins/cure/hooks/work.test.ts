@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 
 const PANE = {
   plugin: 'cure',
@@ -18,25 +19,30 @@ type World = {
   jobs: unknown[]
   clickup: unknown[] | null
   isGhDown: boolean
+  ghCalls: number
+  clickupReply: unknown
+  configGate: Promise<void> | null
   opened: string[]
   closed: string[]
 }
 
 const world = (init: Partial<World> = {}): World => ({
-  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, opened: [], closed: [], ...init,
+  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, ghCalls: 0, clickupReply: undefined, configGate: null, opened: [], closed: [], ...init,
 })
 
 const out = (stdout: string, exitCode = 0, stderr = '') =>
   ({ value: { exitCode, stdout, stderr, isStdoutTruncated: false, isStderrTruncated: false } })
 
 const engine = (on: On, w: World) => {
-  on('process.run', (_, e) => {
+  on('process.run', async (_, e) => {
     const [bin = '', ...args] = [e.argv[0]?.split('/').pop() ?? '', ...e.argv.slice(1)]
     if (bin === 'cure-job' && args[0] === 'config') {
+      await w.configGate
       return out(JSON.stringify({ split: { tracker: w.tracker }, dashboard: { 'refresh-seconds': REFRESH } }))
     }
     if (bin === 'cure-job') return out(JSON.stringify(w.jobs))
     if (bin !== 'gh') return out('', 1)
+    w.ghCalls++
     if (w.isGhDown) return out('', 1, 'gh: network unreachable')
     if (args[1] === 'issues') return out(JSON.stringify(w.issues))
     if (args[1] === 'prs') return out(JSON.stringify(args.includes('--author') ? w.prs.map(({ headRefName, ...hit }) => hit) : []))
@@ -47,31 +53,34 @@ const engine = (on: On, w: World) => {
     w.opened.push(e.id)
     return { value: { isPlaced: true } }
   })
-  on('ui.panes', () => ({ value: w.opened.filter(id => !w.closed.includes(id)).map(id => ({ id, title: id, isPlaced: true })) }))
+  on('ui.panes', () => ({ value: w.opened.filter(id => !w.closed.includes(id)).map(id => ({ id, title: id, isPlaced: true, isShown: true, isFocused: false })) }))
   on('ui.close', (_, e) => {
     w.closed.push(e.id)
-    return {}
+    return { value: undefined }
   })
   on('tool.list', () => ({ value: [] }))
   on('mcp.call', () => ({
-    value: { content: [{ type: 'text', text: w.clickup === null ? 'ClickUp is down' : JSON.stringify({ tasks: w.clickup }) }], isError: w.clickup === null },
+    value: { content: [{ type: 'text', text: w.clickup === null ? 'ClickUp is down' : JSON.stringify(w.clickupReply ?? { tasks: w.clickup }) }], isError: w.clickup === null },
   }))
   on('classic.SessionStart', () => ({}))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
 }
 
-const start = async ($: Parameters<Parameters<typeof test>[1]>[0], on: On, w: World, env: Record<string, string> = {},
-  isDispatcher = false, isInteractive = true) => {
+const start = async ($: Engine, on: On, w: World, env: Record<string, string> = {},
+  isDispatcher = false, isInteractive = true, isSessionFirst = false) => {
   const clock = mock.clock(on, { now: 1_000_000 })
   mock.env(on, env)
   engine(on, w)
-  await $.classic.SessionStart({ source: 'startup', agent_type: isDispatcher ? 'cure:dispatcher' : 'main' })
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive })
+  const classic = () => $.classic.SessionStart({ source: 'startup', agent_type: isDispatcher ? 'cure:dispatcher' : 'main' })
+  const session = () => $.session.start({ cwd: '/', surface: 'terminal', isInteractive })
+  if (isSessionFirst) await session()
+  else await classic()
+  await (isSessionFirst ? classic : session)()
   await clock.settle()
   return clock
 }
 
-const texts = async (surface: (typeof SURFACES)[number], $: Parameters<Parameters<typeof test>[1]>[0]) => {
+const texts = async (surface: (typeof SURFACES)[number], $: Engine) => {
   const ui = await $.ui.mount({ ...PANE, surface })
   const found = (await ui.findAll({ type: 'Text' })).map(text => text.text)
   const hrefs = (await ui.findAll({ type: 'Link' })).map(link => link.props.href)
@@ -162,3 +171,90 @@ for (const [name, env, isDispatcher, isInteractive, isOpened] of [
     expect(w.opened).toEqual(isOpened ? ['work'] : [])
   })
 }
+
+test('a dispatcher whose session.start fires first never opens the pane or calls gh', async ($, on) => {
+  const w = world()
+  await start($, on, w, {}, true, true, true)
+  expect(w.opened).toEqual([])
+  expect(w.ghCalls).toBe(0)
+})
+
+test('a user session waits for both start hooks, whichever fires first, then opens the pane once', async ($, on) => {
+  const w = world()
+  const clock = mock.clock(on, { now: 1_000_000 })
+  mock.env(on, {})
+  engine(on, w)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.settle()
+  expect(w.opened).toEqual([])
+  expect(w.ghCalls).toBe(0)
+  await $.classic.SessionStart({ source: 'startup', agent_type: 'main' })
+  await clock.settle()
+  expect(w.opened).toEqual(['work'])
+  expect(w.ghCalls).toBeGreaterThan(0)
+})
+
+const taskLine = (found: string[], text: string) => found.findIndex(line => line.includes(text))
+
+for (const [name, tracker, ticket, task, key] of [
+  ['a GitHub issue URL joins owner/repo#N', 'github', 'https://github.com/o/r/issues/5',
+    { number: 5, title: 'Fix boot', state: 'open', repository: { nameWithOwner: 'o/r' } }, 'o/r#5 Fix boot'],
+  ['a ClickUp URL with a workspace joins the custom id', 'clickup', 'https://app.clickup.com/t/90123/RND-833',
+    { id: 'abc', custom_id: 'RND-833', name: 'Dashboard', status: 'open' }, 'RND-833 Dashboard'],
+  ['a ClickUp URL with a task id joins the task by its alias', 'clickup', 'https://app.clickup.com/t/abc',
+    { id: 'abc', custom_id: 'RND-833', name: 'Dashboard', status: 'open' }, 'RND-833 Dashboard'],
+] as const) {
+  test(`${name}`, async ($, on) => {
+    const w = world({
+      tracker, issues: tracker === 'github' ? [task] : [], clickup: tracker === 'clickup' ? [task] : [],
+      jobs: [{ id: 'j9', state: 'running', ticket, workspace: null }],
+    })
+    await start($, on, w)
+    const { found } = await texts('terminal', $)
+    expect(taskLine(found, key)).toBeGreaterThanOrEqual(0)
+    expect(taskLine(found, 'job j9')).toBeGreaterThan(taskLine(found, key))
+    expect(found).not.toContain('Unlinked')
+  })
+}
+
+test('a refresh that throws settles every source as failed instead of fetching forever', async ($, on) => {
+  const w = world()
+  mock.env(on, {})
+  engine(on, w)
+  on('clock.now', () => {
+    throw new Error('clock unreadable')
+  })
+  on('clock.every', () => ({ value: undefined }))
+  on('ui.log', () => ({ value: undefined }))
+  const written: unknown[] = []
+  on('state.set', (_, e, next) => {
+    if (e.key === 'work') written.push(e.value)
+    return next(e)
+  })
+  await $.classic.SessionStart({ source: 'startup', agent_type: 'main' })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  for (let turn = 0; turn < 200; turn++) await Promise.resolve()
+  const failed = { kind: 'unavailable' }
+  expect(written[0]).toMatchObject({ value: { tasks: failed, prs: failed, jobs: failed, checkedAt: 0 } })
+})
+
+test('a ClickUp reply without tasks shows the tasks-unavailable line', async ($, on) => {
+  const w = world({ tracker: 'clickup', clickupReply: { error: 'forbidden' } })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found).toContain('Tasks unavailable: ClickUp: the reply holds no task list')
+})
+
+test('session start returns without waiting on the config read', async ($, on) => {
+  let release = () => {}
+  const w = world({ configGate: new Promise<void>(resolve => (release = resolve)) })
+  const clock = mock.clock(on, { now: 1_000_000 })
+  mock.env(on, {})
+  engine(on, w)
+  await $.classic.SessionStart({ source: 'startup', agent_type: 'main' })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  expect(w.opened).toEqual([])
+  release()
+  await clock.settle()
+  expect(w.opened).toEqual(['work'])
+})

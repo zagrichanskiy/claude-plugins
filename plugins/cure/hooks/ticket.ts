@@ -20,9 +20,23 @@ export const branchTicket = (branch: string | null): Ticket | null => {
   return issue ? { kind: 'issue', repo: null, number: issue[1] ?? '' } : null
 }
 
-/** A tracker key, or `owner/repo#N` with `repo` standing in for a ticket that names no repository. */
+const GITHUB_ISSUE_URL = /^https?:\/\/(?:www\.)?github\.com\/([\w.-]+\/[\w.-]+)\/issues\/([0-9]+)(?:[/?#]\S*)?$/
+const CLICKUP_TASK_URL = /^https?:\/\/app\.clickup\.com\/t\/(?:[^/?#]+\/)?([^/?#]+)\/?(?:[?#]\S*)?$/
+
+const urlKey = (url: string): string | null => {
+  const issue = url.match(GITHUB_ISSUE_URL)
+  if (issue) return `${issue[1]}#${issue[2]}`
+  return url.match(CLICKUP_TASK_URL)?.[1] ?? null
+}
+
+/**
+ * A tracker key, or `owner/repo#N` with `repo` standing in for a ticket that names no repository.
+ * A GitHub issue URL keys as `owner/repo#N`; a ClickUp task URL as its last segment, the custom id
+ * under `/t/<workspace-id>/` and the task id otherwise.
+ */
 export const ticketKey = (ticket: Ticket | null, repo: string | null): string | null => {
   if (ticket?.kind === 'tracker') return ticket.key
+  if (ticket?.kind === 'url') return urlKey(ticket.url)
   if (ticket?.kind !== 'issue') return null
   const owner = ticket.repo ?? repo
   return owner === null ? null : `${owner}#${ticket.number}`

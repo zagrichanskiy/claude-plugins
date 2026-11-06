@@ -1,26 +1,17 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import { cureJob, cureJobArgv, exec, failure, githubRepo, listJobs, run } from './cure-job'
+import type { ListedJob } from './cure-job'
 import { parseTicket } from './ticket'
 import { EMPTY, sessionKind, settle } from './work'
-import type { DashboardConfig } from './work'
-import { cureJob, cureJobArgv, exec, fetchWork, githubRepo, readConfig, run } from './work-fetch'
+import type { DashboardConfig, Work } from './work'
+import { fetchWork, readConfig } from './work-fetch'
 import { drawWork } from './work-pane'
 
-type Job = {
-  id: string
-  state: string
-  open: number
-  ticket: string | null
-  'ticket-summary': string | null
-  prs: string[]
-  branch: string | null
-  workspace: string | null
-}
-
-const isDispatcher = atom({ plugin: 'cure', key: 'isDispatcher' } as const, false)
-const isInteractive = atom({ plugin: 'cure', key: 'isInteractive' } as const, false)
-const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-1' })
+const isDispatcher = atom({ plugin: 'cure', key: 'isDispatcher' } as const, null)
+const isInteractive = atom({ plugin: 'cure', key: 'isInteractive' } as const, null)
+const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-2' })
 
 const PANE = 'work'
 
@@ -33,16 +24,7 @@ const trackerUrl = async ($: EngineInterface): Promise<string | null> => {
   }
 }
 
-const listJobs = async ($: EngineInterface): Promise<Job[]> => {
-  const out = await cureJob($, ['list', '--json'])
-  try {
-    return out === null ? [] : (JSON.parse(out) as Job[])
-  } catch {
-    return []
-  }
-}
-
-const ticketUrl = async ($: EngineInterface, job: Job, tracker: string | null): Promise<string | null> => {
+const ticketUrl = async ($: EngineInterface, job: ListedJob, tracker: string | null): Promise<string | null> => {
   const ticket = parseTicket(job.ticket)
   if (ticket?.kind === 'url') return ticket.url
   if (ticket?.kind === 'tracker') return tracker === null ? null : tracker.replaceAll('<key>', ticket.key)
@@ -51,64 +33,83 @@ const ticketUrl = async ($: EngineInterface, job: Job, tracker: string | null): 
   return repo === null ? null : `https://github.com/${repo}/issues/${ticket.number}`
 }
 
+let isStarted = false
 let timer: { cancel: () => void } | null = null
 let isRefreshing = false
+
+const settled = (prev: Work, fetched: Awaited<ReturnType<typeof fetchWork>>, now: number): Work => ({
+  tasks: settle(prev.tasks, fetched.tasks, now),
+  prs: settle(prev.prs, fetched.prs, now),
+  jobs: settle(prev.jobs, fetched.jobs, now),
+  checkedAt: now,
+})
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 const refresh = async ($: EngineInterface, config: DashboardConfig) => {
   if (isRefreshing) return
   isRefreshing = true
+  let now: number | null = null
   try {
     const fetched = await fetchWork($, config)
-    const now = await $.clock.now()
-    await update($, work, prev => ({
-      tasks: settle(prev.tasks, fetched.tasks, now),
-      prs: settle(prev.prs, fetched.prs, now),
-      jobs: settle(prev.jobs, fetched.jobs, now),
-      checkedAt: now,
-    }))
+    now = await $.clock.now()
+    const at = now
+    await update($, work, prev => settled(prev, fetched, at))
   } catch (error) {
-    $.ui.log(`work pane: refresh failed: ${error instanceof Error ? error.message : String(error)}`)
+    $.ui.log(`work pane: refresh failed: ${message(error)}`)
+    const failed = failure(error)
+    try {
+      await update($, work, prev => settled(prev, { tasks: failed, prs: failed, jobs: failed }, now ?? prev.checkedAt ?? 0))
+    } catch (again) {
+      $.ui.log(`work pane: the failed refresh was not recorded: ${message(again)}`)
+    }
   } finally {
     isRefreshing = false
   }
 }
 
-/** Both start hooks call it: which of them fires first is not known, and each settles part of the session's kind. */
+/** Both start hooks call it; each supplies one fact of the session's kind, in an order that is not known. */
 const startDashboard = async ($: EngineInterface) => {
   const kind = sessionKind({
     isDispatcher: await read($, isDispatcher),
     jobId: await $.env.get('CURE_JOB_ID'),
     isInteractive: await read($, isInteractive),
   })
-  if (kind !== 'user') {
-    timer?.cancel()
-    timer = null
-    if ((await $.ui.panes()).some(pane => pane.id === PANE)) await $.ui.close({ id: PANE })
-    return
-  }
-  if (timer !== null) return
-  const starting = { cancel: () => {} }
-  timer = starting
+  if (kind !== 'user' || isStarted) return
+  isStarted = true
   const config = await readConfig($)
-  if (timer !== starting) return
   timer = $.clock.every(config.refreshSeconds * 1000, () => void refresh($, config))
   void $.ui.open({ id: PANE, title: 'Work' })
   void refresh($, config)
 }
 
-type Row = { job: Job; url: string | null; branch: string | null; dir: string | null }
+const startInBackground = ($: EngineInterface) =>
+  void startDashboard($).catch(error => $.ui.log(`work pane: start failed: ${message(error)}`))
+
+type Row = { job: ListedJob; url: string | null; branch: string | null; dir: string | null }
 
 export const register: Register = on => {
   on('classic.SessionStart', async ($, e, next) => {
     await update($, isDispatcher, () => e.agent_type === 'cure:dispatcher')
-    await startDashboard($)
-    return next(e)
+    const result = await next(e)
+    startInBackground($)
+    return result
   })
 
   on('session.start', async ($, e, next) => {
     await update($, isInteractive, () => e.isInteractive)
-    await startDashboard($)
-    return next(e)
+    const result = await next(e)
+    startInBackground($)
+    return result
+  })
+
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    const closed = await next(e)
+    if (e.origin.kind === 'person') {
+      timer?.cancel()
+      timer = null
+    }
+    return closed
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -122,7 +123,8 @@ export const register: Register = on => {
     const jobId = isBoard ? undefined : await $.env.get('CURE_JOB_ID')
     if (jobId === undefined && !isBoard) return next(e)
 
-    const jobs = (await listJobs($)).filter(job =>
+    const listed = await listJobs($)
+    const jobs = (listed.kind === 'ok' ? listed.data : []).filter(job =>
       isBoard ? job.state === 'awaiting-approval' : job.id === jobId,
     )
     if (jobs.length === 0) return next(e)
@@ -141,7 +143,7 @@ export const register: Register = on => {
     }
 
     const { Box, Button, Link, Text } = $.ui.resolve(e)
-    const press = (job: Job, said: string, args: string[]) => async () => {
+    const press = (job: ListedJob, said: string, args: string[]) => async () => {
       const result = await exec($, cureJobArgv($, args))
       if (result?.exitCode === 0) {
         void $.prompt.submit({ text: `${said} job ${job.id} from the band; rescan.` })

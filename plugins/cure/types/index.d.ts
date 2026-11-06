@@ -1,6 +1,7 @@
-export type CureBand = { isDispatcher: boolean }
+export type CureBand = { isDispatcher: boolean | null }
 
-export type CureWorkTask = { key: string; title: string; status: string }
+/** `key` is the one drawn; `aliases` are further keys a ticket may name it by, as a ClickUp task's id beside its custom id. */
+export type CureWorkTask = { key: string; aliases: string[]; title: string; status: string }
 
 export type CureWorkChecks = 'passing' | 'failing' | 'pending' | 'none' | 'unknown'
 
@@ -31,6 +32,6 @@ export type CureWork = {
 
 declare module 'claude-code' {
   interface PluginState {
-    cure: { isDispatcher: boolean; isInteractive: boolean; work: Shaped<CureWork> }
+    cure: { isDispatcher: boolean | null; isInteractive: boolean | null; work: Shaped<CureWork> }
   }
 }

@@ -13,10 +13,14 @@ export type Outcome<T> =
   | { kind: 'failed'; error: string }
   | { kind: 'unavailable'; reason: string }
 
-export type SessionKind = 'dispatcher' | 'job' | 'user' | 'headless'
+export type SessionKind = 'pending' | 'dispatcher' | 'job' | 'user' | 'headless'
 
-export const sessionKind = (s: { isDispatcher: boolean; jobId: string | undefined; isInteractive: boolean }): SessionKind =>
-  s.isDispatcher ? 'dispatcher' : s.jobId !== undefined ? 'job' : s.isInteractive ? 'user' : 'headless'
+/** `null` is a fact whose start hook has not fired yet; `pending` waits for it. */
+export const sessionKind = (s: { isDispatcher: boolean | null; jobId: string | undefined; isInteractive: boolean | null }): SessionKind =>
+  s.isDispatcher === true ? 'dispatcher'
+    : s.jobId !== undefined ? 'job'
+    : s.isDispatcher === null || s.isInteractive === null ? 'pending'
+    : s.isInteractive ? 'user' : 'headless'
 
 export const EMPTY: Work = {
   tasks: { kind: 'unavailable', reason: 'not fetched yet' },
@@ -80,11 +84,18 @@ export type TaskGroup = { task: Task; prs: Pr[]; jobs: Job[] }
 export type Groups = { tasks: TaskGroup[]; unlinked: { prs: Pr[]; jobs: Job[] } }
 
 export const group = (tasks: readonly Task[], prs: readonly Pr[], jobs: readonly Job[]): Groups => {
-  const byKey = new Map<string, TaskGroup>(tasks.map(task => [task.key, { task, prs: [], jobs: [] }]))
+  const groups: TaskGroup[] = []
+  const byKey = new Map<string, TaskGroup>()
+  for (const task of tasks) {
+    if (byKey.has(task.key)) continue
+    const entry: TaskGroup = { task, prs: [], jobs: [] }
+    groups.push(entry)
+    for (const key of [task.key, ...task.aliases]) if (!byKey.has(key)) byKey.set(key, entry)
+  }
   const unlinked: Groups['unlinked'] = { prs: [], jobs: [] }
   for (const pr of prs) (byKey.get(prKey(pr) ?? '') ?? unlinked).prs.push(pr)
   for (const job of jobs) (byKey.get(jobKey(job) ?? '') ?? unlinked).jobs.push(job)
-  return { tasks: [...byKey.values()], unlinked }
+  return { tasks: groups, unlinked }
 }
 
 export const dataOf = <T>(source: Source<T[]>): T[] => (source.kind === 'unavailable' ? [] : source.data)

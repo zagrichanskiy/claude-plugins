@@ -1,49 +1,9 @@
 import type { EngineInterface } from 'claude-code'
 
+import { cureJob, failure, githubRepo, json, listJobs } from './cure-job'
 import { parseTicket } from './ticket'
 import { dashboardConfig, rollup } from './work'
 import type { CheckItem, DashboardConfig, Job, Outcome, Pr, Task } from './work'
-
-export async function exec($: EngineInterface, argv: string[]) {
-  try {
-    return await $.process.run(argv)
-  } catch {
-    return null
-  }
-}
-
-export async function run($: EngineInterface, argv: string[]): Promise<string | null> {
-  const result = await exec($, argv)
-  return result?.exitCode === 0 ? result.stdout.trim() : null
-}
-
-export function cureJobArgv($: EngineInterface, args: string[]) {
-  return [`${$.plugin.root}/bin/cure-job`, ...args]
-}
-
-export function cureJob($: EngineInterface, args: string[]) {
-  return run($, cureJobArgv($, args))
-}
-
-export async function githubRepo($: EngineInterface, dir: string | null) {
-  const remote = dir === null ? null : await run($, ['git', '-C', dir, 'remote', 'get-url', 'origin'])
-  return remote?.match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?$/)?.[1] ?? null
-}
-
-const failure = (error: unknown) => ({ kind: 'failed', error: error instanceof Error ? error.message : String(error) }) as const
-
-async function json($: EngineInterface, argv: string[]): Promise<Outcome<unknown>> {
-  const result = await exec($, argv)
-  if (result === null) return failure(`${argv[0]?.split('/').pop()} did not run`)
-  if (result.exitCode !== 0) {
-    return failure(result.stderr.trim().split('\n')[0] || `${argv[0]?.split('/').pop()} exited ${result.exitCode}`)
-  }
-  try {
-    return { kind: 'ok', data: JSON.parse(result.stdout) }
-  } catch {
-    return failure(`${argv[0]?.split('/').pop()} printed no JSON`)
-  }
-}
 
 const guarded = async <T>(fetch: () => Promise<Outcome<T>>): Promise<Outcome<T>> => {
   try {
@@ -91,14 +51,12 @@ async function fetchPrs($: EngineInterface): Promise<Outcome<Pr[]>> {
   return { kind: 'ok', data: prs }
 }
 
-type Listed = { id: string; state: string; ticket: string | null; workspace: string | null }
-
 async function fetchJobs($: EngineInterface): Promise<Outcome<Job[]>> {
-  const listed = await json($, cureJobArgv($, ['list', '--json']))
+  const listed = await listJobs($)
   if (listed.kind !== 'ok') return listed
   const repos = new Map<string, string | null>()
   const jobs: Job[] = []
-  for (const job of listed.data as Listed[]) {
+  for (const job of listed.data) {
     const ticket = parseTicket(job.ticket)
     const dir = ticket?.kind === 'issue' && ticket.repo === null ? job.workspace : null
     if (dir !== null && !repos.has(dir)) repos.set(dir, await githubRepo($, dir))
@@ -116,7 +74,7 @@ async function githubTasks($: EngineInterface, owners: string[]): Promise<Outcom
       'number,title,repository,state'])
     if (found.kind !== 'ok') return found
     for (const issue of found.data as Issue[]) {
-      tasks.push({ key: `${issue.repository.nameWithOwner}#${issue.number}`, title: issue.title, status: issue.state })
+      tasks.push({ key: `${issue.repository.nameWithOwner}#${issue.number}`, aliases: [], title: issue.title, status: issue.state })
     }
   }
   return { kind: 'ok', data: tasks }
@@ -141,10 +99,11 @@ async function clickupTasks($: EngineInterface, config: DashboardConfig): Promis
     const result = await $.mcp.call(server, 'clickup_filter_tasks', { ...filter, page })
     const text = result.content.find(block => block.type === 'text')?.text ?? ''
     if (result.isError) return failure(`ClickUp: ${text.split('\n')[0] || 'the call failed'}`)
-    const body = (result.structuredContent ?? JSON.parse(text)) as ClickupPage
+    const body = (result.structuredContent ?? JSON.parse(text)) as Partial<ClickupPage> | null
+    if (!Array.isArray(body?.tasks)) return failure('ClickUp: the reply holds no task list')
     for (const task of body.tasks) {
       const status = typeof task.status === 'string' ? task.status : task.status?.status ?? ''
-      tasks.push({ key: task.custom_id || task.id, title: task.name, status })
+      tasks.push({ key: task.custom_id || task.id, aliases: task.custom_id ? [task.id] : [], title: task.name, status })
     }
     page = body.has_more ? body.next_page : undefined
   }
