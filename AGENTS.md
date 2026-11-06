@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 See [README.md](README.md) for what this repository contains and how to install it. This file
 records only what reading the files will not tell you.
