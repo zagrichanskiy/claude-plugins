@@ -66,7 +66,7 @@ A job session without a handoff `branch` shows `git branch --show-current` of it
 
 ## Work dashboard
 
-The same module opens a pane titled Work in an interactive session that is neither a job session nor the dispatcher. It shows the user's open tracker tasks, their open GitHub pull requests and the cure jobs. The data is fetched once at session start and then every `dashboard.refresh-seconds`, without a model call. The pane is placed at once from 144 terminal columns; narrower, it waits until the terminal widens. Closing the pane stops the refresh; `/work` reopens it and restarts the refresh, and in a job session or the dispatcher it answers that the pane is not available there.
+The same module opens a pane titled Work in an interactive session that is neither a job session nor the dispatcher. It shows the user's open tracker tasks, their open GitHub pull requests and the cure jobs. The data is fetched once at session start and then every `dashboard.refresh-seconds`, without a model call. The pane is placed at once from 144 terminal columns; narrower, it waits until the terminal widens. Closing the pane stops the refresh; `/cure-work` reopens it and restarts the refresh, and in a job session or the dispatcher it answers that the pane is not available there.
 
 | Source | Fetched with |
 |---|---|
@@ -82,7 +82,7 @@ A source whose refresh fails keeps its last data and the pane shows how old the 
 
 | Key | Default | Value |
 |---|---|---|
-| `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start and by `/work` |
+| `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start and by `/cure-work` |
 | `dashboard.github-owners` | `[]` | GitHub owners whose issues count as tasks and whose PRs are shown; empty means every owner |
 | `dashboard.clickup-spaces` | `[]` | ClickUp space ids that narrow the tasks; empty means no space filter |
 | `dashboard.clickup-lists` | `[]` | ClickUp list ids that narrow the tasks; empty means no list filter |

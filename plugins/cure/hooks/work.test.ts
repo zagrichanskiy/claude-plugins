@@ -357,15 +357,15 @@ test('session start returns without waiting on the config read', async ($, on) =
 })
 
 const runWork = ($: Engine) =>
-  $.command.run({ command: 'work', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+  $.command.run({ command: 'cure-work', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
 
-test('session start registers the work command', async ($, on) => {
+test('session start registers the cure-work command', async ($, on) => {
   const w = world()
   await start($, on, w)
-  expect(w.commands).toEqual(['work'])
+  expect(w.commands).toEqual(['cure-work'])
 })
 
-test('the work command in a user session reopens a closed pane and restarts polling', async ($, on) => {
+test('the cure-work command in a user session reopens a closed pane and restarts polling', async ($, on) => {
   const w = world()
   const clock = await start($, on, w)
   w.closed.push('work')
@@ -381,7 +381,7 @@ for (const [name, env, isDispatcher] of [
   ['a job session', { CURE_JOB_ID: 'j1' }, false],
   ['the dispatcher', {}, true],
 ] as const) {
-  test(`the work command in ${name} answers that the pane is not available and opens nothing`, async ($, on) => {
+  test(`the cure-work command in ${name} answers that the pane is not available and opens nothing`, async ($, on) => {
     const w = world()
     const clock = await start($, on, w, env, isDispatcher)
     const { text } = await runWork($)
@@ -392,7 +392,7 @@ for (const [name, env, isDispatcher] of [
   })
 }
 
-test('the work command while the pane is open restarts polling with a newly read config', async ($, on) => {
+test('the cure-work command while the pane is open restarts polling with a newly read config', async ($, on) => {
   const w = world()
   const clock = await start($, on, w)
   w.dashboard = { 'refresh-seconds': 30 }
@@ -428,7 +428,7 @@ test('a session start does not open or poll while a person has closed the pane',
   expect(w.ghCalls).toBe(0)
 })
 
-test('the work command opens the pane a person closed, clears the closed mark and polls', async ($, on) => {
+test('the cure-work command opens the pane a person closed, clears the closed mark and polls', async ($, on) => {
   const w = world()
   const clock = mock.clock(on, { now: 1_000_000 })
   mock.env(on, {})

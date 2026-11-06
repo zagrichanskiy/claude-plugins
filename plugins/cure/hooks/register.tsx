@@ -124,13 +124,13 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await update($, isInteractive, () => e.isInteractive)
     const result = await next(e)
-    void $.command.register({ name: 'work', description: 'Reopen the Work pane and restart its refresh' })
-      .catch(error => $.ui.log(`work pane: /work was not registered: ${message(error)}`))
+    void $.command.register({ name: 'cure-work', description: 'Reopen the Work pane and restart its refresh' })
+      .catch(error => $.ui.log(`work pane: /cure-work was not registered: ${message(error)}`))
     startInBackground($)
     return result
   })
 
-  on('command.run', { command: 'work' }, async $ => {
+  on('command.run', { command: 'cure-work' }, async $ => {
     if ((await kindOf($)) !== 'user') {
       return { text: 'The Work pane is shown only in an interactive user session, not in a job session or the dispatcher.' }
     }
