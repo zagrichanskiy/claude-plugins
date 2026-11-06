@@ -73,10 +73,9 @@ The same module opens a pane titled Work in an interactive session that is neith
 | Pull requests | One `gh api graphql` search for open PRs authored by `@me` and one for those whose review is requested from `@me`, narrowed to the `dashboard.github-owners` entries when the list is set; each returns the head branch, review decision and last commit's check state |
 | Jobs | `cure-job list --json`, narrowed to `dashboard.job-states` and, under `dashboard.job-scope` `workspace`, to the jobs whose `workspace` is the session's project root (where it started, or where `/cd`, a host directory change or a worktree move took it; a shell `cd` does not move it) |
 | Tasks, `split.tracker` `github` | `gh search issues --assignee @me --state open`, once per `dashboard.github-owners` entry with `--owner`, once without when the list is empty |
-| Tasks, `split.tracker` `clickup` | `clickup_filter_tasks` of the session's ClickUp MCP server: assignee `me`, closed tasks left out, narrowed by `dashboard.clickup-spaces` and `dashboard.clickup-lists` (both narrow when both are set) |
-| Tasks, `split.tracker` `jira` | None: the pane says tasks are unavailable |
+| Tasks, any other `split.tracker` | One call of the MCP tool `dashboard.tasks-mcp-tool` on server `dashboard.tasks-mcp-server` with `dashboard.tasks-mcp-args`; the list at `dashboard.tasks-field-items` in its reply gives one task per item. While the server, the tool or `dashboard.tasks-field-key` is empty, the pane says tasks are unavailable |
 
-Each task is one group with the PRs and jobs that belong to it. A PR belongs to a task by its head branch: `ABC-12_…` to the tracker key `ABC-12`, `issue-5-…` or `issue-5_…` to issue 5 of the PR's repository. A job belongs to a task by its `ticket`. A PR or job that matches no task is listed under Unlinked.
+Each task is one group with the PRs and jobs that belong to it. A PR belongs to a task by its head branch: `ABC-12_…` to the tracker key `ABC-12`, `issue-5-…` or `issue-5_…` to issue 5 of the PR's repository. A job belongs to a task by its `ticket`: a tracker key, an issue reference, or a URL equal to the task's `dashboard.tasks-field-url` value. A PR or job that matches no task is listed under Unlinked.
 
 A source whose refresh fails keeps its last data and the pane shows how old the data is and the error. When a PR search returns some PRs together with an error, the pane shows those PRs and the line `PRs incomplete: <reason>`. A source with no data yet shows why it is unavailable; PRs and jobs still show without tasks.
 
@@ -84,7 +83,13 @@ A source whose refresh fails keeps its last data and the pane shows how old the 
 |---|---|---|
 | `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start and by `/cure-work` |
 | `dashboard.github-owners` | `[]` | GitHub owners whose issues count as tasks and whose PRs are shown; empty means every owner |
-| `dashboard.clickup-spaces` | `[]` | ClickUp space ids that narrow the tasks; empty means no space filter |
-| `dashboard.clickup-lists` | `[]` | ClickUp list ids that narrow the tasks; empty means no list filter |
+| `dashboard.tasks-mcp-server` | `""` | MCP server whose tool lists the tasks when `split.tracker` is not `github` |
+| `dashboard.tasks-mcp-tool` | `""` | Name of that tool |
+| `dashboard.tasks-mcp-args` | `{}` | JSON object passed to the tool as its arguments |
+| `dashboard.tasks-field-items` | `""` | Dotted path to the task list in the tool's reply; empty means the reply is the list |
+| `dashboard.tasks-field-key` | `""` | Dotted path, within one item, to the task key; an item without a key is skipped |
+| `dashboard.tasks-field-title` | `""` | Dotted path to the task title; empty shows no title |
+| `dashboard.tasks-field-status` | `""` | Dotted path to the task status; empty shows no status |
+| `dashboard.tasks-field-url` | `""` | Dotted path to the task URL, by which a job whose `ticket` is that URL joins the task |
 | `dashboard.job-states` | `["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"]` | Job states the pane lists, each a state `cure-job list` reports (`invalid` included) |
 | `dashboard.job-scope` | `"workspace"` | `workspace` lists the jobs started in the session's project root; `all` lists every job |

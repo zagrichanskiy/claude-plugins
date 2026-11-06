@@ -35,8 +35,14 @@
   "dashboard": {
     "refresh-seconds": 120,
     "github-owners": [],
-    "clickup-spaces": [],
-    "clickup-lists": [],
+    "tasks-mcp-server": "",
+    "tasks-mcp-tool": "",
+    "tasks-mcp-args": {},
+    "tasks-field-items": "",
+    "tasks-field-key": "",
+    "tasks-field-title": "",
+    "tasks-field-status": "",
+    "tasks-field-url": "",
     "job-states": [
       "launched",
       "running",

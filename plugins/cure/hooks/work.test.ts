@@ -21,11 +21,11 @@ type World = {
   issues: unknown[]
   prs: Record<string, unknown>[]
   jobs: unknown[]
-  clickup: unknown[] | null
   isGhDown: boolean
   searchExit: number
   ghCalls: number
-  clickupReply: unknown
+  mcpReply: unknown
+  mcpCalls: unknown[]
   configGate: Promise<void> | null
   ghGate: Promise<void> | null
   opened: string[]
@@ -36,7 +36,7 @@ type World = {
 }
 
 const world = (init: Partial<World> = {}): World => ({
-  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, searchExit: 0, ghCalls: 0, clickupReply: undefined, configGate: null, ghGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
+  tracker: 'github', issues: [], prs: [], jobs: [], isGhDown: false, searchExit: 0, ghCalls: 0, mcpReply: null, mcpCalls: [], configGate: null, ghGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
 })
 
 const out = (stdout: string, exitCode = 0, stderr = '') =>
@@ -75,9 +75,10 @@ const engine = (on: On, w: World) => {
     return { value: { command: e.name } }
   })
   on('tool.list', () => ({ value: [] }))
-  on('mcp.call', () => ({
-    value: { content: [{ type: 'text', text: w.clickup === null ? 'ClickUp is down' : JSON.stringify(w.clickupReply ?? { tasks: w.clickup }) }], isError: w.clickup === null },
-  }))
+  on('mcp.call', (_, e) => {
+    w.mcpCalls.push(e)
+    return { value: { content: [{ type: 'text', text: JSON.stringify(w.mcpReply) }], isError: false } }
+  })
   on('classic.SessionStart', () => ({}))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
 }
@@ -127,28 +128,48 @@ test('a GitHub issue groups the PRs on issue-N-x and issue-N_x branches and the 
   }
 })
 
-test('a ClickUp task groups the PR on its RND-833_x branch and the job on its ticket', async ($, on) => {
+const TASKS_MCP = {
+  'tasks-mcp-server': 'acme-tasks', 'tasks-mcp-tool': 'list_items', 'tasks-mcp-args': { mine: true },
+  'tasks-field-items': 'data.items', 'tasks-field-key': 'ref', 'tasks-field-title': 'name',
+  'tasks-field-status': 'state.label', 'tasks-field-url': 'link',
+}
+
+test('a configured MCP tool lists the tasks by the configured fields and joins PRs and jobs by key and URL', async ($, on) => {
   const w = world({
-    tracker: 'clickup',
-    clickup: [{ id: 'abc', custom_id: 'RND-833', name: 'Dashboard', status: 'in progress' }],
-    prs: [pr(20, 'RND-833_dashboard'), pr(21, 'main-fix')],
-    jobs: [{ id: 'j2', state: 'running', ticket: 'RND-833', workspace: WORKSPACE }, { id: 'j3', state: 'running', ticket: null, workspace: WORKSPACE }],
+    tracker: 'acme', dashboard: TASKS_MCP,
+    mcpReply: { data: { items: [{ ref: 'ACME-7', name: 'Dashboard', state: { label: 'doing' }, link: 'https://tasks.example/i/7' }] } },
+    prs: [pr(20, 'ACME-7_dashboard'), pr(21, 'main-fix')],
+    jobs: [
+      { id: 'j2', state: 'running', ticket: 'ACME-7', workspace: WORKSPACE },
+      { id: 'j5', state: 'running', ticket: 'https://tasks.example/i/7', workspace: WORKSPACE },
+      { id: 'j3', state: 'running', ticket: null, workspace: WORKSPACE },
+    ],
   })
   await start($, on, w)
+  expect(w.mcpCalls[0]).toMatchObject({ server: 'acme-tasks', tool: 'list_items', args: { mine: true } })
   for (const surface of SURFACES) {
     const { found } = await texts(surface, $)
     const at = (text: string) => found.findIndex(line => line.includes(text))
-    expect(at('RND-833 Dashboard')).toBeGreaterThanOrEqual(0)
+    expect(at('ACME-7 Dashboard')).toBeGreaterThanOrEqual(0)
     expect(at('PR 20')).toBeLessThan(at('Unlinked'))
     expect(at('job j2')).toBeLessThan(at('Unlinked'))
+    expect(at('job j5')).toBeLessThan(at('Unlinked'))
     expect(at('PR 21')).toBeGreaterThan(at('Unlinked'))
     expect(at('job j3')).toBeGreaterThan(at('Unlinked'))
   }
 })
 
+test('a non-github tracker without the MCP task keys shows the tasks-unavailable line', async ($, on) => {
+  const w = world({ tracker: 'acme' })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found.filter(line => line.startsWith('Tasks unavailable: split.tracker acme has no task source'))).toHaveLength(1)
+  expect(w.mcpCalls).toHaveLength(0)
+})
+
 for (const [name, init] of [
   ['absent', { tracker: null }],
-  ['failing', { tracker: 'clickup', clickup: null }],
+  ['failing', { tracker: 'acme', dashboard: TASKS_MCP, mcpReply: { error: 'forbidden' } }],
 ] as const) {
   test(`a ${name} tracker prints one unavailable line and the PRs and jobs stay in Unlinked`, async ($, on) => {
     const w = world({ ...init, prs: [pr(30, 'RND-1_x')], jobs: [{ id: 'j4', state: 'running', ticket: null, workspace: WORKSPACE }] })
@@ -301,14 +322,10 @@ const taskLine = (found: string[], text: string) => found.findIndex(line => line
 for (const [name, tracker, ticket, task, key] of [
   ['a GitHub issue URL joins owner/repo#N', 'github', 'https://github.com/o/r/issues/5',
     { number: 5, title: 'Fix boot', state: 'open', repository: { nameWithOwner: 'o/r' } }, 'o/r#5 Fix boot'],
-  ['a ClickUp URL with a workspace joins the custom id', 'clickup', 'https://app.clickup.com/t/90123/RND-833',
-    { id: 'abc', custom_id: 'RND-833', name: 'Dashboard', status: 'open' }, 'RND-833 Dashboard'],
-  ['a ClickUp URL with a task id joins the task by its alias', 'clickup', 'https://app.clickup.com/t/abc',
-    { id: 'abc', custom_id: 'RND-833', name: 'Dashboard', status: 'open' }, 'RND-833 Dashboard'],
 ] as const) {
   test(`${name}`, async ($, on) => {
     const w = world({
-      tracker, issues: tracker === 'github' ? [task] : [], clickup: tracker === 'clickup' ? [task] : [],
+      tracker, issues: [task],
       jobs: [{ id: 'j9', state: 'running', ticket, workspace: WORKSPACE }],
     })
     await start($, on, w)
@@ -338,13 +355,6 @@ test('a refresh that throws settles every source as failed instead of fetching f
   for (let turn = 0; turn < 200; turn++) await Promise.resolve()
   const failed = { kind: 'unavailable' }
   expect(written[0]).toMatchObject({ value: { tasks: failed, prs: failed, jobs: failed, checkedAt: 0 } })
-})
-
-test('a ClickUp reply without tasks shows the tasks-unavailable line', async ($, on) => {
-  const w = world({ tracker: 'clickup', clickupReply: { error: 'forbidden' } })
-  await start($, on, w)
-  const { found } = await texts('terminal', $)
-  expect(found).toContain('Tasks unavailable: ClickUp: the reply holds no task list')
 })
 
 test('session start returns without waiting on the config read', async ($, on) => {

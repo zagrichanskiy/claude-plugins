@@ -1,9 +1,9 @@
 import type { EngineInterface } from 'claude-code'
 
 import { cureJob, exec, failure, githubRepo, json, listJobs } from './cure-job'
-import { parseTicket } from './ticket'
+import { parseTicket, ticketKey } from './ticket'
 import { dashboardConfig, rollup } from './work'
-import type { DashboardConfig, Job, Outcome, Pr, Task } from './work'
+import type { DashboardConfig, Job, Outcome, Pr, Task, TasksMcp } from './work'
 
 const guarded = async <T>(fetch: () => Promise<Outcome<T>>): Promise<Outcome<T>> => {
   try {
@@ -107,40 +107,37 @@ async function githubTasks($: EngineInterface, owners: string[]): Promise<Outcom
   return { kind: 'ok', data: tasks }
 }
 
-type ClickupTask = { id: string; custom_id?: string | null; name: string; status?: string | { status?: string } }
-type ClickupPage = { tasks: ClickupTask[]; has_more?: boolean; next_page?: number }
+const at = (value: unknown, path: string): unknown =>
+  path === '' ? value : path.split('.').reduce<unknown>((node, name) => (node as Record<string, unknown> | null)?.[name], value)
 
-const CLICKUP_PAGES = 10
+const scalar = (value: unknown): string => (typeof value === 'string' || typeof value === 'number' ? String(value) : '')
 
-async function clickupTasks($: EngineInterface, config: DashboardConfig): Promise<Outcome<Task[]>> {
-  const tools = await $.tool.list()
-  const server = tools.map(tool => tool.name.match(/^mcp__(.+)__clickup_filter_tasks$/)?.[1]).find(Boolean) ?? 'clickup'
-  const filter = {
-    assignees: ['me'], include_closed: false, fields: ['custom_id', 'status'],
-    ...(config.clickupSpaces.length > 0 && { space_ids: config.clickupSpaces }),
-    ...(config.clickupLists.length > 0 && { list_ids: config.clickupLists }),
-  }
+async function mcpTasks($: EngineInterface, { server, tool, args, field }: TasksMcp): Promise<Outcome<Task[]>> {
+  const result = await $.mcp.call(server, tool, args)
+  const text = result.content.find(block => block.type === 'text')?.text ?? ''
+  const name = `${server} ${tool}`
+  if (result.isError) return failure(`${name}: ${text.split('\n')[0] || 'the call failed'}`)
+  const items = at(result.structuredContent ?? JSON.parse(text), field.items)
+  if (!Array.isArray(items)) return failure(`${name}: the reply holds no list at "${field.items}"`)
   const tasks: Task[] = []
-  let page: number | undefined = 0
-  for (let pages = 0; page !== undefined && pages < CLICKUP_PAGES; pages++) {
-    const result = await $.mcp.call(server, 'clickup_filter_tasks', { ...filter, page })
-    const text = result.content.find(block => block.type === 'text')?.text ?? ''
-    if (result.isError) return failure(`ClickUp: ${text.split('\n')[0] || 'the call failed'}`)
-    const body = (result.structuredContent ?? JSON.parse(text)) as Partial<ClickupPage> | null
-    if (!Array.isArray(body?.tasks)) return failure('ClickUp: the reply holds no task list')
-    for (const task of body.tasks) {
-      const status = typeof task.status === 'string' ? task.status : task.status?.status ?? ''
-      tasks.push({ key: task.custom_id || task.id, aliases: task.custom_id ? [task.id] : [], title: task.name, status })
-    }
-    page = body.has_more ? body.next_page : undefined
+  for (const item of items) {
+    const key = scalar(at(item, field.key))
+    if (key === '') continue
+    const url = field.url === '' ? '' : scalar(at(item, field.url))
+    tasks.push({
+      key, aliases: url === '' ? [] : [ticketKey({ kind: 'url', url }, null) ?? url],
+      title: field.title === '' ? '' : scalar(at(item, field.title)),
+      status: field.status === '' ? '' : scalar(at(item, field.status)),
+    })
   }
   return { kind: 'ok', data: tasks }
 }
 
 function fetchTasks($: EngineInterface, config: DashboardConfig): Promise<Outcome<Task[]>> {
   if (config.tracker === 'github') return githubTasks($, config.githubOwners)
-  if (config.tracker === 'clickup') return clickupTasks($, config)
-  return Promise.resolve({ kind: 'unavailable', reason: `split.tracker ${config.tracker ?? '(unread)'} has no task source` })
+  const { server, tool, field } = config.tasksMcp
+  if (server !== '' && tool !== '' && field.key !== '') return mcpTasks($, config.tasksMcp)
+  return Promise.resolve({ kind: 'unavailable', reason: `split.tracker ${config.tracker ?? '(unread)'} has no task source and no dashboard.tasks-mcp-server, tasks-mcp-tool and tasks-field-key` })
 }
 
 export async function fetchWork($: EngineInterface, config: DashboardConfig) {

@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 23
+    assert len(DEFAULTS) == 29
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -130,19 +130,26 @@ def test_config_check_rejects_a_band_tracker_url_without_the_key_placeholder(h, 
     assert "config.json: band.tracker-url: expected a URL with <key>" in capsys.readouterr().err
 
 
-DASHBOARD_LISTS = ["dashboard.github-owners", "dashboard.clickup-spaces", "dashboard.clickup-lists"]
+DASHBOARD_LISTS = ["dashboard.github-owners"]
+DASHBOARD_NAMES = ["dashboard.tasks-mcp-server", "dashboard.tasks-mcp-tool", "dashboard.tasks-field-items",
+                   "dashboard.tasks-field-key", "dashboard.tasks-field-title", "dashboard.tasks-field-status",
+                   "dashboard.tasks-field-url"]
 
 
 def test_config_get_dashboard_without_a_file_prints_the_defaults(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0])["dashboard"] == {
-        "refresh-seconds": 120, "github-owners": [], "clickup-spaces": [], "clickup-lists": [],
+        "refresh-seconds": 120, "github-owners": [], "tasks-mcp-server": "", "tasks-mcp-tool": "",
+        "tasks-mcp-args": {}, "tasks-field-items": "", "tasks-field-key": "", "tasks-field-title": "",
+        "tasks-field-status": "", "tasks-field-url": "",
         "job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
         "job-scope": "workspace"}
 
 
 def test_config_check_accepts_dashboard_values_at_their_bounds(h):
-    configure(h, {"dashboard": {"refresh-seconds": 30, "github-owners": ["acme", "o2"], "clickup-spaces": ["9015"]}})
+    configure(h, {"dashboard": {"refresh-seconds": 30, "github-owners": ["acme", "o2"],
+                                "tasks-mcp-server": "acme-tasks", "tasks-mcp-tool": "list_items",
+                                "tasks-mcp-args": {"mine": True}, "tasks-field-key": "ref.id"}})
     assert h.run("config", "check") == 0
     configure(h, {"dashboard": {"refresh-seconds": 3600}})
     assert h.run("config", "check") == 0
@@ -165,6 +172,25 @@ def test_config_check_rejects_a_dashboard_list_that_is_not_distinct_names_withou
     assert f"config.json: {key}: expected a list of distinct names without spaces" in capsys.readouterr().err
     assert h.run("config", "get", key) == 0
     assert h.lines[-1] == "[]"
+
+
+@pytest.mark.parametrize("key", DASHBOARD_NAMES)
+@pytest.mark.parametrize("value", ["a b", 1, None, ["ref"]])
+def test_config_check_rejects_a_dashboard_task_name_that_is_not_a_string_without_spaces(h, capsys, key, value):
+    configure(h, {"dashboard": {key.partition(".")[2]: value}})
+    assert h.run("config", "check") == 1
+    assert f"config.json: {key}: expected a name without spaces" in capsys.readouterr().err
+    assert h.run("config", "get", key) == 0
+    assert h.lines[-1] == '""'
+
+
+@pytest.mark.parametrize("value", [[], "mine", 1])
+def test_config_check_rejects_dashboard_task_args_that_are_not_an_object(h, capsys, value):
+    configure(h, {"dashboard": {"tasks-mcp-args": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.tasks-mcp-args: expected a JSON object" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.tasks-mcp-args") == 0
+    assert h.lines[-1] == "{}"
 
 
 @pytest.mark.parametrize("value", [[], ["done", "failed"], ["invalid", "needs-input"]])

@@ -42,17 +42,26 @@ export const settle = <T>(prev: Source<T>, outcome: Outcome<T>, now: number): So
 export const rollup = (state: string | null | undefined): Checks =>
   !state ? 'none' : state === 'SUCCESS' ? 'passing' : state === 'FAILURE' || state === 'ERROR' ? 'failing' : 'pending'
 
+/** Each `field` is a dotted path into the tool's reply; `items` empty means the reply is the list itself. */
+export type TasksMcp = {
+  server: string
+  tool: string
+  args: Record<string, unknown>
+  field: { items: string; key: string; title: string; status: string; url: string }
+}
+
 export type DashboardConfig = {
   refreshSeconds: number
   tracker: string | null
   githubOwners: string[]
-  clickupSpaces: string[]
-  clickupLists: string[]
+  tasksMcp: TasksMcp
   jobStates: string[]
   jobScope: 'workspace' | 'all'
 }
 
 const JOB_STATES = ['launched', 'running', 'blocked', 'stalled', 'lost', 'needs-input', 'failed']
+
+const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
@@ -62,12 +71,21 @@ export const dashboardConfig = (config: unknown): DashboardConfig => {
   const groups = (config ?? {}) as { split?: { tracker?: unknown }; dashboard?: Record<string, unknown> }
   const dashboard = groups.dashboard ?? {}
   const seconds = dashboard['refresh-seconds']
+  const args = dashboard['tasks-mcp-args']
   return {
     refreshSeconds: typeof seconds === 'number' && seconds > 0 ? seconds : 120,
     tracker: typeof groups.split?.tracker === 'string' ? groups.split.tracker : null,
     githubOwners: strings(dashboard['github-owners']),
-    clickupSpaces: strings(dashboard['clickup-spaces']),
-    clickupLists: strings(dashboard['clickup-lists']),
+    tasksMcp: {
+      server: text(dashboard['tasks-mcp-server']),
+      tool: text(dashboard['tasks-mcp-tool']),
+      args: typeof args === 'object' && args !== null && !Array.isArray(args) ? args as Record<string, unknown> : {},
+      field: {
+        items: text(dashboard['tasks-field-items']), key: text(dashboard['tasks-field-key']),
+        title: text(dashboard['tasks-field-title']), status: text(dashboard['tasks-field-status']),
+        url: text(dashboard['tasks-field-url']),
+      },
+    },
     jobStates: Array.isArray(dashboard['job-states']) ? strings(dashboard['job-states']) : JOB_STATES,
     jobScope: dashboard['job-scope'] === 'all' ? 'all' : 'workspace',
   }

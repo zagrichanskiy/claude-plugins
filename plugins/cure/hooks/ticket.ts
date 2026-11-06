@@ -21,18 +21,14 @@ export const branchTicket = (branch: string | null): Ticket | null => {
 }
 
 const GITHUB_ISSUE_URL = /^https?:\/\/(?:www\.)?github\.com\/([\w.-]+\/[\w.-]+)\/issues\/([0-9]+)(?:[/?#]\S*)?$/
-const CLICKUP_TASK_URL = /^https?:\/\/app\.clickup\.com\/t\/(?:[^/?#]+\/)?([^/?#]+)\/?(?:[?#]\S*)?$/
-
-const urlKey = (url: string): string | null => {
+const urlKey = (url: string): string => {
   const issue = url.match(GITHUB_ISSUE_URL)
-  if (issue) return `${issue[1]}#${issue[2]}`
-  return url.match(CLICKUP_TASK_URL)?.[1] ?? null
+  return issue ? `${issue[1]}#${issue[2]}` : url
 }
 
 /**
  * A tracker key, or `owner/repo#N` with `repo` standing in for a ticket that names no repository.
- * A GitHub issue URL keys as `owner/repo#N`; a ClickUp task URL as its last segment, the custom id
- * under `/t/<workspace-id>/` and the task id otherwise.
+ * A GitHub issue URL keys as `owner/repo#N`; any other URL keys as itself, which a task's URL alias matches.
  */
 export const ticketKey = (ticket: Ticket | null, repo: string | null): string | null => {
   if (ticket?.kind === 'tracker') return ticket.key
