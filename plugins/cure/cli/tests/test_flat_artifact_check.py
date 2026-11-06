@@ -131,6 +131,9 @@ def test_mcp_write_with_bare_identifier_in_id_and_clean_prose_passes(tool_name, 
             "mcp__slack__post_message",
             {"channel": "C1", "content": [{"type": "text", "text": "Blocks RND-123"}]},
         ),
+        ("mcp__tracker2__tracker2_create_task_comment", {"task_id": "RND-1", "comment_text": "Blocks RND-123"}),
+        ("mcp__slack__addComment", {"channel": "C1", "text": "Blocks RND-123"}),
+        ("mcp__notes__notes-create-pages", {"parent": "P1", "title": "Blocks RND-123"}),
     ],
 )
 def test_mcp_write_with_bare_identifier_in_prose_is_denied(tool_name, tool_input):
@@ -150,6 +153,20 @@ def test_mcp_write_with_bare_identifier_in_prose_is_denied(tool_name, tool_input
     ],
 )
 def test_mcp_tool_without_write_verb_passes(tool_name):
+    result = run_tool(tool_name, {"task_id": "RND-1", "description": "Blocks RND-123"})
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        "mcp__tracker2__get_create_form",
+        "mcp__slack__list_post_drafts",
+    ],
+)
+def test_mcp_read_verb_before_write_verb_passes(tool_name):
     result = run_tool(tool_name, {"task_id": "RND-1", "description": "Blocks RND-123"})
 
     assert result.returncode == 0
