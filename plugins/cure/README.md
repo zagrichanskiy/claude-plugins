@@ -83,7 +83,7 @@ A source whose refresh fails keeps its last data and the pane shows how old the 
 |---|---|---|
 | `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start and by `/cure-work` |
 | `dashboard.github-owners` | `[]` | GitHub owners whose issues count as tasks and whose PRs are shown; empty means every owner |
-| `dashboard.tasks-mcp-server` | `""` | MCP server whose tool lists the tasks when `split.tracker` is not `github` |
+| `dashboard.tasks-mcp-server` | `""` | MCP server whose tool lists the tasks when `split.tracker` is not `github`, named as `/mcp` lists it |
 | `dashboard.tasks-mcp-tool` | `""` | Name of that tool |
 | `dashboard.tasks-mcp-args` | `{}` | JSON object passed to the tool as its arguments |
 | `dashboard.tasks-field-items` | `""` | Dotted path to the task list in the tool's reply; empty means the reply is the list |

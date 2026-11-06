@@ -330,7 +330,7 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "band.tracker-url": _key_url,
     "dashboard.refresh-seconds": _int_range(30, 3600),
     "dashboard.github-owners": _names,
-    "dashboard.tasks-mcp-server": _optional_name,
+    "dashboard.tasks-mcp-server": _text,
     "dashboard.tasks-mcp-tool": _optional_name,
     "dashboard.tasks-mcp-args": _object,
     "dashboard.tasks-field-items": _optional_name,

@@ -131,7 +131,7 @@ def test_config_check_rejects_a_band_tracker_url_without_the_key_placeholder(h, 
 
 
 DASHBOARD_LISTS = ["dashboard.github-owners"]
-DASHBOARD_NAMES = ["dashboard.tasks-mcp-server", "dashboard.tasks-mcp-tool", "dashboard.tasks-field-items",
+DASHBOARD_NAMES = ["dashboard.tasks-mcp-tool", "dashboard.tasks-field-items",
                    "dashboard.tasks-field-key", "dashboard.tasks-field-title", "dashboard.tasks-field-status",
                    "dashboard.tasks-field-url"]
 
@@ -153,6 +153,22 @@ def test_config_check_accepts_dashboard_values_at_their_bounds(h):
     assert h.run("config", "check") == 0
     configure(h, {"dashboard": {"refresh-seconds": 3600}})
     assert h.run("config", "check") == 0
+
+
+def test_config_check_accepts_a_tasks_server_named_with_spaces_and_dots(h):
+    configure(h, {"dashboard": {"tasks-mcp-server": "claude.ai Acme Tasks"}})
+    assert h.run("config", "check") == 0
+    assert h.run("config", "get", "dashboard.tasks-mcp-server") == 0
+    assert h.lines[-1] == '"claude.ai Acme Tasks"'
+
+
+@pytest.mark.parametrize("value", [1, None, ["acme-tasks"]])
+def test_config_check_rejects_a_tasks_server_that_is_not_a_string(h, capsys, value):
+    configure(h, {"dashboard": {"tasks-mcp-server": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.tasks-mcp-server: expected a string" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.tasks-mcp-server") == 0
+    assert h.lines[-1] == '""'
 
 
 @pytest.mark.parametrize("value", [29, 3601, 0, "120", 90.5, True])

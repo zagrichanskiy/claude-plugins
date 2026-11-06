@@ -117,7 +117,15 @@ async function mcpTasks($: EngineInterface, { server, tool, args, field }: Tasks
   const text = result.content.find(block => block.type === 'text')?.text ?? ''
   const name = `${server} ${tool}`
   if (result.isError) return failure(`${name}: ${text.split('\n')[0] || 'the call failed'}`)
-  const items = at(result.structuredContent ?? JSON.parse(text), field.items)
+  let reply: unknown = result.structuredContent
+  if (reply === undefined || reply === null) {
+    try {
+      reply = JSON.parse(text)
+    } catch {
+      return failure(`${name}: the reply is not JSON`)
+    }
+  }
+  const items = at(reply, field.items)
   if (!Array.isArray(items)) return failure(`${name}: the reply holds no list at "${field.items}"`)
   const tasks: Task[] = []
   for (const item of items) {

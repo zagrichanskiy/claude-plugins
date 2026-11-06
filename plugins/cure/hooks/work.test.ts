@@ -25,6 +25,8 @@ type World = {
   searchExit: number
   ghCalls: number
   mcpReply: unknown
+  mcpText: string | null
+  mcpIsError: boolean
   mcpCalls: unknown[]
   configGate: Promise<void> | null
   ghGate: Promise<void> | null
@@ -36,7 +38,7 @@ type World = {
 }
 
 const world = (init: Partial<World> = {}): World => ({
-  tracker: 'github', issues: [], prs: [], jobs: [], isGhDown: false, searchExit: 0, ghCalls: 0, mcpReply: null, mcpCalls: [], configGate: null, ghGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
+  tracker: 'github', issues: [], prs: [], jobs: [], isGhDown: false, searchExit: 0, ghCalls: 0, mcpReply: null, mcpText: null, mcpIsError: false, mcpCalls: [], configGate: null, ghGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
 })
 
 const out = (stdout: string, exitCode = 0, stderr = '') =>
@@ -74,10 +76,9 @@ const engine = (on: On, w: World) => {
     w.commands.push(e.name)
     return { value: { command: e.name } }
   })
-  on('tool.list', () => ({ value: [] }))
   on('mcp.call', (_, e) => {
     w.mcpCalls.push(e)
-    return { value: { content: [{ type: 'text', text: JSON.stringify(w.mcpReply) }], isError: false } }
+    return { value: { content: [{ type: 'text', text: w.mcpText ?? JSON.stringify(w.mcpReply) }], isError: w.mcpIsError } }
   })
   on('classic.SessionStart', () => ({}))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -172,7 +173,7 @@ for (const [name, init] of [
   ['failing', { tracker: 'acme', dashboard: TASKS_MCP, mcpReply: { error: 'forbidden' } }],
 ] as const) {
   test(`a ${name} tracker prints one unavailable line and the PRs and jobs stay in Unlinked`, async ($, on) => {
-    const w = world({ ...init, prs: [pr(30, 'RND-1_x')], jobs: [{ id: 'j4', state: 'running', ticket: null, workspace: WORKSPACE }] })
+    const w = world({ ...init, prs: [pr(30, 'ACME-1_x')], jobs: [{ id: 'j4', state: 'running', ticket: null, workspace: WORKSPACE }] })
     await start($, on, w)
     for (const surface of SURFACES) {
       const { found } = await texts(surface, $)
@@ -183,6 +184,31 @@ for (const [name, init] of [
     }
   })
 }
+
+for (const [name, init, reason] of [
+  ['an MCP error reply', { mcpIsError: true, mcpText: 'forbidden: token expired\nretry later' }, 'forbidden: token expired'],
+  ['a non-JSON MCP reply', { mcpText: 'Here are your items' }, 'the reply is not JSON'],
+] as const) {
+  test(`${name} prints one tasks-unavailable line naming the server and tool`, async ($, on) => {
+    const w = world({ tracker: 'acme', dashboard: TASKS_MCP, ...init })
+    await start($, on, w)
+    const { found } = await texts('terminal', $)
+    expect(found.filter(line => line.startsWith('Tasks '))).toEqual([`Tasks unavailable: acme-tasks list_items: ${reason}`])
+  })
+}
+
+test('an empty tasks-field-items reads a top-level list, skips an item without a key and shows a numeric key', async ($, on) => {
+  const w = world({
+    tracker: 'acme', dashboard: { ...TASKS_MCP, 'tasks-field-items': '' },
+    mcpReply: [{ ref: 'ACME-8', name: 'Keyed' }, { name: 'Unkeyed' }, { ref: 42, name: 'Numbered' }],
+  })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.includes('ACME-8 Keyed'))).toBe(true)
+  expect(found.some(line => line.includes('42 Numbered'))).toBe(true)
+  expect(found.some(line => line.includes('Unkeyed'))).toBe(false)
+  expect(found.some(line => line.startsWith('Tasks '))).toBe(false)
+})
 
 test('each role searches open PRs with one user qualifier per configured owner', async ($, on) => {
   const w = world({ dashboard: { 'github-owners': ['acme', 'o2'] } })
