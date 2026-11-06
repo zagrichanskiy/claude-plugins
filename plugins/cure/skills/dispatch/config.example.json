@@ -36,7 +36,17 @@
     "refresh-seconds": 120,
     "github-owners": [],
     "clickup-spaces": [],
-    "clickup-lists": []
+    "clickup-lists": [],
+    "job-states": [
+      "launched",
+      "running",
+      "blocked",
+      "stalled",
+      "lost",
+      "needs-input",
+      "failed"
+    ],
+    "job-scope": "workspace"
   },
   "launch-grace-seconds": 60
 }

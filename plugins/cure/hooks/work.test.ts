@@ -11,6 +11,7 @@ const PANE = {
 
 const SURFACES = ['terminal', 'desktop'] as const
 const REFRESH = 120
+const WORKSPACE = '/ws'
 
 type World = {
   tracker: string | null
@@ -24,10 +25,13 @@ type World = {
   configGate: Promise<void> | null
   opened: string[]
   closed: string[]
+  queries: string[]
+  dashboard: Record<string, unknown>
+  commands: string[]
 }
 
 const world = (init: Partial<World> = {}): World => ({
-  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, ghCalls: 0, clickupReply: undefined, configGate: null, opened: [], closed: [], ...init,
+  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, ghCalls: 0, clickupReply: undefined, configGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
 })
 
 const out = (stdout: string, exitCode = 0, stderr = '') =>
@@ -38,16 +42,16 @@ const engine = (on: On, w: World) => {
     const [bin = '', ...args] = [e.argv[0]?.split('/').pop() ?? '', ...e.argv.slice(1)]
     if (bin === 'cure-job' && args[0] === 'config') {
       await w.configGate
-      return out(JSON.stringify({ split: { tracker: w.tracker }, dashboard: { 'refresh-seconds': REFRESH } }))
+      return out(JSON.stringify({ split: { tracker: w.tracker }, dashboard: { 'refresh-seconds': REFRESH, ...w.dashboard } }))
     }
     if (bin === 'cure-job') return out(JSON.stringify(w.jobs))
     if (bin !== 'gh') return out('', 1)
     w.ghCalls++
     if (w.isGhDown) return out('', 1, 'gh: network unreachable')
     if (args[1] === 'issues') return out(JSON.stringify(w.issues))
-    if (args[1] === 'prs') return out(JSON.stringify(args.includes('--author') ? w.prs.map(({ headRefName, ...hit }) => hit) : []))
-    const pr = w.prs.find(candidate => candidate.number === Number(args[2]))
-    return out(JSON.stringify({ headRefName: pr?.headRefName, state: 'OPEN', reviewDecision: '', statusCheckRollup: [] }))
+    const q = args.find(arg => arg.startsWith('q=')) ?? ''
+    w.queries.push(q.slice(2))
+    return out(JSON.stringify({ data: { search: { nodes: q.includes('author:@me') ? w.prs : [] } } }))
   })
   on('ui.open', (_, e) => {
     w.opened.push(e.id)
@@ -57,6 +61,11 @@ const engine = (on: On, w: World) => {
   on('ui.close', (_, e) => {
     w.closed.push(e.id)
     return { value: undefined }
+  })
+  on('session.cwd', () => ({ value: WORKSPACE }))
+  on('command.register', (_, e) => {
+    w.commands.push(e.name)
+    return { value: { command: e.name } }
   })
   on('tool.list', () => ({ value: [] }))
   on('mcp.call', () => ({
@@ -89,14 +98,14 @@ const texts = async (surface: (typeof SURFACES)[number], $: Engine) => {
 }
 
 const pr = (number: number, headRefName: string, repo = 'o/r') => ({
-  number, title: `PR ${number}`, url: `https://github.com/${repo}/pull/${number}`, state: 'OPEN', repository: { nameWithOwner: repo }, headRefName,
+  number, title: `PR ${number}`, url: `https://github.com/${repo}/pull/${number}`, state: 'OPEN', repository: { nameWithOwner: repo }, headRefName, reviewDecision: null, commits: { nodes: [] },
 })
 
 test('a GitHub issue groups the PRs on issue-N-x and issue-N_x branches and the job on its ticket', async ($, on) => {
   const w = world({
     issues: [{ number: 5, title: 'Fix boot', state: 'open', repository: { nameWithOwner: 'o/r' } }],
     prs: [pr(10, 'issue-5-boot'), pr(11, 'issue-5_boot'), pr(12, 'issue-6-other')],
-    jobs: [{ id: 'j1', state: 'running', ticket: 'o/r#5', workspace: null }],
+    jobs: [{ id: 'j1', state: 'running', ticket: 'o/r#5', workspace: WORKSPACE }],
   })
   await start($, on, w)
   for (const surface of SURFACES) {
@@ -116,7 +125,7 @@ test('a ClickUp task groups the PR on its RND-833_x branch and the job on its ti
     tracker: 'clickup',
     clickup: [{ id: 'abc', custom_id: 'RND-833', name: 'Dashboard', status: 'in progress' }],
     prs: [pr(20, 'RND-833_dashboard'), pr(21, 'main-fix')],
-    jobs: [{ id: 'j2', state: 'running', ticket: 'RND-833', workspace: null }, { id: 'j3', state: 'running', ticket: null, workspace: null }],
+    jobs: [{ id: 'j2', state: 'running', ticket: 'RND-833', workspace: WORKSPACE }, { id: 'j3', state: 'running', ticket: null, workspace: WORKSPACE }],
   })
   await start($, on, w)
   for (const surface of SURFACES) {
@@ -135,7 +144,7 @@ for (const [name, init] of [
   ['failing', { tracker: 'clickup', clickup: null }],
 ] as const) {
   test(`a ${name} tracker prints one unavailable line and the PRs and jobs stay in Unlinked`, async ($, on) => {
-    const w = world({ ...init, prs: [pr(30, 'RND-1_x')], jobs: [{ id: 'j4', state: 'running', ticket: null, workspace: null }] })
+    const w = world({ ...init, prs: [pr(30, 'RND-1_x')], jobs: [{ id: 'j4', state: 'running', ticket: null, workspace: WORKSPACE }] })
     await start($, on, w)
     for (const surface of SURFACES) {
       const { found } = await texts(surface, $)
@@ -146,6 +155,74 @@ for (const [name, init] of [
     }
   })
 }
+
+test('each role searches open PRs with one user qualifier per configured owner', async ($, on) => {
+  const w = world({ dashboard: { 'github-owners': ['acme', 'o2'] } })
+  await start($, on, w)
+  expect(w.queries).toEqual([
+    'is:pr is:open author:@me user:acme user:o2',
+    'is:pr is:open review-requested:@me user:acme user:o2',
+  ])
+})
+
+test('the PR searches carry no user qualifier when no owner is configured', async ($, on) => {
+  const w = world()
+  await start($, on, w)
+  expect(w.queries).toEqual(['is:pr is:open author:@me', 'is:pr is:open review-requested:@me'])
+})
+
+const job = (id: string, state: string, workspace: string | null = WORKSPACE) => ({ id, state, ticket: null, workspace })
+
+test('the jobs list holds the jobs in a configured state, so a done job is hidden and a failed job shown', async ($, on) => {
+  const w = world({ jobs: [job('jdone', 'done'), job('jfailed', 'failed')] })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.includes('job jfailed'))).toBe(true)
+  expect(found.some(line => line.includes('job jdone'))).toBe(false)
+})
+
+test('dashboard.job-states replaces the default states', async ($, on) => {
+  const w = world({ dashboard: { 'job-states': ['done'] }, jobs: [job('jdone', 'done'), job('jrun', 'running')] })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.includes('job jdone'))).toBe(true)
+  expect(found.some(line => line.includes('job jrun'))).toBe(false)
+})
+
+for (const [scope, isShown] of [['workspace', false], ['all', true]] as const) {
+  test(`under job-scope ${scope} a job of another workspace is ${isShown ? 'shown' : 'hidden'}`, async ($, on) => {
+    const w = world({
+      dashboard: { 'job-scope': scope },
+      jobs: [job('jhere', 'running'), job('jaway', 'running', '/elsewhere'), job('jnone', 'running', null)],
+    })
+    await start($, on, w)
+    const { found } = await texts('terminal', $)
+    const has = (id: string) => found.some(line => line.includes(`job ${id}`))
+    expect(has('jhere')).toBe(true)
+    expect(has('jaway')).toBe(isShown)
+    expect(has('jnone')).toBe(isShown)
+  })
+}
+
+test('a failed GraphQL search keeps the last good PRs and marks them stale', async ($, on) => {
+  const w = world({ prs: [pr(41, 'feature')] })
+  const clock = await start($, on, w)
+  w.isGhDown = true
+  await clock.advance(REFRESH * 1000)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.startsWith('PRs as of'))).toBe(true)
+  expect(found.some(line => line.includes('PR 41'))).toBe(true)
+})
+
+test('a GraphQL reply without search nodes fails the PR source', async ($, on) => {
+  const w = world({ prs: [pr(42, 'feature')] })
+  const clock = await start($, on, w)
+  w.prs = null as never
+  await clock.advance(REFRESH * 1000)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.startsWith('PRs as of') && line.includes('no search result'))).toBe(true)
+  expect(found.some(line => line.includes('PR 42'))).toBe(true)
+})
 
 test('a failed refresh keeps the last good data and says how old it is', async ($, on) => {
   const w = world({ prs: [pr(40, 'feature')] })
@@ -207,7 +284,7 @@ for (const [name, tracker, ticket, task, key] of [
   test(`${name}`, async ($, on) => {
     const w = world({
       tracker, issues: tracker === 'github' ? [task] : [], clickup: tracker === 'clickup' ? [task] : [],
-      jobs: [{ id: 'j9', state: 'running', ticket, workspace: null }],
+      jobs: [{ id: 'j9', state: 'running', ticket, workspace: WORKSPACE }],
     })
     await start($, on, w)
     const { found } = await texts('terminal', $)
@@ -258,3 +335,39 @@ test('session start returns without waiting on the config read', async ($, on) =
   await clock.settle()
   expect(w.opened).toEqual(['work'])
 })
+
+const runWork = ($: Engine) =>
+  $.command.run({ command: 'work', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+
+test('session start registers the work command', async ($, on) => {
+  const w = world()
+  await start($, on, w)
+  expect(w.commands).toEqual(['work'])
+})
+
+test('the work command in a user session reopens a closed pane and restarts polling', async ($, on) => {
+  const w = world()
+  const clock = await start($, on, w)
+  w.closed.push('work')
+  const calls = w.ghCalls
+  const { text } = await runWork($)
+  await clock.settle()
+  expect(text).toBe('Work pane opened.')
+  expect(w.opened).toEqual(['work', 'work'])
+  expect(w.ghCalls).toBeGreaterThan(calls)
+})
+
+for (const [name, env, isDispatcher] of [
+  ['a job session', { CURE_JOB_ID: 'j1' }, false],
+  ['the dispatcher', {}, true],
+] as const) {
+  test(`the work command in ${name} answers that the pane is not available and opens nothing`, async ($, on) => {
+    const w = world()
+    const clock = await start($, on, w, env, isDispatcher)
+    const { text } = await runWork($)
+    await clock.settle()
+    expect(text).toContain('only in an interactive user session')
+    expect(w.opened).toEqual([])
+    expect(w.ghCalls).toBe(0)
+  })
+}

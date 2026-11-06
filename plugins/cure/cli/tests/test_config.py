@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 21
+    assert len(DEFAULTS) == 23
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -136,7 +136,9 @@ DASHBOARD_LISTS = ["dashboard.github-owners", "dashboard.clickup-spaces", "dashb
 def test_config_get_dashboard_without_a_file_prints_the_defaults(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0])["dashboard"] == {
-        "refresh-seconds": 120, "github-owners": [], "clickup-spaces": [], "clickup-lists": []}
+        "refresh-seconds": 120, "github-owners": [], "clickup-spaces": [], "clickup-lists": [],
+        "job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
+        "job-scope": "workspace"}
 
 
 def test_config_check_accepts_dashboard_values_at_their_bounds(h):
@@ -163,6 +165,36 @@ def test_config_check_rejects_a_dashboard_list_that_is_not_distinct_names_withou
     assert f"config.json: {key}: expected a list of distinct names without spaces" in capsys.readouterr().err
     assert h.run("config", "get", key) == 0
     assert h.lines[-1] == "[]"
+
+
+@pytest.mark.parametrize("value", [[], ["done", "failed"], ["invalid", "needs-input"]])
+def test_config_check_accepts_dashboard_job_states_that_are_distinct_states_or_invalid(h, value):
+    configure(h, {"dashboard": {"job-states": value}})
+    assert h.run("config", "check") == 0
+
+
+@pytest.mark.parametrize("value", ["running", [1], ["bogus"], ["running", "running"]])
+def test_config_check_rejects_dashboard_job_states_that_are_not_a_distinct_list_of_states(h, capsys, value):
+    configure(h, {"dashboard": {"job-states": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.job-states: expected a list of distinct job states" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.job-states") == 0
+    assert h.lines[-1] == json.dumps(DEFAULTS["dashboard.job-states"])
+
+
+@pytest.mark.parametrize("value", ["workspace", "all"])
+def test_config_check_accepts_the_two_dashboard_job_scopes(h, value):
+    configure(h, {"dashboard": {"job-scope": value}})
+    assert h.run("config", "check") == 0
+
+
+@pytest.mark.parametrize("value", ["repo", "", ["all"], 1])
+def test_config_check_rejects_a_dashboard_job_scope_other_than_workspace_or_all(h, capsys, value):
+    configure(h, {"dashboard": {"job-scope": value}})
+    assert h.run("config", "check") == 1
+    assert 'config.json: dashboard.job-scope: expected "workspace" or "all"' in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.job-scope") == 0
+    assert h.lines[-1] == '"workspace"'
 
 
 def test_config_check_names_the_replacement_of_band_jira_url(h, capsys):

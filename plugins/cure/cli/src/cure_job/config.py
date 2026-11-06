@@ -48,6 +48,8 @@ DEFAULTS: dict[str, object] = {
     "dashboard.github-owners": [],
     "dashboard.clickup-spaces": [],
     "dashboard.clickup-lists": [],
+    "dashboard.job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
+    "dashboard.job-scope": "workspace",
     "launch-grace-seconds": 60,
 }
 
@@ -256,6 +258,21 @@ def _names(value: object) -> str | None:
     return None
 
 
+def _job_states(value: object) -> str | None:
+    from .commands.list import INVALID  # both import this module
+    from .state import State
+
+    states = [state.value for state in State] + [INVALID]
+    if (not isinstance(value, list) or any(item not in states for item in value)
+            or len(set(value)) != len(value)):
+        return f"expected a list of distinct job states from {', '.join(states)}, got {json.dumps(value)}"
+    return None
+
+
+def _job_scope(value: object) -> str | None:
+    return None if value in ("workspace", "all") else f"expected \"workspace\" or \"all\", got {json.dumps(value)}"
+
+
 def _tiers(value: object) -> str | None:
     if (not isinstance(value, list) or any(tier not in TIERS for tier in value)
             or len(set(value)) != len(value)):
@@ -299,6 +316,8 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "dashboard.github-owners": _names,
     "dashboard.clickup-spaces": _names,
     "dashboard.clickup-lists": _names,
+    "dashboard.job-states": _job_states,
+    "dashboard.job-scope": _job_scope,
     "launch-grace-seconds": _int_range(10, 600),
 }
 

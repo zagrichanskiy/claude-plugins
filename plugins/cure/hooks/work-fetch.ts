@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import { cureJob, failure, githubRepo, json, listJobs } from './cure-job'
 import { parseTicket } from './ticket'
 import { dashboardConfig, rollup } from './work'
-import type { CheckItem, DashboardConfig, Job, Outcome, Pr, Task } from './work'
+import type { DashboardConfig, Job, Outcome, Pr, Task } from './work'
 
 const guarded = async <T>(fetch: () => Promise<Outcome<T>>): Promise<Outcome<T>> => {
   try {
@@ -22,41 +22,44 @@ export async function readConfig($: EngineInterface): Promise<DashboardConfig> {
   }
 }
 
-type Hit = { number: number; title: string; state: string; url: string; repository: { nameWithOwner: string } }
-type View = { headRefName?: string; reviewDecision?: string; statusCheckRollup?: CheckItem[]; state?: string }
-
-const SEARCH = ['--state', 'open', '--limit', '100', '--json']
-
-async function fetchPrs($: EngineInterface): Promise<Outcome<Pr[]>> {
-  const hits = new Map<string, Hit>()
-  for (const who of ['--author', '--review-requested']) {
-    const found = await json($, ['gh', 'search', 'prs', who, '@me', ...SEARCH, 'number,title,repository,url,state'])
-    if (found.kind !== 'ok') return found
-    for (const hit of found.data as Hit[]) hits.set(hit.url, hit)
-  }
-  const prs: Pr[] = []
-  for (const hit of hits.values()) {
-    const repo = hit.repository.nameWithOwner
-    const viewed = await json($, ['gh', 'pr', 'view', String(hit.number), '-R', repo,
-      '--json', 'headRefName,reviewDecision,statusCheckRollup,state,url'])
-    const view = viewed.kind === 'ok' ? (viewed.data as View) : null
-    prs.push({
-      repo, number: hit.number, title: hit.title, url: hit.url,
-      state: view?.state ?? hit.state,
-      reviewDecision: view?.reviewDecision || null,
-      checks: view === null ? 'unknown' : rollup(view.statusCheckRollup),
-      headRefName: view?.headRefName ?? null,
-    })
-  }
-  return { kind: 'ok', data: prs }
+type Hit = {
+  number: number; title: string; state: string; url: string; headRefName: string; reviewDecision: string | null
+  repository: { nameWithOwner: string }; commits: { nodes: { commit: { statusCheckRollup: { state: string } | null } }[] }
 }
 
-async function fetchJobs($: EngineInterface): Promise<Outcome<Job[]>> {
+const PR_QUERY = `query($q: String!) { search(type: ISSUE, query: $q, first: 100) { nodes { ... on PullRequest {
+  number title url state headRefName reviewDecision repository { nameWithOwner }
+  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`
+
+async function fetchPrs($: EngineInterface, owners: string[]): Promise<Outcome<Pr[]>> {
+  const hits = new Map<string, Hit>()
+  for (const role of ['author', 'review-requested']) {
+    const q = ['is:pr', 'is:open', `${role}:@me`, ...owners.map(owner => `user:${owner}`)].join(' ')
+    const found = await json($, ['gh', 'api', 'graphql', '-f', `query=${PR_QUERY}`, '-f', `q=${q}`])
+    if (found.kind !== 'ok') return found
+    const nodes = (found.data as { data?: { search?: { nodes?: unknown } } } | null)?.data?.search?.nodes
+    if (!Array.isArray(nodes)) return failure('gh api graphql printed no search result')
+    for (const hit of nodes as Hit[]) hits.set(hit.url, hit)
+  }
+  return {
+    kind: 'ok',
+    data: [...hits.values()].map(hit => ({
+      repo: hit.repository.nameWithOwner, number: hit.number, title: hit.title, url: hit.url, state: hit.state,
+      reviewDecision: hit.reviewDecision || null,
+      checks: rollup(hit.commits.nodes[0]?.commit.statusCheckRollup?.state),
+      headRefName: hit.headRefName,
+    })),
+  }
+}
+
+async function fetchJobs($: EngineInterface, config: DashboardConfig): Promise<Outcome<Job[]>> {
   const listed = await listJobs($)
   if (listed.kind !== 'ok') return listed
+  const here = config.jobScope === 'workspace' ? await $.session.cwd() : null
   const repos = new Map<string, string | null>()
   const jobs: Job[] = []
   for (const job of listed.data) {
+    if (!config.jobStates.includes(job.state) || (here !== null && job.workspace !== here)) continue
     const ticket = parseTicket(job.ticket)
     const dir = ticket?.kind === 'issue' && ticket.repo === null ? job.workspace : null
     if (dir !== null && !repos.has(dir)) repos.set(dir, await githubRepo($, dir))
@@ -64,6 +67,8 @@ async function fetchJobs($: EngineInterface): Promise<Outcome<Job[]>> {
   }
   return { kind: 'ok', data: jobs }
 }
+
+const SEARCH = ['--state', 'open', '--limit', '100', '--json']
 
 type Issue = { number: number; title: string; state: string; repository: { nameWithOwner: string } }
 
@@ -118,7 +123,7 @@ function fetchTasks($: EngineInterface, config: DashboardConfig): Promise<Outcom
 
 export async function fetchWork($: EngineInterface, config: DashboardConfig) {
   const [tasks, prs, jobs] = await Promise.all([
-    guarded(() => fetchTasks($, config)), guarded(() => fetchPrs($)), guarded(() => fetchJobs($)),
+    guarded(() => fetchTasks($, config)), guarded(() => fetchPrs($, config.githubOwners)), guarded(() => fetchJobs($, config)),
   ])
   return { tasks, prs, jobs }
 }

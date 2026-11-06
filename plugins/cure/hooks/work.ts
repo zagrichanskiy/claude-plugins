@@ -38,19 +38,9 @@ export const settle = <T>(prev: Source<T>, outcome: Outcome<T>, now: number): So
     : { kind: 'stale', data: prev.data, at: prev.at, error: outcome.error }
 }
 
-export type CheckItem = { status?: string | null; conclusion?: string | null; state?: string | null }
-
-const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
-const PASSED = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED'])
-
-/** One state for a PR's `statusCheckRollup`; an item in any state it does not know counts as pending. */
-export const rollup = (items: readonly CheckItem[] | null | undefined): Checks => {
-  if (!Array.isArray(items)) return 'unknown'
-  if (items.length === 0) return 'none'
-  const states = items.map(item => (item.conclusion || item.state || item.status || '').toUpperCase())
-  if (states.some(state => FAILED.has(state))) return 'failing'
-  return states.every(state => PASSED.has(state)) ? 'passing' : 'pending'
-}
+/** A PR's last-commit `statusCheckRollup.state`: none without checks, and pending for a state it does not know. */
+export const rollup = (state: string | null | undefined): Checks =>
+  !state ? 'none' : state === 'SUCCESS' ? 'passing' : state === 'FAILURE' || state === 'ERROR' ? 'failing' : 'pending'
 
 export type DashboardConfig = {
   refreshSeconds: number
@@ -58,7 +48,11 @@ export type DashboardConfig = {
   githubOwners: string[]
   clickupSpaces: string[]
   clickupLists: string[]
+  jobStates: string[]
+  jobScope: 'workspace' | 'all'
 }
+
+const JOB_STATES = ['launched', 'running', 'blocked', 'stalled', 'lost', 'needs-input', 'failed']
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
@@ -74,6 +68,8 @@ export const dashboardConfig = (config: unknown): DashboardConfig => {
     githubOwners: strings(dashboard['github-owners']),
     clickupSpaces: strings(dashboard['clickup-spaces']),
     clickupLists: strings(dashboard['clickup-lists']),
+    jobStates: Array.isArray(dashboard['job-states']) ? strings(dashboard['job-states']) : JOB_STATES,
+    jobScope: dashboard['job-scope'] === 'all' ? 'all' : 'workspace',
   }
 }
 

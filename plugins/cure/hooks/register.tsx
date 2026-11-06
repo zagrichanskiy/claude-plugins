@@ -11,7 +11,7 @@ import { drawWork } from './work-pane'
 
 const isDispatcher = atom({ plugin: 'cure', key: 'isDispatcher' } as const, null)
 const isInteractive = atom({ plugin: 'cure', key: 'isInteractive' } as const, null)
-const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-2' })
+const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-3' })
 
 const PANE = 'work'
 
@@ -68,19 +68,25 @@ const refresh = async ($: EngineInterface, config: DashboardConfig) => {
   }
 }
 
-/** Both start hooks call it; each supplies one fact of the session's kind, in an order that is not known. */
-const startDashboard = async ($: EngineInterface) => {
-  const kind = sessionKind({
-    isDispatcher: await read($, isDispatcher),
-    jobId: await $.env.get('CURE_JOB_ID'),
-    isInteractive: await read($, isInteractive),
-  })
-  if (kind !== 'user' || isStarted) return
-  isStarted = true
+const kindOf = async ($: EngineInterface) => sessionKind({
+  isDispatcher: await read($, isDispatcher),
+  jobId: await $.env.get('CURE_JOB_ID'),
+  isInteractive: await read($, isInteractive),
+})
+
+const poll = async ($: EngineInterface) => {
   const config = await readConfig($)
-  timer = $.clock.every(config.refreshSeconds * 1000, () => void refresh($, config))
+  if (timer === null) timer = $.clock.every(config.refreshSeconds * 1000, () => void refresh($, config))
   void $.ui.open({ id: PANE, title: 'Work' })
   void refresh($, config)
+}
+
+/** Both start hooks call it; each supplies one fact of the session's kind, in an order that is not known. */
+const startDashboard = async ($: EngineInterface) => {
+  const kind = await kindOf($)
+  if (kind !== 'user' || isStarted) return
+  isStarted = true
+  await poll($)
 }
 
 const startInBackground = ($: EngineInterface) =>
@@ -99,8 +105,18 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await update($, isInteractive, () => e.isInteractive)
     const result = await next(e)
+    void $.command.register({ name: 'work', description: 'Reopen the Work pane and restart its refresh' })
+      .catch(error => $.ui.log(`work pane: /work was not registered: ${message(error)}`))
     startInBackground($)
     return result
+  })
+
+  on('command.run', { command: 'work' }, async $ => {
+    if ((await kindOf($)) !== 'user') {
+      return { text: 'The Work pane is shown only in an interactive user session, not in a job session or the dispatcher.' }
+    }
+    await poll($)
+    return { text: 'Work pane opened.' }
   })
 
   on('ui.close', { id: PANE }, async ($, e, next) => {

@@ -3,7 +3,7 @@ export type CureBand = { isDispatcher: boolean | null }
 /** `key` is the one drawn; `aliases` are further keys a ticket may name it by, as a ClickUp task's id beside its custom id. */
 export type CureWorkTask = { key: string; aliases: string[]; title: string; status: string }
 
-export type CureWorkChecks = 'passing' | 'failing' | 'pending' | 'none' | 'unknown'
+export type CureWorkChecks = 'passing' | 'failing' | 'pending' | 'none'
 
 export type CureWorkPr = {
   repo: string
