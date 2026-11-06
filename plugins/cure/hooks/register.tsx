@@ -12,6 +12,7 @@ import { drawWork } from './work-pane'
 const isDispatcher = atom({ plugin: 'cure', key: 'isDispatcher' } as const, null)
 const isInteractive = atom({ plugin: 'cure', key: 'isInteractive' } as const, null)
 const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-3' })
+const isWorkClosed = atom({ plugin: 'cure', key: 'isWorkClosed' } as const, false)
 
 const PANE = 'work'
 
@@ -33,8 +34,11 @@ const ticketUrl = async ($: EngineInterface, job: ListedJob, tracker: string | n
   return repo === null ? null : `https://github.com/${repo}/issues/${ticket.number}`
 }
 
-let isStarted = false
-let timer: { cancel: () => void } | null = null
+type Polling = { config: DashboardConfig; timer: { cancel(): void } }
+/** Module-local on purpose: a reload cancels the timer, so this resets with it. */
+let polling: Polling | null = null
+let isStarting = false
+let closes = 0
 let isRefreshing = false
 
 const settled = (prev: Work, fetched: Awaited<ReturnType<typeof fetchWork>>, now: number): Work => ({
@@ -74,9 +78,20 @@ const kindOf = async ($: EngineInterface) => sessionKind({
   isInteractive: await read($, isInteractive),
 })
 
-const poll = async ($: EngineInterface) => {
+const stopPolling = () => {
+  polling?.timer.cancel()
+  polling = null
+}
+
+/** A person's close that lands while this awaits, before its atom write does, is seen through `closes`. */
+const startPolling = async ($: EngineInterface) => {
+  const seen = closes
   const config = await readConfig($)
-  if (timer === null) timer = $.clock.every(config.refreshSeconds * 1000, () => void refresh($, config))
+  if ((await read($, isWorkClosed)) || closes !== seen) return
+  stopPolling()
+  polling = { config, timer: $.clock.every(config.refreshSeconds * 1000, () => {
+    if (polling !== null) void refresh($, polling.config)
+  }) }
   void $.ui.open({ id: PANE, title: 'Work' })
   void refresh($, config)
 }
@@ -84,9 +99,13 @@ const poll = async ($: EngineInterface) => {
 /** Both start hooks call it; each supplies one fact of the session's kind, in an order that is not known. */
 const startDashboard = async ($: EngineInterface) => {
   const kind = await kindOf($)
-  if (kind !== 'user' || isStarted) return
-  isStarted = true
-  await poll($)
+  if (kind !== 'user' || polling !== null || isStarting) return
+  isStarting = true
+  try {
+    await startPolling($)
+  } finally {
+    isStarting = false
+  }
 }
 
 const startInBackground = ($: EngineInterface) =>
@@ -115,15 +134,18 @@ export const register: Register = on => {
     if ((await kindOf($)) !== 'user') {
       return { text: 'The Work pane is shown only in an interactive user session, not in a job session or the dispatcher.' }
     }
-    await poll($)
+    await update($, isWorkClosed, () => false)
+    await startPolling($)
     return { text: 'Work pane opened.' }
   })
 
   on('ui.close', { id: PANE }, async ($, e, next) => {
     const closed = await next(e)
     if (e.origin.kind === 'person') {
-      timer?.cancel()
-      timer = null
+      closes++
+      stopPolling()
+      await update($, isWorkClosed, () => true)
+        .catch(error => $.ui.log(`work pane: the close was not recorded: ${message(error)}`))
     }
     return closed
   })

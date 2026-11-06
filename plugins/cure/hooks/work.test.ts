@@ -12,6 +12,7 @@ const PANE = {
 const SURFACES = ['terminal', 'desktop'] as const
 const REFRESH = 120
 const WORKSPACE = '/ws'
+const SUBDIRECTORY = '/ws/sub'
 
 type World = {
   tracker: string | null
@@ -20,6 +21,7 @@ type World = {
   jobs: unknown[]
   clickup: unknown[] | null
   isGhDown: boolean
+  searchExit: number
   ghCalls: number
   clickupReply: unknown
   configGate: Promise<void> | null
@@ -31,7 +33,7 @@ type World = {
 }
 
 const world = (init: Partial<World> = {}): World => ({
-  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, ghCalls: 0, clickupReply: undefined, configGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
+  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, searchExit: 0, ghCalls: 0, clickupReply: undefined, configGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
 })
 
 const out = (stdout: string, exitCode = 0, stderr = '') =>
@@ -51,7 +53,7 @@ const engine = (on: On, w: World) => {
     if (args[1] === 'issues') return out(JSON.stringify(w.issues))
     const q = args.find(arg => arg.startsWith('q=')) ?? ''
     w.queries.push(q.slice(2))
-    return out(JSON.stringify({ data: { search: { nodes: q.includes('author:@me') ? w.prs : [] } } }))
+    return out(JSON.stringify({ data: { search: { nodes: q.includes('author:@me') ? w.prs : [] } } }), w.searchExit, w.searchExit === 0 ? '' : 'gh: SSO forbidden')
   })
   on('ui.open', (_, e) => {
     w.opened.push(e.id)
@@ -62,7 +64,8 @@ const engine = (on: On, w: World) => {
     w.closed.push(e.id)
     return { value: undefined }
   })
-  on('session.cwd', () => ({ value: WORKSPACE }))
+  on('session.cwd', () => ({ value: SUBDIRECTORY }))
+  on('session.root', () => ({ value: WORKSPACE }))
   on('command.register', (_, e) => {
     w.commands.push(e.name)
     return { value: { command: e.name } }
@@ -224,6 +227,23 @@ test('a GraphQL reply without search nodes fails the PR source', async ($, on) =
   expect(found.some(line => line.includes('PR 42'))).toBe(true)
 })
 
+test('a GraphQL reply with a non-zero exit but usable nodes shows those PRs as fresh', async ($, on) => {
+  const w = world({ prs: [pr(43, 'feature')], searchExit: 1 })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.includes('PR 43'))).toBe(true)
+  expect(found.some(line => line.startsWith('PRs as of'))).toBe(false)
+})
+
+test('a null node and a node without repository are skipped while the other PRs show', async ($, on) => {
+  const w = world({ prs: [null, { ...pr(44, 'feature'), repository: undefined }, pr(45, 'feature')] })
+  await start($, on, w)
+  const { found } = await texts('terminal', $)
+  expect(found.some(line => line.includes('PR 45'))).toBe(true)
+  expect(found.some(line => line.includes('PR 44'))).toBe(false)
+  expect(found.some(line => line.startsWith('PRs as of'))).toBe(false)
+})
+
 test('a failed refresh keeps the last good data and says how old it is', async ($, on) => {
   const w = world({ prs: [pr(40, 'feature')] })
   const clock = await start($, on, w)
@@ -371,3 +391,55 @@ for (const [name, env, isDispatcher] of [
     expect(w.ghCalls).toBe(0)
   })
 }
+
+test('the work command while the pane is open restarts polling with a newly read config', async ($, on) => {
+  const w = world()
+  const clock = await start($, on, w)
+  w.dashboard = { 'refresh-seconds': 30 }
+  await runWork($)
+  await clock.settle()
+  const calls = w.ghCalls
+  await clock.advance(30_000)
+  expect(w.ghCalls).toBeGreaterThan(calls)
+})
+
+const seedClosed = (on: On) => {
+  const mark = { value: true as unknown, version: 1 }
+  on('state.get', (_, e, next) => (e.key === 'isWorkClosed' ? { value: { ...mark } } : next(e)))
+  on('state.set', (_, e, next) => {
+    if (e.key !== 'isWorkClosed') return next(e)
+    mark.value = e.value
+    mark.version++
+    return { value: { isSet: true, version: mark.version } }
+  })
+  return mark
+}
+
+test('a session start does not open or poll while a person has closed the pane', async ($, on) => {
+  const w = world()
+  const clock = mock.clock(on, { now: 1_000_000 })
+  mock.env(on, {})
+  engine(on, w)
+  seedClosed(on)
+  await $.classic.SessionStart({ source: 'clear', agent_type: 'main' })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.settle()
+  expect(w.opened).toEqual([])
+  expect(w.ghCalls).toBe(0)
+})
+
+test('the work command opens the pane a person closed, clears the closed mark and polls', async ($, on) => {
+  const w = world()
+  const clock = mock.clock(on, { now: 1_000_000 })
+  mock.env(on, {})
+  engine(on, w)
+  const mark = seedClosed(on)
+  await $.classic.SessionStart({ source: 'startup', agent_type: 'main' })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.settle()
+  await runWork($)
+  await clock.settle()
+  expect(w.opened).toEqual(['work'])
+  expect(w.ghCalls).toBeGreaterThan(0)
+  expect(mark.value).toBe(false)
+})

@@ -66,12 +66,12 @@ A job session without a handoff `branch` shows `git branch --show-current` of it
 
 ## Work dashboard
 
-The same module opens a pane titled Work in an interactive session that is neither a job session nor the dispatcher. It shows the user's open tracker tasks, their open GitHub pull requests and the cure jobs. The data is fetched once at session start and then every `dashboard.refresh-seconds`, without a model call. The pane is placed at once from 144 terminal columns; narrower, it waits until the terminal widens. Closing the pane stops the refresh; `/cure:work` reopens it and restarts the refresh, and in a job session or the dispatcher it answers that the pane is not available there.
+The same module opens a pane titled Work in an interactive session that is neither a job session nor the dispatcher. It shows the user's open tracker tasks, their open GitHub pull requests and the cure jobs. The data is fetched once at session start and then every `dashboard.refresh-seconds`, without a model call. The pane is placed at once from 144 terminal columns; narrower, it waits until the terminal widens. Closing the pane stops the refresh; `/work` reopens it and restarts the refresh, and in a job session or the dispatcher it answers that the pane is not available there.
 
 | Source | Fetched with |
 |---|---|
 | Pull requests | One `gh api graphql` search for open PRs authored by `@me` and one for those whose review is requested from `@me`, narrowed to the `dashboard.github-owners` entries when the list is set; each returns the head branch, review decision and last commit's check state |
-| Jobs | `cure-job list --json`, narrowed to `dashboard.job-states` and, under `dashboard.job-scope` `workspace`, to the jobs whose `workspace` is the session's directory |
+| Jobs | `cure-job list --json`, narrowed to `dashboard.job-states` and, under `dashboard.job-scope` `workspace`, to the jobs whose `workspace` is the session's project root (where it started; a shell `cd` does not move it) |
 | Tasks, `split.tracker` `github` | `gh search issues --assignee @me --state open`, once per `dashboard.github-owners` entry with `--owner`, once without when the list is empty |
 | Tasks, `split.tracker` `clickup` | `clickup_filter_tasks` of the session's ClickUp MCP server: assignee `me`, closed tasks left out, narrowed by `dashboard.clickup-spaces` and `dashboard.clickup-lists` (both narrow when both are set) |
 | Tasks, `split.tracker` `jira` | None: the pane says tasks are unavailable |
@@ -82,9 +82,9 @@ A source whose refresh fails keeps its last data and the pane shows how old the 
 
 | Key | Default | Value |
 |---|---|---|
-| `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start |
+| `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start and by `/work` |
 | `dashboard.github-owners` | `[]` | GitHub owners whose issues count as tasks and whose PRs are shown; empty means every owner |
 | `dashboard.clickup-spaces` | `[]` | ClickUp space ids that narrow the tasks; empty means no space filter |
 | `dashboard.clickup-lists` | `[]` | ClickUp list ids that narrow the tasks; empty means no list filter |
 | `dashboard.job-states` | `["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"]` | Job states the pane lists, each a state `cure-job list` reports (`invalid` included) |
-| `dashboard.job-scope` | `"workspace"` | `workspace` lists the jobs started in the session's directory; `all` lists every job |
+| `dashboard.job-scope` | `"workspace"` | `workspace` lists the jobs started in the session's project root; `all` lists every job |

@@ -32,6 +32,6 @@ export type CureWork = {
 
 declare module 'claude-code' {
   interface PluginState {
-    cure: { isDispatcher: boolean | null; isInteractive: boolean | null; work: Shaped<CureWork> }
+    cure: { isDispatcher: boolean | null; isInteractive: boolean | null; isWorkClosed: boolean; work: Shaped<CureWork> }
   }
 }

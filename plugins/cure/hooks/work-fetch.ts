@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import { cureJob, failure, githubRepo, json, listJobs } from './cure-job'
+import { cureJob, exec, failure, githubRepo, json, listJobs } from './cure-job'
 import { parseTicket } from './ticket'
 import { dashboardConfig, rollup } from './work'
 import type { DashboardConfig, Job, Outcome, Pr, Task } from './work'
@@ -31,15 +31,33 @@ const PR_QUERY = `query($q: String!) { search(type: ISSUE, query: $q, first: 100
   number title url state headRefName reviewDecision repository { nameWithOwner }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`
 
+/** `gh api graphql` exits non-zero on a partial error (one SSO-forbidden org), yet prints the nodes it could read. */
+async function searchNodes($: EngineInterface, q: string): Promise<Outcome<unknown[]>> {
+  const result = await exec($, ['gh', 'api', 'graphql', '-f', `query=${PR_QUERY}`, '-f', `q=${q}`])
+  if (result === null) return failure('gh did not run')
+  let nodes: unknown
+  try {
+    nodes = (JSON.parse(result.stdout) as { data?: { search?: { nodes?: unknown } } } | null)?.data?.search?.nodes
+  } catch {
+    nodes = undefined
+  }
+  if (Array.isArray(nodes)) return { kind: 'ok', data: nodes }
+  if (result.exitCode !== 0) return failure(result.stderr.trim().split('\n')[0] || `gh exited ${result.exitCode}`)
+  return failure('gh api graphql printed no search result')
+}
+
+const isHit = (node: unknown): node is Hit => {
+  const hit = node as Partial<Hit> | null
+  return typeof hit?.url === 'string' && typeof hit.repository?.nameWithOwner === 'string' && Array.isArray(hit.commits?.nodes)
+}
+
 async function fetchPrs($: EngineInterface, owners: string[]): Promise<Outcome<Pr[]>> {
   const hits = new Map<string, Hit>()
   for (const role of ['author', 'review-requested']) {
     const q = ['is:pr', 'is:open', `${role}:@me`, ...owners.map(owner => `user:${owner}`)].join(' ')
-    const found = await json($, ['gh', 'api', 'graphql', '-f', `query=${PR_QUERY}`, '-f', `q=${q}`])
+    const found = await searchNodes($, q)
     if (found.kind !== 'ok') return found
-    const nodes = (found.data as { data?: { search?: { nodes?: unknown } } } | null)?.data?.search?.nodes
-    if (!Array.isArray(nodes)) return failure('gh api graphql printed no search result')
-    for (const hit of nodes as Hit[]) hits.set(hit.url, hit)
+    for (const hit of found.data.filter(isHit)) hits.set(hit.url, hit)
   }
   return {
     kind: 'ok',
@@ -55,7 +73,7 @@ async function fetchPrs($: EngineInterface, owners: string[]): Promise<Outcome<P
 async function fetchJobs($: EngineInterface, config: DashboardConfig): Promise<Outcome<Job[]>> {
   const listed = await listJobs($)
   if (listed.kind !== 'ok') return listed
-  const here = config.jobScope === 'workspace' ? await $.session.cwd() : null
+  const here = config.jobScope === 'workspace' ? await $.session.root() : null
   const repos = new Map<string, string | null>()
   const jobs: Job[] = []
   for (const job of listed.data) {
