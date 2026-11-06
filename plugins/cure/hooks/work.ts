@@ -9,7 +9,7 @@ export type Source<T> = CureWorkSource<T>
 export type Work = CureWork
 
 export type Outcome<T> =
-  | { kind: 'ok'; data: T }
+  | { kind: 'ok'; data: T; partial?: string }
   | { kind: 'failed'; error: string }
   | { kind: 'unavailable'; reason: string }
 
@@ -31,7 +31,7 @@ export const EMPTY: Work = {
 
 /** A failed refresh keeps the last good data, stamped with when it was good. */
 export const settle = <T>(prev: Source<T>, outcome: Outcome<T>, now: number): Source<T> => {
-  if (outcome.kind === 'ok') return { kind: 'fresh', data: outcome.data, at: now }
+  if (outcome.kind === 'ok') return { kind: 'fresh', data: outcome.data, at: now, ...(outcome.partial !== undefined && { partial: outcome.partial }) }
   if (outcome.kind === 'unavailable') return { kind: 'unavailable', reason: outcome.reason }
   return prev.kind === 'unavailable'
     ? { kind: 'unavailable', reason: outcome.error }

@@ -20,7 +20,7 @@ export type CureWorkJob = { id: string; state: string; ticket: string | null; re
 
 export type CureWorkSource<T> =
   | { kind: 'unavailable'; reason: string }
-  | { kind: 'fresh'; data: T; at: number }
+  | { kind: 'fresh'; data: T; at: number; partial?: string }
   | { kind: 'stale'; data: T; at: number; error: string }
 
 export type CureWork = {

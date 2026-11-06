@@ -31,7 +31,7 @@ const PR_QUERY = `query($q: String!) { search(type: ISSUE, query: $q, first: 100
   number title url state headRefName reviewDecision repository { nameWithOwner }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`
 
-/** `gh api graphql` exits non-zero on a partial error (one SSO-forbidden org), yet prints the nodes it could read. */
+/** `gh api graphql` exits non-zero on a partial error (one SSO-forbidden org), yet prints the nodes it could read; `partial` is its first stderr line then. */
 async function searchNodes($: EngineInterface, q: string): Promise<Outcome<unknown[]>> {
   const result = await exec($, ['gh', 'api', 'graphql', '-f', `query=${PR_QUERY}`, '-f', `q=${q}`])
   if (result === null) return failure('gh did not run')
@@ -41,8 +41,9 @@ async function searchNodes($: EngineInterface, q: string): Promise<Outcome<unkno
   } catch {
     nodes = undefined
   }
-  if (Array.isArray(nodes)) return { kind: 'ok', data: nodes }
-  if (result.exitCode !== 0) return failure(result.stderr.trim().split('\n')[0] || `gh exited ${result.exitCode}`)
+  const reason = result.stderr.trim().split('\n')[0] || `gh exited ${result.exitCode}`
+  if (Array.isArray(nodes)) return { kind: 'ok', data: nodes, ...(result.exitCode !== 0 && { partial: reason }) }
+  if (result.exitCode !== 0) return failure(reason)
   return failure('gh api graphql printed no search result')
 }
 
@@ -53,10 +54,12 @@ const isHit = (node: unknown): node is Hit => {
 
 async function fetchPrs($: EngineInterface, owners: string[]): Promise<Outcome<Pr[]>> {
   const hits = new Map<string, Hit>()
+  let partial: string | undefined
   for (const role of ['author', 'review-requested']) {
     const q = ['is:pr', 'is:open', `${role}:@me`, ...owners.map(owner => `user:${owner}`)].join(' ')
     const found = await searchNodes($, q)
     if (found.kind !== 'ok') return found
+    partial ??= found.partial
     for (const hit of found.data.filter(isHit)) hits.set(hit.url, hit)
   }
   return {
@@ -67,6 +70,7 @@ async function fetchPrs($: EngineInterface, owners: string[]): Promise<Outcome<P
       checks: rollup(hit.commits.nodes[0]?.commit.statusCheckRollup?.state),
       headRefName: hit.headRefName,
     })),
+    ...(partial !== undefined && { partial }),
   }
 }
 

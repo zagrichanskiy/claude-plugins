@@ -11,7 +11,7 @@ import { drawWork } from './work-pane'
 
 const isDispatcher = atom({ plugin: 'cure', key: 'isDispatcher' } as const, null)
 const isInteractive = atom({ plugin: 'cure', key: 'isInteractive' } as const, null)
-const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-3' })
+const work = atom({ plugin: 'cure', key: 'work' } as const, EMPTY, { shape: 'work-4' })
 const isWorkClosed = atom({ plugin: 'cure', key: 'isWorkClosed' } as const, false)
 
 const PANE = 'work'
@@ -39,7 +39,9 @@ type Polling = { config: DashboardConfig; timer: { cancel(): void } }
 let polling: Polling | null = null
 let isStarting = false
 let closes = 0
-let isRefreshing = false
+/** A request from the polling that is `running` is dropped; one from another polling waits in `queued`. */
+let running: Polling | null = null
+let queued: Polling | null = null
 
 const settled = (prev: Work, fetched: Awaited<ReturnType<typeof fetchWork>>, now: number): Work => ({
   tasks: settle(prev.tasks, fetched.tasks, now),
@@ -50,12 +52,15 @@ const settled = (prev: Work, fetched: Awaited<ReturnType<typeof fetchWork>>, now
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-const refresh = async ($: EngineInterface, config: DashboardConfig) => {
-  if (isRefreshing) return
-  isRefreshing = true
+const refresh = async ($: EngineInterface, owner: Polling): Promise<void> => {
+  if (running !== null) {
+    if (owner !== running) queued = owner
+    return
+  }
+  running = owner
   let now: number | null = null
   try {
-    const fetched = await fetchWork($, config)
+    const fetched = await fetchWork($, owner.config)
     now = await $.clock.now()
     const at = now
     await update($, work, prev => settled(prev, fetched, at))
@@ -68,7 +73,10 @@ const refresh = async ($: EngineInterface, config: DashboardConfig) => {
       $.ui.log(`work pane: the failed refresh was not recorded: ${message(again)}`)
     }
   } finally {
-    isRefreshing = false
+    running = null
+    const waiting = queued
+    queued = null
+    if (waiting !== null && waiting === polling) void refresh($, waiting)
   }
 }
 
@@ -90,10 +98,17 @@ const startPolling = async ($: EngineInterface) => {
   if ((await read($, isWorkClosed)) || closes !== seen) return
   stopPolling()
   polling = { config, timer: $.clock.every(config.refreshSeconds * 1000, () => {
-    if (polling !== null) void refresh($, polling.config)
+    if (polling !== null) void refresh($, polling)
   }) }
   void $.ui.open({ id: PANE, title: 'Work' })
-  void refresh($, config)
+  void refresh($, polling)
+}
+
+export async function closeByPerson($: EngineInterface): Promise<void> {
+  closes++
+  stopPolling()
+  await update($, isWorkClosed, () => true)
+    .catch(error => $.ui.log(`work pane: the close was not recorded: ${message(error)}`))
 }
 
 /** Both start hooks call it; each supplies one fact of the session's kind, in an order that is not known. */
@@ -140,14 +155,8 @@ export const register: Register = on => {
   })
 
   on('ui.close', { id: PANE }, async ($, e, next) => {
-    const closed = await next(e)
-    if (e.origin.kind === 'person') {
-      closes++
-      stopPolling()
-      await update($, isWorkClosed, () => true)
-        .catch(error => $.ui.log(`work pane: the close was not recorded: ${message(error)}`))
-    }
-    return closed
+    if (e.origin.kind === 'person') await closeByPerson($)
+    return next(e)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

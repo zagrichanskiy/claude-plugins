@@ -2,6 +2,8 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { closeByPerson } from './register'
+
 const PANE = {
   plugin: 'cure',
   component: 'Pane',
@@ -25,6 +27,7 @@ type World = {
   ghCalls: number
   clickupReply: unknown
   configGate: Promise<void> | null
+  ghGate: Promise<void> | null
   opened: string[]
   closed: string[]
   queries: string[]
@@ -33,7 +36,7 @@ type World = {
 }
 
 const world = (init: Partial<World> = {}): World => ({
-  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, searchExit: 0, ghCalls: 0, clickupReply: undefined, configGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
+  tracker: 'github', issues: [], prs: [], jobs: [], clickup: [], isGhDown: false, searchExit: 0, ghCalls: 0, clickupReply: undefined, configGate: null, ghGate: null, opened: [], closed: [], queries: [], dashboard: {}, commands: [], ...init,
 })
 
 const out = (stdout: string, exitCode = 0, stderr = '') =>
@@ -49,6 +52,7 @@ const engine = (on: On, w: World) => {
     if (bin === 'cure-job') return out(JSON.stringify(w.jobs))
     if (bin !== 'gh') return out('', 1)
     w.ghCalls++
+    await w.ghGate
     if (w.isGhDown) return out('', 1, 'gh: network unreachable')
     if (args[1] === 'issues') return out(JSON.stringify(w.issues))
     const q = args.find(arg => arg.startsWith('q=')) ?? ''
@@ -233,6 +237,7 @@ test('a GraphQL reply with a non-zero exit but usable nodes shows those PRs as f
   const { found } = await texts('terminal', $)
   expect(found.some(line => line.includes('PR 43'))).toBe(true)
   expect(found.some(line => line.startsWith('PRs as of'))).toBe(false)
+  expect(found).toContain('PRs incomplete: gh: SSO forbidden')
 })
 
 test('a null node and a node without repository are skipped while the other PRs show', async ($, on) => {
@@ -442,4 +447,55 @@ test('the cure-work command opens the pane a person closed, clears the closed ma
   expect(w.opened).toEqual(['work'])
   expect(w.ghCalls).toBeGreaterThan(0)
   expect(mark.value).toBe(false)
+})
+
+const person = ($: Engine, mark: { value: unknown; version: number }) => ({
+  ...$,
+  ui: { log: (text: string) => { throw new Error(text) } },
+  state: {
+    get: async () => ({ ...mark }),
+    set: async (_: unknown, value: unknown) => ({ isSet: true, version: ++mark.version, value: (mark.value = value) }),
+  },
+}) as never
+
+test('a person close writes the closed mark, so a later start opens nothing and cure-work reopens', async ($, on) => {
+  const w = world()
+  const clock = mock.clock(on, { now: 1_000_000 })
+  mock.env(on, {})
+  engine(on, w)
+  const mark = seedClosed(on)
+  mark.value = false
+  await closeByPerson(person($, mark))
+  expect(mark.value).toBe(true)
+  await $.classic.SessionStart({ source: 'clear', agent_type: 'main' })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(REFRESH * 2000)
+  expect(w.opened).toEqual([])
+  expect(w.ghCalls).toBe(0)
+  await runWork($)
+  await clock.settle()
+  expect(w.opened).toEqual(['work'])
+  expect(w.ghCalls).toBeGreaterThan(0)
+  expect(mark.value).toBe(false)
+})
+
+test('a cure-work restart during a running refresh runs one more fetch with the new config, and a tick is dropped', async ($, on) => {
+  const w = world()
+  let release = () => {}
+  const clock = mock.clock(on, { now: 1_000_000 })
+  mock.env(on, {})
+  engine(on, w)
+  await $.classic.SessionStart({ source: 'startup', agent_type: 'main' })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.settle()
+  w.ghGate = new Promise<void>(resolve => (release = resolve))
+  w.queries.length = 0
+  await clock.advance(REFRESH * 1000)
+  await clock.advance(REFRESH * 1000)
+  w.dashboard = { 'refresh-seconds': 30, 'github-owners': ['newowner'] }
+  await runWork($)
+  release()
+  await clock.settle()
+  expect(w.queries.filter(q => q.includes('user:newowner'))).toHaveLength(2)
+  expect(w.queries.filter(q => !q.includes('user:newowner')).length).toBeLessThanOrEqual(2)
 })

@@ -11,7 +11,8 @@ export type PaneElements = {
 
 export const note = (name: string, source: Source<unknown[]>, now: number): string | null => {
   if (source.kind === 'unavailable') return `${name} unavailable: ${source.reason}`
-  return source.kind === 'stale' ? `${name} as of ${age(source.at, now)} ago: ${source.error}` : null
+  if (source.kind === 'stale') return `${name} as of ${age(source.at, now)} ago: ${source.error}`
+  return source.partial === undefined ? null : `${name} incomplete: ${source.partial}`
 }
 
 const words = (value: string) => value.toLowerCase().replaceAll('_', ' ')

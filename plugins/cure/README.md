@@ -71,14 +71,14 @@ The same module opens a pane titled Work in an interactive session that is neith
 | Source | Fetched with |
 |---|---|
 | Pull requests | One `gh api graphql` search for open PRs authored by `@me` and one for those whose review is requested from `@me`, narrowed to the `dashboard.github-owners` entries when the list is set; each returns the head branch, review decision and last commit's check state |
-| Jobs | `cure-job list --json`, narrowed to `dashboard.job-states` and, under `dashboard.job-scope` `workspace`, to the jobs whose `workspace` is the session's project root (where it started; a shell `cd` does not move it) |
+| Jobs | `cure-job list --json`, narrowed to `dashboard.job-states` and, under `dashboard.job-scope` `workspace`, to the jobs whose `workspace` is the session's project root (where it started, or where `/cd`, a host directory change or a worktree move took it; a shell `cd` does not move it) |
 | Tasks, `split.tracker` `github` | `gh search issues --assignee @me --state open`, once per `dashboard.github-owners` entry with `--owner`, once without when the list is empty |
 | Tasks, `split.tracker` `clickup` | `clickup_filter_tasks` of the session's ClickUp MCP server: assignee `me`, closed tasks left out, narrowed by `dashboard.clickup-spaces` and `dashboard.clickup-lists` (both narrow when both are set) |
 | Tasks, `split.tracker` `jira` | None: the pane says tasks are unavailable |
 
 Each task is one group with the PRs and jobs that belong to it. A PR belongs to a task by its head branch: `ABC-12_…` to the tracker key `ABC-12`, `issue-5-…` or `issue-5_…` to issue 5 of the PR's repository. A job belongs to a task by its `ticket`. A PR or job that matches no task is listed under Unlinked.
 
-A source whose refresh fails keeps its last data and the pane shows how old the data is and the error. A source with no data yet shows why it is unavailable; PRs and jobs still show without tasks.
+A source whose refresh fails keeps its last data and the pane shows how old the data is and the error. When a PR search returns some PRs together with an error, the pane shows those PRs and the line `PRs incomplete: <reason>`. A source with no data yet shows why it is unavailable; PRs and jobs still show without tasks.
 
 | Key | Default | Value |
 |---|---|---|
