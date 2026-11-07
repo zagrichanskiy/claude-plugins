@@ -44,6 +44,18 @@ DEFAULTS: dict[str, object] = {
     "short-hold.wait-total-minutes": 120,
     "prune.failed-days": 30,
     "band.tracker-url": "https://ienso-team.atlassian.net/browse/<key>",
+    "dashboard.refresh-seconds": 120,
+    "dashboard.github-owners": [],
+    "dashboard.tasks-mcp-server": "",
+    "dashboard.tasks-mcp-tool": "",
+    "dashboard.tasks-mcp-args": {},
+    "dashboard.tasks-field-items": "",
+    "dashboard.tasks-field-key": "",
+    "dashboard.tasks-field-title": "",
+    "dashboard.tasks-field-status": "",
+    "dashboard.tasks-field-url": "",
+    "dashboard.job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
+    "dashboard.job-scope": "workspace",
     "launch-grace-seconds": 60,
 }
 
@@ -245,6 +257,38 @@ def _key_url(value: object) -> str | None:
     return None if "<key>" in value else f"expected a URL with <key>, got {json.dumps(value)}"
 
 
+def _names(value: object) -> str | None:
+    if (not isinstance(value, list) or any(not isinstance(item, str) or not re.fullmatch(r"\S+", item) for item in value)
+            or len(set(value)) != len(value)):
+        return f"expected a list of distinct names without spaces, got {json.dumps(value)}"
+    return None
+
+
+def _optional_name(value: object) -> str | None:
+    if not isinstance(value, str) or not re.fullmatch(r"\S*", value):
+        return f"expected a name without spaces or \"\", got {json.dumps(value)}"
+    return None
+
+
+def _object(value: object) -> str | None:
+    return None if isinstance(value, dict) else f"expected a JSON object, got {json.dumps(value)}"
+
+
+def _job_states(value: object) -> str | None:
+    from .commands.list import INVALID  # both import this module
+    from .state import State
+
+    states = [state.value for state in State] + [INVALID]
+    if (not isinstance(value, list) or any(item not in states for item in value)
+            or len(set(value)) != len(value)):
+        return f"expected a list of distinct job states from {', '.join(states)}, got {json.dumps(value)}"
+    return None
+
+
+def _job_scope(value: object) -> str | None:
+    return None if value in ("workspace", "all") else f"expected \"workspace\" or \"all\", got {json.dumps(value)}"
+
+
 def _tiers(value: object) -> str | None:
     if (not isinstance(value, list) or any(tier not in TIERS for tier in value)
             or len(set(value)) != len(value)):
@@ -284,6 +328,18 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "short-hold.wait-total-minutes": _int_range(10, 1440),
     "prune.failed-days": _int_range(1, 365),
     "band.tracker-url": _key_url,
+    "dashboard.refresh-seconds": _int_range(30, 3600),
+    "dashboard.github-owners": _names,
+    "dashboard.tasks-mcp-server": _text,
+    "dashboard.tasks-mcp-tool": _optional_name,
+    "dashboard.tasks-mcp-args": _object,
+    "dashboard.tasks-field-items": _optional_name,
+    "dashboard.tasks-field-key": _optional_name,
+    "dashboard.tasks-field-title": _optional_name,
+    "dashboard.tasks-field-status": _optional_name,
+    "dashboard.tasks-field-url": _optional_name,
+    "dashboard.job-states": _job_states,
+    "dashboard.job-scope": _job_scope,
     "launch-grace-seconds": _int_range(10, 600),
 }
 

@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 17
+    assert len(DEFAULTS) == 29
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -128,6 +128,115 @@ def test_config_check_rejects_a_band_tracker_url_without_the_key_placeholder(h, 
     configure(h, {"band": {"tracker-url": "https://example.atlassian.net/browse"}})
     assert h.run("config", "check") == 1
     assert "config.json: band.tracker-url: expected a URL with <key>" in capsys.readouterr().err
+
+
+DASHBOARD_LISTS = ["dashboard.github-owners"]
+DASHBOARD_NAMES = ["dashboard.tasks-mcp-tool", "dashboard.tasks-field-items",
+                   "dashboard.tasks-field-key", "dashboard.tasks-field-title", "dashboard.tasks-field-status",
+                   "dashboard.tasks-field-url"]
+
+
+def test_config_get_dashboard_without_a_file_prints_the_defaults(h):
+    assert h.run("config", "get") == 0
+    assert json.loads(h.lines[0])["dashboard"] == {
+        "refresh-seconds": 120, "github-owners": [], "tasks-mcp-server": "", "tasks-mcp-tool": "",
+        "tasks-mcp-args": {}, "tasks-field-items": "", "tasks-field-key": "", "tasks-field-title": "",
+        "tasks-field-status": "", "tasks-field-url": "",
+        "job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
+        "job-scope": "workspace"}
+
+
+def test_config_check_accepts_dashboard_values_at_their_bounds(h):
+    configure(h, {"dashboard": {"refresh-seconds": 30, "github-owners": ["acme", "o2"],
+                                "tasks-mcp-server": "acme-tasks", "tasks-mcp-tool": "list_items",
+                                "tasks-mcp-args": {"mine": True}, "tasks-field-key": "ref.id"}})
+    assert h.run("config", "check") == 0
+    configure(h, {"dashboard": {"refresh-seconds": 3600}})
+    assert h.run("config", "check") == 0
+
+
+def test_config_check_accepts_a_tasks_server_named_with_spaces_and_dots(h):
+    configure(h, {"dashboard": {"tasks-mcp-server": "claude.ai Acme Tasks"}})
+    assert h.run("config", "check") == 0
+    assert h.run("config", "get", "dashboard.tasks-mcp-server") == 0
+    assert h.lines[-1] == '"claude.ai Acme Tasks"'
+
+
+@pytest.mark.parametrize("value", [1, None, ["acme-tasks"]])
+def test_config_check_rejects_a_tasks_server_that_is_not_a_string(h, capsys, value):
+    configure(h, {"dashboard": {"tasks-mcp-server": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.tasks-mcp-server: expected a string" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.tasks-mcp-server") == 0
+    assert h.lines[-1] == '""'
+
+
+@pytest.mark.parametrize("value", [29, 3601, 0, "120", 90.5, True])
+def test_config_check_rejects_a_dashboard_refresh_outside_30_to_3600(h, capsys, value):
+    configure(h, {"dashboard": {"refresh-seconds": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.refresh-seconds:" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.refresh-seconds") == 0
+    assert h.lines[-1] == "120"
+
+
+@pytest.mark.parametrize("key", DASHBOARD_LISTS)
+@pytest.mark.parametrize("value", ["acme", [1], ["a b"], [""], ["a", "a"]])
+def test_config_check_rejects_a_dashboard_list_that_is_not_distinct_names_without_spaces(h, capsys, key, value):
+    configure(h, {"dashboard": {key.partition(".")[2]: value}})
+    assert h.run("config", "check") == 1
+    assert f"config.json: {key}: expected a list of distinct names without spaces" in capsys.readouterr().err
+    assert h.run("config", "get", key) == 0
+    assert h.lines[-1] == "[]"
+
+
+@pytest.mark.parametrize("key", DASHBOARD_NAMES)
+@pytest.mark.parametrize("value", ["a b", 1, None, ["ref"]])
+def test_config_check_rejects_a_dashboard_task_name_that_is_not_a_string_without_spaces(h, capsys, key, value):
+    configure(h, {"dashboard": {key.partition(".")[2]: value}})
+    assert h.run("config", "check") == 1
+    assert f"config.json: {key}: expected a name without spaces" in capsys.readouterr().err
+    assert h.run("config", "get", key) == 0
+    assert h.lines[-1] == '""'
+
+
+@pytest.mark.parametrize("value", [[], "mine", 1])
+def test_config_check_rejects_dashboard_task_args_that_are_not_an_object(h, capsys, value):
+    configure(h, {"dashboard": {"tasks-mcp-args": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.tasks-mcp-args: expected a JSON object" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.tasks-mcp-args") == 0
+    assert h.lines[-1] == "{}"
+
+
+@pytest.mark.parametrize("value", [[], ["done", "failed"], ["invalid", "needs-input"]])
+def test_config_check_accepts_dashboard_job_states_that_are_distinct_states_or_invalid(h, value):
+    configure(h, {"dashboard": {"job-states": value}})
+    assert h.run("config", "check") == 0
+
+
+@pytest.mark.parametrize("value", ["running", [1], ["bogus"], ["running", "running"]])
+def test_config_check_rejects_dashboard_job_states_that_are_not_a_distinct_list_of_states(h, capsys, value):
+    configure(h, {"dashboard": {"job-states": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: dashboard.job-states: expected a list of distinct job states" in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.job-states") == 0
+    assert h.lines[-1] == json.dumps(DEFAULTS["dashboard.job-states"])
+
+
+@pytest.mark.parametrize("value", ["workspace", "all"])
+def test_config_check_accepts_the_two_dashboard_job_scopes(h, value):
+    configure(h, {"dashboard": {"job-scope": value}})
+    assert h.run("config", "check") == 0
+
+
+@pytest.mark.parametrize("value", ["repo", "", ["all"], 1])
+def test_config_check_rejects_a_dashboard_job_scope_other_than_workspace_or_all(h, capsys, value):
+    configure(h, {"dashboard": {"job-scope": value}})
+    assert h.run("config", "check") == 1
+    assert 'config.json: dashboard.job-scope: expected "workspace" or "all"' in capsys.readouterr().err
+    assert h.run("config", "get", "dashboard.job-scope") == 0
+    assert h.lines[-1] == '"workspace"'
 
 
 def test_config_check_names_the_replacement_of_band_jira_url(h, capsys):

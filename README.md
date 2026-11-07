@@ -246,7 +246,7 @@ Every agent states its own `model` and `effort`, by role:
 
 1. Agents: one `.md` file in `plugins/<plugin>/agents/`. Skills: `plugins/<plugin>/skills/<name>/SKILL.md`.
    Both are auto-discovered; no manifest entry is needed.
-2. Bump `version` in that plugin's `plugin.json` — **required**, see [CLAUDE.md](CLAUDE.md).
+2. Bump `version` in that plugin's `plugin.json` — **required**, see [AGENTS.md](AGENTS.md).
 3. Run `python3 scripts/lint-plugin.py`, then `claude plugin validate .`
 
 ## Structure

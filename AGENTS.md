@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 See [README.md](README.md) for what this repository contains and how to install it. This file
 records only what reading the files will not tell you.
@@ -112,14 +112,23 @@ The earlier findings are deliberately not given to the agents. That would be a t
 
 ## Goals that edit cure's own prompts
 
-These rules apply to a goal written for this repository (`cure:goal` reads this file) whose work
-changes a prompt under `plugins/cure/`. All tiers follow them.
+These rules apply to a goal written for this repository whose work changes a prompt under
+`plugins/cure/`. All tiers follow them. Cure reads a repository's `CLAUDE.md`, not this file, so a
+goal for this repository names `AGENTS.md`.
 
 | Change | Rule |
 |---|---|
 | How a job is launched or resumed | The goal names `agents/dispatcher.md` in the work item that makes the change. |
 | A format a run session follows | The goal names `skills/goal/rules.md` or `skills/goal/short-holds.md`, and its copy in `agents/orchestrator.md`, in the work item that makes the change. |
 | A step added to the dispatcher | A Settled statement names each `cure-job next` action (a row of the Actions table in `agents/dispatcher.md`) whose procedure runs the step. |
+
+## cure names no user's tracker
+
+cure is generic. No code, config key, test or doc names a tracker that one user happens to work
+with. Tracker access goes through generic interfaces only, such as a configured MCP server and the
+tool it exposes.
+
+The tracker-specific code already on `main` predates this rule.
 
 ## Marketplace names resembling official ones are rejected
 
