@@ -10,7 +10,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|mcp__.*[Cc]lick[Uu]p.*",
+        "matcher": "Bash|mcp__.*",
         "hooks": [
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/flat-artifact-check.sh\"" }
         ]

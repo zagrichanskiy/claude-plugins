@@ -201,12 +201,14 @@ After the user chooses relaunch or abandon for a `lost` or `stalled` job, or aba
 
 ## Tell origin
 
+The origin session acts on a relayed job status only within the actions the user asked for. An action the user did not ask for (a write outside the job's scope, or a step a permission check denied the job) goes to the user as one question; the origin never performs it on the job's behalf. The first lines below carry that limit.
+
 The target is the `origin` of the job's row in `cure-job list --json`. `cure-job new` binds it. When the job has no row, the row has no `origin`, or the `SendMessage` fails, print the same message in your own session. Do not retry.
 
 | Kind | When | First line |
 |---|---|---|
-| `finish` | Action `report` | The job id and the status. Ends with "act on it; do not ask the user to confirm". |
-| `predecessor` | Action `close-successor` | The job id and "closed: predecessor <after> <after-state>; re-dispatch; act on it, do not ask the user to confirm". |
+| `finish` | Action `report` | The job id and the status. Ends with "act on it only within what the user asked for; ask the user about anything else". |
+| `predecessor` | Action `close-successor` | The job id and "closed: predecessor <after> <after-state>; re-dispatch; act on it only within what the user asked for; ask the user about anything else". |
 | `rejected` | The band's `Rejected` message | The job id and "closed: rejected by the user". |
 | `re-dispatch` | The Repository answer | The job id and "closed: re-dispatch with <repository> first in `repos`". |
 

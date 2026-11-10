@@ -75,3 +75,99 @@ def test_other_bare_identifiers_are_denied(message, identifier):
     output = json.loads(result.stdout)["hookSpecificOutput"]
     assert output["permissionDecision"] == "deny"
     assert "bare identifier: " + identifier in output["permissionDecisionReason"]
+
+
+def run_tool(tool_name, tool_input):
+    payload = {"tool_name": tool_name, "tool_input": tool_input}
+    return subprocess.run(
+        ["sh", str(HOOK)], input=json.dumps(payload), capture_output=True, text=True, check=False
+    )
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        "mcp__claude_ai_ClickUp__get_task_comments",
+        "mcp__claude_ai_ClickUp__get_task",
+        "mcp__tracker2__get_task_comments",
+        "mcp__slack__get_task",
+    ],
+)
+def test_mcp_read_with_bare_identifier_in_id_passes(tool_name):
+    result = run_tool(tool_name, {"task_id": "RND-123"})
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "tool_name, tool_input",
+    [
+        ("mcp__claude_ai_ClickUp__create_task_comment", {"task_id": "RND-123", "comment_text": "Fix the parser"}),
+        ("mcp__claude_ai_ClickUp__update_task", {"task_id": "RND-123", "description": "Fix the parser"}),
+        ("mcp__tracker2__create_task_comment", {"task_id": "RND-123", "comment_text": "Fix the parser"}),
+        ("mcp__slack__updateTask", {"issue_id": "RND-123", "description": "Fix the parser"}),
+    ],
+)
+def test_mcp_write_with_bare_identifier_in_id_and_clean_prose_passes(tool_name, tool_input):
+    result = run_tool(tool_name, tool_input)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "tool_name, tool_input",
+    [
+        ("mcp__claude_ai_ClickUp__create_task_comment", {"task_id": "RND-1", "comment_text": "Blocks RND-123"}),
+        ("mcp__claude_ai_ClickUp__update_task", {"task_id": "RND-1", "description": "Blocks RND-123"}),
+        (
+            "mcp__claude_ai_ClickUp__create_task_comment",
+            {"task_id": "RND-1", "content": [{"type": "text", "text": "Blocks RND-123"}]},
+        ),
+        ("mcp__tracker2__create_task_comment", {"task_id": "RND-1", "comment_text": "Blocks RND-123"}),
+        ("mcp__slack__update_task", {"task_id": "RND-1", "description": "Blocks RND-123"}),
+        (
+            "mcp__slack__post_message",
+            {"channel": "C1", "content": [{"type": "text", "text": "Blocks RND-123"}]},
+        ),
+        ("mcp__tracker2__tracker2_create_task_comment", {"task_id": "RND-1", "comment_text": "Blocks RND-123"}),
+        ("mcp__slack__addComment", {"channel": "C1", "text": "Blocks RND-123"}),
+        ("mcp__notes__notes-create-pages", {"parent": "P1", "title": "Blocks RND-123"}),
+    ],
+)
+def test_mcp_write_with_bare_identifier_in_prose_is_denied(tool_name, tool_input):
+    result = run_tool(tool_name, tool_input)
+
+    output = json.loads(result.stdout)["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "bare identifier: RND-123" in output["permissionDecisionReason"]
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        "mcp__claude_ai_ClickUp__delete_task",
+        "mcp__claude_ai_ClickUp__creator_lookup",
+        "mcp__tracker2__search_tasks",
+    ],
+)
+def test_mcp_tool_without_write_verb_passes(tool_name):
+    result = run_tool(tool_name, {"task_id": "RND-1", "description": "Blocks RND-123"})
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        "mcp__tracker2__get_create_form",
+        "mcp__slack__list_post_drafts",
+    ],
+)
+def test_mcp_read_verb_before_write_verb_passes(tool_name):
+    result = run_tool(tool_name, {"task_id": "RND-1", "description": "Blocks RND-123"})
+
+    assert result.returncode == 0
+    assert result.stdout == ""

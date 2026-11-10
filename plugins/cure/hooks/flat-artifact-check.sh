@@ -1,8 +1,9 @@
 #!/bin/sh
-# PreToolUse: deny writing a commit message, pull request, issue or ClickUp task whose text has an
+# PreToolUse: deny writing a commit message, pull request, issue or MCP write whose text has an
 # identifier without its name or a soft-offer closer. These texts outlive the session, so this is
 # where a check can stop the text before anyone reads it. Code spans and fenced blocks are skipped,
-# so quoting a pattern is not a violation.
+# so quoting a pattern is not a violation. An MCP call is a write when the first read or write verb
+# among the words of its action is a write verb.
 payload=$(cat)
 commit=
 
@@ -21,9 +22,21 @@ case "$tool" in
 $(cat "$file")"
     done
     ;;
-  mcp__*[Cc]lick[Uu]p*)
-    printf '%s' "$tool" | grep -Eiq 'create|update|comment' || exit 0
-    text=$(printf '%s' "$payload" | jq -r '[.tool_input | .. | strings] | join("\n")')
+  mcp__*)
+    # The action is the last `__` segment, split into words on `_`, `-` and camelCase. Its first
+    # read or write verb word decides: a write verb is checked; a read verb or no verb passes.
+    verb=$(printf '%s\n' "${tool##*__}" \
+      | sed -e 's/\([a-z0-9]\)\([A-Z]\)/\1_\2/g' -e 's/\([A-Z]\)\([A-Z][a-z]\)/\1_\2/g' \
+      | tr '_-' '\n\n' | tr '[:upper:]' '[:lower:]' \
+      | grep -xE 'get|search|filter|list|read|view|create|update|edit|add|post|send' | head -n 1)
+    case "$verb" in
+      create|update|edit|add|post|send) ;;
+      *) exit 0 ;;
+    esac
+    text=$(printf '%s' "$payload" | jq -r '
+      [.tool_input | .. | objects | to_entries[]
+        | select(.key | IN("comment_text", "body", "description", "markdown_description", "name", "title", "content", "text", "message"))
+        | .value | strings] | join("\n")')
     ;;
   *)
     exit 0
