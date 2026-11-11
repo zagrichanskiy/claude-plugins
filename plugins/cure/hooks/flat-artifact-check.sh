@@ -1,9 +1,9 @@
 #!/bin/sh
 # PreToolUse: deny writing a commit message, pull request, issue or MCP write whose text has an
 # identifier without its name or a soft-offer closer. These texts outlive the session, so this is
-# where a check can stop the text before anyone reads it. Code spans and fenced blocks are skipped,
-# so quoting a pattern is not a violation. An MCP call is a write when the first read or write verb
-# among the words of its action is a write verb.
+# where a check can stop the text before anyone reads it. Code spans, fenced blocks and URLs are
+# skipped, so quoting a pattern is not a violation. An MCP call is a write when the first read or
+# write verb among the words of its action is a write verb.
 payload=$(cat)
 commit=
 

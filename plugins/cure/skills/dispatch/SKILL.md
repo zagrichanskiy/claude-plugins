@@ -186,7 +186,7 @@ Tell the user in one line: job queued, dispatcher started, pin it with ctrl+t in
 
 ## Updates to a dispatched job
 
-This session is the origin of the jobs it dispatched. Until a job is `done`, `failed` or `abandoned`, send the `dispatcher` session the user's updates for it with `SendMessage`, each naming the job id: `goal.md` facts and Settled answers, or a request to relaunch, stop or resume that job. The dispatcher applies them and passes them to the job's running session.
+This session is the origin of the jobs it dispatched. Until a job is `done`, `failed` or `abandoned`, send the `dispatcher` session the user's updates for it with `SendMessage`, each naming the job id: `goal.md` facts and Settled answers, or a request to relaunch, stop or resume that job. The dispatcher applies them. A running job sees an update when it is resumed or relaunched.
 
 ## Reports from the dispatcher
 
