@@ -46,6 +46,7 @@ esac
 findings=$(printf '%s' "$text" | COMMIT=$commit perl -0777 -ne '
   s/```.*?```//gs;
   s/`[^`\n]*`//g;
+  s{https?://\S+}{}g;
   # In a commit message, a work-item number, step number or step range is a reference.
   if ($ENV{COMMIT}) {
     s/\bwork\s+items?\s+#?\d+(?:\.\d+)?//gi;
