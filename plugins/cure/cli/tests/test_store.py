@@ -7,7 +7,7 @@ from datetime import timezone
 import pytest
 
 from cure_job.errors import HandoffError, StoreError, UnknownJob
-from cure_job.events import Claim, Closed, Launched
+from cure_job.events import Claim, Closed, SessionStarted
 from cure_job.job_id import MAX_SUFFIX, with_suffix
 from cure_job.result import ResultStatus
 from cure_job.store import JobStore
@@ -147,13 +147,13 @@ def test_load_invalid_handoff_names_the_path(store):
 
 def test_append_event_writes_one_line_per_event_in_order(store):
     store.create(BASE, render)
-    store.append_event(BASE, Launched(1, BASE, NOW))
+    store.append_event(BASE, SessionStarted("work", 1, BASE, NOW, 1))
     store.append_event(BASE, Claim("device:bench"))
     store.append_event(BASE, Closed("done with it"))
     lines = (store.job_dir(BASE) / "dispatch.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 3
     record = store.load(BASE)
-    assert record.events == (Launched(1, BASE, NOW), Claim("device:bench"), Closed("done with it"))
+    assert record.events == (SessionStarted("work", 1, BASE, NOW, 1), Claim("device:bench"), Closed("done with it"))
     assert record.run == 1 and record.session == BASE
     assert record.closed == Closed("done with it")
     assert record.events_mtime is not None
@@ -162,8 +162,8 @@ def test_append_event_writes_one_line_per_event_in_order(store):
 
 def test_record_run_counts_launches_and_session_is_the_latest(store):
     store.create(BASE, render)
-    store.append_event(BASE, Launched(1, BASE, NOW))
-    store.append_event(BASE, Launched(2, BASE + "-r2", NOW))
+    store.append_event(BASE, SessionStarted("work", 1, BASE, NOW, 1))
+    store.append_event(BASE, SessionStarted("work", 2, BASE + "-r2", NOW, 2))
     record = store.load(BASE)
     assert (record.run, record.session) == (2, BASE + "-r2")
 

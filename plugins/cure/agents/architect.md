@@ -52,6 +52,11 @@ than silently working without it.
 
 Before writing, grep the whole target directory for every term whose meaning the change alters. List the hits in the reply.
 
+The user reviews the document. The caller passes only changes the user has agreed. Apply each one,
+then rewrite every section, table and diagram it affects. The document reads as the current state.
+Write no "changed", "formerly" or "no longer" note. Git history keeps old states. Remove every trace
+of a removed rule, term or mechanism. Keep the rejected alternative of each decision.
+
 Drafting rules for an architecture document. The matching review items are in
 `checklist-architecture.md`, §2 (Boundaries and contracts), §5 (Failure, degradation and the link)
 and §11 (Hygiene of the document itself).

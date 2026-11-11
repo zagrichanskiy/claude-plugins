@@ -14,7 +14,7 @@ from cure_job.errors import ResourceHeld
 from cure_job.goal import digest
 from cure_job.store import JobStore
 from cure_job.state import LAUNCH_GRACE, State, derive
-from tests.builders import NOW, make_record
+from tests.builders import NOW, make_record, listed
 from tests.test_cli import Harness
 from tests.test_jobs import Harness as ProviderHarness, new_job
 from tests.test_state import A, B, C, launched, states
@@ -237,7 +237,7 @@ def test_done_when_7_a_later_approved_job_on_the_free_repo_is_approved():
     holder = make_record(A, repos=(X,), events=(launched(A),))
     wide = make_record(B, repos=(X, Y), approved=True)
     later = make_record(C, repos=(Y,), approved=True)
-    result = derive([holder, wide, later], {A: SessionStatus.BUSY}, NOW, frozenset())
+    result = derive([holder, wide, later], listed({A: SessionStatus.BUSY}), NOW, frozenset())
     by_id = {view.record.id: view for view in result}
     assert by_id[C].state is State.APPROVED and by_id[C].blocked_by == ()
     assert by_id[B].state is State.HELD and by_id[B].blocked_by == (A, C)
@@ -267,7 +267,7 @@ def test_done_when_8_no_blocked_by_names_a_job_in_queued_held_or_awaiting_approv
         make_record("261013-1005-video-core-f", repos=(X,), goal=True),
         make_record("261013-1006-video-core-g", repos=(Y,), approved=True),
     ]
-    views = derive(records, {A: SessionStatus.BUSY}, NOW, frozenset())
+    views = derive(records, listed({A: SessionStatus.BUSY}), NOW, frozenset())
     state_of = {view.record.id: view.state for view in views}
     named = {holder for view in views for holder in view.blocked_by}
     assert named
@@ -278,7 +278,7 @@ def test_done_when_8_a_held_approved_job_is_not_named_as_a_blocker():
     wide = make_record(B, repos=(X, Y), approved=True)
     holder = make_record(A, repos=(X,), events=(launched(A),))
     later = make_record(C, repos=(X, Y), approved=True)
-    views = {view.record.id: view for view in derive([holder, wide, later], {A: SessionStatus.BUSY}, NOW, frozenset())}
+    views = {view.record.id: view for view in derive([holder, wide, later], listed({A: SessionStatus.BUSY}), NOW, frozenset())}
     assert views[B].state is State.HELD and views[C].state is State.HELD
     assert views[C].blocked_by == (A,)
 
@@ -322,7 +322,7 @@ def test_done_when_9_launch_after_the_holder_ends_succeeds_with_resources_unheld
 # --- Done when 10 --------------------------------------------------------------------------------------
 
 def _names(records, job_id, sessions=None):
-    view = {v.record.id: v for v in derive(records, sessions or {}, NOW, frozenset())}[job_id]
+    view = {v.record.id: v for v in derive(records, listed(sessions or {}), NOW, frozenset())}[job_id]
     return [action.name for action in actions(view, {})]
 
 
