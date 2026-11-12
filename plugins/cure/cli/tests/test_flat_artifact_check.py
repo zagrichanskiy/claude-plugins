@@ -171,3 +171,31 @@ def test_mcp_read_verb_before_write_verb_passes(tool_name):
 
     assert result.returncode == 0
     assert result.stdout == ""
+
+
+def run_body_file(tmp_path, body):
+    body_file = tmp_path / "body.md"
+    body_file.write_text(body)
+    return run_tool("Bash", {"command": "gh pr create --title Fix --body-file " + str(body_file)})
+
+
+def test_identifier_inside_url_passes(tmp_path):
+    result = run_body_file(tmp_path, "## Related issues\n\nhttps://tracker.example/t/123/RND-123\n")
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "fixes RND-123 today\n",
+        "https://tracker.example/t/123/RND-123\n\nfixes RND-123 today\n",
+    ],
+)
+def test_bare_identifier_in_prose_beside_url_is_denied(tmp_path, body):
+    result = run_body_file(tmp_path, body)
+
+    output = json.loads(result.stdout)["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "bare identifier: RND-123" in output["permissionDecisionReason"]
