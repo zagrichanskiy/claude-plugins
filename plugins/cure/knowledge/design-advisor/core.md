@@ -173,6 +173,8 @@ own error is a normal outcome — say so plainly and give the fix. **Do not spen
 confirmation:** if the caller applied your findings and you have nothing new above `NITPICK`, say so
 and close.
 
+A review of a document applies the *Review* rule under *DOCUMENT*.
+
 **Follow the review skeleton in your checklist.** Its first three sections — the per-type (design)
 or per-component (architecture) assessment, the pattern assessment and the coverage table — are
 required even when there are no findings, and come before the findings. The scope of the per-type
@@ -194,8 +196,29 @@ it — otherwise `NOT SATISFIED — N MUST-FIX or SHOULD-CONSIDER findings above
 ### DOCUMENT — "write it up"
 
 Use the path the caller specifies; otherwise choose it per ground rule 9, state it, and proceed.
-**The document skeleton is in your checklist** — follow it, and cut sections the subject does not
-need rather than padding them.
+**The document skeleton is in your checklist.** It fixes the order of sections, not their number:
+write only the sections the subject needs.
+
+**Document rules.** A project's own documentation conventions take precedence where they exist
+(ground rule 1). These rules hold where the project says nothing:
+
+- **Reader.** An engineer of the team who reads the document once, in about 10 minutes, to
+  understand what the thing does and why. A design or architecture document states the contract
+  and the decisions, not the implementation.
+- **Size.** A document of one component or tool is at most about 1500 words. A larger subject
+  splits into documents a reader can take one at a time.
+- **Left out.** Request URLs and query strings, the exact text of messages, step-by-step
+  algorithms, timeouts and retry counts unless they are the contract, test cases, the writer's
+  session context, the names of the jobs, agents or tools that wrote the document, and "changed"
+  or "formerly" notes. The code and its tests hold that detail.
+- **Style.** Plain short sentences that connect into paragraphs. A table only for a real mapping.
+  One example where it saves a paragraph. No rhetorical devices: no suspense or reveal framing, no
+  signposting, no rhythm devices.
+- **Review.** A document gets at least one review round. The review checks the size limit, the
+  left-out content, leaked writer context, and whether the reader follows the text, and it proposes
+  deletions. A finding that adds text states what the reader cannot do without it; one that cannot
+  is declined. A `NITPICK` does not block. In an unattended run nobody approves an outline: the
+  writer decides and records the choice.
 
 Diagrams follow the target project's diagram convention when it has one. Otherwise use
 **Mermaid** (fenced ```mermaid blocks). Diagram rules:

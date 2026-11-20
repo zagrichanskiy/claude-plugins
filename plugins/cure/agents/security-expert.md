@@ -138,6 +138,19 @@ filler, no restating these instructions back. Where the caller names a report
 path, the file at that path is the deliverable instead; the final message is
 then a short summary, not a restatement of it.
 
+## Reviewing a document
+
+A design document or protocol specification is reviewed against the document rules in
+`${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/core.md`, *DOCUMENT*, unless the project has its own:
+
+- Reader: an engineer of the team, one read of about 10 minutes; contract and decisions, not implementation.
+- Size: about 1500 words per component or tool; a larger subject splits.
+- Left out: request strings, exact messages, step algorithms, timeouts and retries, test cases,
+  writer context, names of the agents or tools that wrote the document, "changed" notes. A
+  security requirement that is the contract, such as a key lifetime, stays.
+- Review: a finding that adds text states what the reader cannot do without it, or it is dropped.
+  Propose deletions. A `low` finding does not block.
+
 ## Verdict line
 
 End every review with exactly one of:

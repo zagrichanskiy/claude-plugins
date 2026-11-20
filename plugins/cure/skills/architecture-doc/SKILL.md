@@ -6,7 +6,10 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent, AskUserQuestion
 # Architecture document
 
 This skill runs in the main session, because each section needs decisions from the user. The
-`cure:architect` agent drafts and reviews; the session asks, decides and records.
+`cure:architect` agent drafts and reviews; the session asks, decides and records. The document
+rules (reader, size limit, left-out content, style, review) are in
+`${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/core.md`, *DOCUMENT*. A project's own documentation
+conventions take precedence over them.
 
 ## Inputs
 
@@ -43,31 +46,39 @@ The handoff file is the only state. Create it in step 1; update it at the end of
    - No handoff file: read the layout, find the project's diagram convention, ask the user for the
      subject, the document path and the handoff path, then create the handoff file.
 2. Choose the sections. Propose which layout sections the subject needs and which it does not, with
-   one line of reason each. The user confirms or changes the list. Record it.
+   one line of reason each. The user confirms or changes the list. In an unattended run (a goal or
+   a job), nobody confirms it: take the proposal. Record it. When the sections will not fit the
+   size limit, split the subject into several documents and record the split.
 3. Work on one section at a time, in layout order.
-   1. Ask the user the questions the section needs. Ask them in one round.
+   1. Ask the user the questions the section needs, in one round. In an unattended run, decide
+      each open question by its recommended option and record it.
    2. Record the answers in the handoff file. Dispatch `cure:architect` in DOCUMENT mode with
       paths only: the layout file, the document path, the handoff path, the section title and the
       project's diagram convention. Pass no pasted content. The brief says: write only the named
       section and modify no other section. One exception: add a glossary entry to §2 (Concepts)
       for a term the section needs, and record each added entry in the handoff file. The brief
       also says: list each companion file in the handoff file.
-   3. Run the newcomer-reader pass. Dispatch a general-purpose agent given only the text of the
-      document and its companion files up to and including the section, not the handoff file or
-      the layout. It returns a list of terms, arrows and claims it cannot explain from that text.
+   3. Run the reader pass. Dispatch a general-purpose agent given only the text of the document
+      and its companion files up to and including the section, not the handoff file or the layout.
+      It reads as an engineer of the team and returns the places where it cannot follow what the
+      thing does or why. It does not ask for a definition of a term a team engineer knows.
       Fix a gap that needs no new fact through `cure:architect` in DOCUMENT mode. A gap that needs
       a fact becomes a question to the user. Do this before the user sees the section.
    4. Present the draft. Agree changes with the user. Record each decision and each agreed change
       in the handoff file. Dispatch `cure:architect` in DOCUMENT mode again with the same brief,
-      so that it applies the agreed changes. Repeat until the user accepts the draft.
-   5. Run the exit check (below). Run the table checks first. Then run the prose review as a loop:
-      dispatch `cure:architect` in REVIEW mode with paths and the section title, fix the findings
-      through DOCUMENT mode, and review again. Stop when a round ends with `SATISFIED` (no
-      `MUST-FIX` or `SHOULD-CONSIDER`), or after 5 rounds. After round 5 without `SATISFIED`, the
-      section stays `agreed`, the open findings are reported to the user, and the user decides.
+      so that it applies the agreed changes. Repeat until the user accepts the draft. In an
+      unattended run, skip this step.
+   5. Run the exit check (below). Run the table checks first. Then run the review: at least one
+      round. Dispatch `cure:architect` in REVIEW mode with paths and the section title, and fix the
+      findings through DOCUMENT mode. Apply its proposed deletions. Decline a finding that adds
+      text without stating what the reader cannot do without it. Review again only while a
+      `MUST-FIX` or `SHOULD-CONSIDER` remains, at most 5 rounds; a `NITPICK` does not block. After
+      round 5 without `SATISFIED`, the section stays `agreed` and the open findings are reported
+      to the user, who decides.
    6. Write the retrospective (below).
-   7. Set the section to `done`, report it in a few lines and stop.
-4. Continue to the next section only when the user says so.
+   7. Set the section to `done`, report it in a few lines and stop (in an unattended run, report
+      at the end).
+4. Continue to the next section only when the user says so. In an unattended run, continue.
 
 ## Exit check
 
@@ -76,11 +87,13 @@ A section is `done` when all of these hold:
 | Check | Pass condition |
 |---|---|
 | Description | The section meets its description in the layout |
+| Size | The document so far stays within the size limit of `core.md` |
+| Left out | The section holds no content that `core.md` leaves out, and no writer context |
 | Open items | Open items are in the handoff file. For the open-decisions and risks section: all of them are in its tables, or it states there are none |
 | Diagrams | Each one, in the document and in companion files, renders and follows the project's convention. Mermaid: extract each block and run `npx -y @mermaid-js/mermaid-cli -i <file>.mmd -o <file>.svg` |
 | Consistency | Names and terms match the sections already `done` and the companion files |
 | Decisions | Each decision made in the session appears in the document or in the handoff file |
-| Review | The `cure:architect` REVIEW ends with `SATISFIED`, or its open findings were reported to the user after round 5 and the user accepted them |
+| Review | At least one `cure:architect` REVIEW round ran, and the last ends with `SATISFIED` or its open findings were reported to the user after round 5 |
 
 A failed table check returns the section to step 3.4. Report it to the user. A REVIEW that ends with `NOT SATISFIED` follows step 3.5.
 
