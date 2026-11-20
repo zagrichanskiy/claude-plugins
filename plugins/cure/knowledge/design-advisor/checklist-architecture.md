@@ -62,11 +62,8 @@ supplement for the target's language.
 - **A binding between an internal definition and an external component is explicit.** Name the
   artifact that owns the binding and what validates it. Flag a binding that exists only as a naming
   convention.
-- **Where agents call external systems, each call has a tool contract.** A step is one unit of
-  work with typed input and output and one record entry. A tool call is one request to an
-  external system. The contract states name, request, result, time limit and locked
-  resource. Flag a step described as a tool call, or a tool call (many per step) described as a
-  step.
+- **Where agents call external systems, a tool call (one request to an external system) is not
+  described as a step** (one unit of work with typed input and output, many tool calls per step).
 - **The environment tools inventory is complete.** Map every existing tool or CLI the team uses to
   a component or a tool, or exclude it with a reason. Flag a tool in use that the document does not
   mention.
@@ -200,21 +197,14 @@ attachment points still get named.
 - **Extensibility is stated per extensible element.** Name which elements are open sets, what
   adding one means, and what stays unchanged. Flag a blanket claim such as "the system is
   extensible".
-- **Term coverage works both ways.** Every term, abbreviation and named entity used after §2
-  (Concepts) is defined there before use. Abbreviations are expanded at first use. When the document is
-  complete, every defined concept is used. Flag an unexpanded abbreviation, a workflow name used before its
-  definition, an undefined "pipeline", "plugin pin" or "worker", and lifecycle stages that are
-  defined and never used.
-- **Each glossary entry states the term's kind and what it is not,** where a reader could confuse
-  it: message and prompt, ledger and log, telemetry (raw data) and statistics (aggregates),
-  workflow (concept) and CI pipeline (its implementation), step, tool, service and actor. Where a
-  term such as "workflow definition" names a data file, the entry says where it lives and how it
-  changes.
+- **The document rules in `core.md` (*DOCUMENT*) hold:** the reader, the size limit, the left-out
+  content and the style. Flag an implementation spec, leaked writer context, and text the reader
+  cannot follow. Propose deletions.
+- **A term the team does not know is defined in §2 (Concepts) before use,** and a defined term is
+  used. Where two terms are easily confused, such as message and prompt, the entry says which is
+  which. Do not demand a definition for a term a team engineer knows.
 - **A term that names something in the user's environment names that exact thing,** such as a
   specific repository or setup. Flag a generic notion in its place (concrete over abstract).
-- **Concept diagrams cover the whole glossary:** one overview model plus one relation page per
-  concept cluster, each in its own file with its own diagram. Flag a glossary concept that appears
-  in no concept diagram.
 - **Section and term names are checked against the glossary for collisions.** Example: build-order
   "stages" collided with lifecycle stages and were renamed "increments". §8 (Stages) of the document skeleton may be renamed, for example to
   "Increments", when the glossary already uses the term.
@@ -247,8 +237,8 @@ attachment points still get named.
   contract, a cutover that cannot be staged or reverted.
 - **SHOULD-CONSIDER** — a real cost that one component can absorb later: missing observability, a
   pattern half-applied where a degraded path still exists, an unstated but non-critical attribute.
-- **NITPICK** — document hygiene, except the glossary, term, name-collision, concept-diagram and
-  extensibility items of §11, which rank SHOULD-CONSIDER.
+- **NITPICK** — document hygiene, except the term, name-collision and extensibility items of §11,
+  which rank SHOULD-CONSIDER.
 
 ## Review skeleton — architecture mode
 
@@ -301,7 +291,7 @@ first three are required even when there are no findings.
 ## Document skeleton — architecture document
 
 Every section is optional. A document includes a section only when the subject needs it. The
-sections that remain keep this order.
+sections that remain keep this order. The size limit in `core.md` holds for the whole document.
 
 ### 1. Motivation and scope
 
@@ -311,8 +301,8 @@ the document growing.
 
 ### 2. Concepts
 
-A glossary with one meaning per term, each entry stating the term's kind and what it is not, and
-concept diagrams: one overview model plus one relation page per concept cluster.
+A glossary of the terms a team engineer does not already know, one meaning per term, and a
+concept diagram where the relations between them are not obvious from the text.
 
 ### 3. Structure
 
@@ -335,8 +325,8 @@ answer.
 
 ### 7. Operation
 
-One subsection each for resource budget, validation, deployment and security, each only when it
-applies. The validation subsection gives one check per §1 goal.
+One subsection each for validation, deployment and security, each only when it applies. The
+validation subsection gives one check per §1 goal.
 
 ### 8. Stages
 

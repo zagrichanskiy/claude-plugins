@@ -273,12 +273,14 @@ are no findings: they are what distinguishes a design review from a bug list.
 
 ## Document skeleton — design document
 
+Write only the sections the subject needs. The document rules in `core.md` (*DOCUMENT*) hold.
+
 1. **Structure** — a Mermaid `classDiagram` of the key types, their operations and their
    relationships (association, composition, inheritance, dependency), with a legend. This opens the
    document: every later section details one type from it, so a reader meets the whole before any
    part. A design document without it is incomplete.
-2. **One section per type** — its responsibility, its contract (invariant, pre/postconditions),
-   its own API, how it is built inside, the order its steps run in.
+2. **One section per key type** — its responsibility and its contract (invariant,
+   pre/postconditions). Members, internals and step order live in the code, not here.
 3. **Patterns** — the patterns the design uses, each with the forces that justify it.
 4. **Key flows** — the important runtime sequences, as a Mermaid `sequenceDiagram` where it adds
    clarity.
