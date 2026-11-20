@@ -1,0 +1,16 @@
+# cure-job command reference
+
+The CLI is `cure-job` (bare name; `${CLAUDE_PLUGIN_ROOT}/bin/cure-job`). The state root is `${CURE_JOB_ROOT:-~/.claude/cure}`.
+
+| Command | Behaviour |
+|---|---|
+| `cure-job prune` | Removes finished jobs and half-created directories. A `done` job goes once reported and its sessions are removed; an `abandoned` job once its sessions are removed; a `failed` job after `prune.failed-days`. A job named by the `after` of an unfinished job stays. |
+| `cure-job next --json` | JSON array in lock-rank order. Element: the job's `list --json` row plus `actions` (ordered action names) and `args` (object keyed by action). A job with no action is absent. |
+| `cure-job list --json` | One row per job: derived state, resources, files, `origin` (bound by `cure-job new`), `open` (count of `## Open` items in `goal.md`), `reported`, `sessions-removed`, `prs`, `ticket`, `ticket-summary`, `branch` (null when the handoff omits it), `workspace` (launch directory), `after` (predecessor id or null), `after-state` (predecessor state, `missing` or `invalid`), and for a `blocked` job `waiting-for`. |
+| `cure-job reported <id>` | Records that the finish message for the job's latest run was sent or printed. |
+| `cure-job stop <id>` | Stops the session of the latest run and waits until it is down. Prints the session name, or `<session> not live`; both exit 0. Exit 1 means the session may still be alive. |
+| `cure-job approve <id> --by user\|auto` | Records approval of the current `goal.md` digest. `--by` is required. Exit 1 while `## Open` has items. Legal for a job with a `goal.md` and no launched run (`held`, `awaiting-approval`, `approved`). The same digest again writes nothing. Any later edit of `goal.md` revokes it. |
+| `cure-job launch <id> [-- --permission-mode <mode>]` | Starts the job session. After `--` only `--permission-mode acceptEdits\|default\|auto`. Passes the worker allow rules `finish <id>`, `claim <id>`, `release <id>`, `config get`, `list`, `finish --help` on `<plugin-root>/bin/cure-job` in `--settings`. A Light or Full job starts with `--agent cure:orchestrator`; a Solo job without `--agent`. A run-1 launch needs `approved`; `awaiting-approval` is refused with a message naming `cure-job approve <id>`. Refuses a job that does not hold every resource it names, and a job whose session is alive. Refuses a `needs-input` job whose session is listed live with `job <id> is needs-input and its session <name> is live; continue it: cure-job resume <id>`. A `needs-input` job whose session is gone or listed stopped launches. |
+| `cure-job close <id>` | Abandons a job. Refuses while its session is alive. |
+| `cure-job resume <id> [-- --permission-mode <mode>]` | Needs `needs-input`. Stops the kept session, then runs `claude --bg --resume <session-uuid> "/goal @<goal.md>"`: same session name, new run. When the session no longer exists, exits 1 with `session <name> no longer exists; start a new run` and starts nothing. |
+| `cure-job remove-sessions <id>` | Needs `done` or `abandoned`, else exit 1. Stops each live session of every run, runs `claude rm` on it, prints each removed name. When no session of the job is left listed, records `sessions-removed`. |

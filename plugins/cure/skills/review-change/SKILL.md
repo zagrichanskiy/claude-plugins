@@ -1,114 +1,64 @@
 ---
-description: Review a change with more than one agent without paying for the same reading twice — run the collector once to produce a source digest, dispatch the reviewing agents against that digest in parallel, then merge their findings into one report with a section per altitude. Use it whenever the user asks, in any words, for a design, architecture or multi-agent review of a pull request, a branch, a pull request group or a change ("review this PR with the designer and architect", "do a design review of this branch", "review the change" on more than a handful of files), and whenever two or more of reviewer, designer and architect would otherwise each read the same tree. Prefer it over dispatching those agents directly.
+description: Review a change with more than one agent without paying for the same reading twice: collect a source digest once, dispatch the reviewing agents against it in parallel, merge their findings into one report with a section per altitude. Use it whenever the user asks for a design, architecture or multi-agent review of a pull request, a branch, a pull request group or a change ("review this PR with the designer and architect", "do a design review of this branch", "review the change" on more than a handful of files), and whenever two or more of reviewer, designer and architect would otherwise each read the same tree. Prefer it to dispatching those agents directly.
 argument-hint: "[target] [--with architect]"
 allowed-tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 ---
 
 # Review change
 
-Two advisory agents reviewing one pull request group independently cost 4.4 M weighted input tokens
-across 249 requests and reached six findings twice, because each ran its own collection pass. This
-skill collects once and judges in parallel against the result.
+Collect once, then judge in parallel. Assign no areas and forbid no files: each reviewer decides
+what to open.
 
-**It does not divide the source between the agents.** Each reviewer still decides for itself what to
-open; the digest makes that decision informed rather than exhaustive. Assigned areas and forbidden
-files would trade a cost problem for a coverage problem, and the defects worth finding are the ones
-that cross an area.
+## 1. Fix the target
 
-## The pipeline
+State in one line before dispatching: the base, the branches or pull requests, the repositories, the
+token budget, and whether the target is a **C++ change**. Resolve it with
+`git diff --stat <base>...HEAD`, `gh pr view`, `gh pr diff`. Never substitute a local `git diff` for
+an unchecked-out pull request. Every agent inherits this boundary.
 
-### 1. Fix the target
+- A C++ change has at least one *Changed C++ file*, as `${CLAUDE_PLUGIN_ROOT}/agents/collector.md`
+  *Gating signals* defines it. It runs step 3a; any other change runs step 3.
+- Record `--with architect` when passed; step 3a uses it.
+- Token budget: 400k tokens per agent per round unless the caller states another figure. When an
+  agent's per-leg usage (step 5) nears it with findings open, stop the agent, take what it returned,
+  and say so in the close-out.
+- Find earlier review reports of the same target (under `.notes/`, a published report the user
+  names, an earlier digest). Record each and the commits since. Do not pass their findings to the
+  agents; step 4 uses them.
+- For a C++ change, read `${CLAUDE_PLUGIN_ROOT}/skills/review-change/cpp-change.md` §Registration check
+  before dispatching anything.
 
-State it in one line before dispatching anything: the base, the branches or pull requests, the
-repositories. Resolve it with `git diff --stat <base>...HEAD`, `gh pr view`, `gh pr diff`. Every
-agent in the run inherits this boundary, so it is written once here rather than re-derived five
-times.
+## 1a. Re-check mode
 
-State in the same line whether the target is a **C++ change**: one with at least one *Changed C++
-file*, as `${CLAUDE_PLUGIN_ROOT}/agents/collector.md` *Gating signals* defines it. Never substitute
-a local `git diff` for a pull request that is not checked out. A C++ change runs the two waves of
-step 3a; any other change runs step 3.
-Record `--with architect` when the user passed it; step 3a uses it.
+Skip the collector and dispatch straight to step 3 when the agents are resumed from the previous
+round, or are fresh and the diff since the last round is 5 files and 200 lines or fewer. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/review-change/recheck.md` before dispatching in this mode. A fresh
+agent over the threshold forces the full pipeline from step 2.
 
-Also find earlier review reports of the same target: a report or handoff under `.notes/`, a
-published report the user names, an earlier digest. Record each one and the commits that landed
-since it. Do not pass their findings to the agents (step 3 forbids topics); the merge uses them in
-step 4. Step 1a is the one exception: re-check mode passes the open ledger ids, not the findings
-themselves.
+## 2. Collect once
 
-**Set the token budget for the round** before dispatching anything: 400k tokens per agent per
-round, unless the caller states a different figure. State the figure in the same line as the
-target. If an agent's per-leg usage (not its cumulative context — see step 5) is near the budget
-with findings still open, stop it, take what it returned, and say so in the close-out rather than
-letting it run unbounded.
+Dispatch `collector` with the target and a digest path (default `.notes/<slug>-digest.md` at the
+repository root, per the `note` skill). Wait for it.
 
-**Check that the `cg-*` agents are registered** before dispatching anything for a C++ change. Look
-for `cg-interfaces`, `cg-classes`, `cg-resources`, `cg-statements`, `cg-philosophy`,
-`cg-concurrency` and `cg-generic` in the session's available agent list. Plugin agents appear there
-prefixed with the plugin name, for example `cure:cg-philosophy`. When any is missing, tell the user
-so, in those words, before dispatching:
+Run it once per target. Re-run it only when the target changes materially, and say the digest is
+stale. Skip it for a handful of files in one repository, never for a C++ change.
 
-- Cause: the session loaded a `cure` version without the `cg-*` agents. A session that started
-  before a plugin update keeps the old agent list.
-- Fix: run `claude plugin marketplace update zagrichanskiy` and
-  `claude plugin update cure@zagrichanskiy`, then restart Claude Code.
+## 3. Judge in parallel
 
-Do not fall back to step 3's table without saying so. If the user chooses to continue, state in the
-report that the Core Guidelines section is absent and why.
-
-### 1a. Re-check mode
-
-Skip the collector and dispatch straight to step 3 when either holds:
-
-| Agents | Condition |
-|---|---|
-| Resumed from the previous round | None on diff size. A resumed agent re-checks a diff range of any size. |
-| Freshly dispatched | The diff since the last round touches 5 files or fewer, and 200 changed lines or fewer (`git diff --stat <last-round-ref>..HEAD`). |
-
-A fresh agent over the threshold forces the full pipeline from step 2. Resuming the previous round's
-agents avoided a new collector and fresh readings in the run this rule came from; the per-leg budget
-of step 1 still applies.
-
-For a C++ change, the previous round's gating (step 3a) stands; the skipped agents stay skipped and
-are listed again in the report. Resume every gated-in `cg-*` agent of the previous round on the fix
-diff, not only the agents that raised the round's ids. A fix can introduce a defect in a guideline
-area whose agent raised nothing before; only that agent is placed to find it.
-
-Give each resumed agent the ledger ids still open, from `.notes/<slug>-ledger.md`, and a diff range
-(`git diff <last-round-ref>..HEAD`) instead of a digest. Give a fresh agent the diff range only, with
-no ledger ids: they would be a topic brief, which step 3 forbids. Do not re-run the collector to
-produce a digest. `<last-round-ref>` and the commit of each round: see step 5.
-
-### 2. Collect once
-
-Dispatch `collector` with the target and a digest path — `.notes/<slug>-digest.md` at the repository
-root by default, per the `note` skill. Wait for it. It returns the path, the totals and its verbatim
-shortlist.
-
-Run it exactly once per target. If the target changes materially mid-review, the digest is stale:
-say so and re-run it, rather than letting reviewers work from a map of a different change.
-
-For a change of a handful of files, skip this step and dispatch the reviewers directly. The digest
-earns its cost when more than one agent reads, or when the target spans repositories. A C++ change
-never skips it: step 3a gates agents on the digest's §10 *Gating signals*, and at least seven agents
-read the digest.
-
-### 3. Judge in parallel
-
-For a C++ change, dispatch by step 3a instead of the table below. Otherwise, dispatch the agents
-the change warrants, **in one message so they run concurrently**:
+For a C++ change, dispatch by step 3a instead of this table. Otherwise dispatch the agents the
+change warrants, in one message so they run concurrently:
 
 | Agent | Dispatch it when |
 |---|---|
-| `reviewer` | Always. Correctness, convention, safety, test coverage. |
-| `designer` | The change adds or reshapes a component: class decomposition, interface contracts and completeness, design patterns, ownership model, error strategy. |
-| `architect` | The change touches a boundary, a resource budget, a deployment surface, or hardware; architectural patterns. |
+| `reviewer` | Always. |
+| `designer` | The change adds or reshapes a component, or changes class decomposition, an interface contract, a design pattern, an ownership model or an error strategy. |
+| `architect` | The change touches a boundary, a resource budget, a deployment surface, or hardware, or introduces or changes an architectural pattern. |
 | `security-expert` | The change touches authentication, keys, trust boundaries, or a network protocol. |
 | `ui-reviewer`, `ux-reviewer` | The change has a user interface. |
 
-Give each the same things and nothing that constrains its reading. `reviewer`, `security-expert`,
-`designer`, `architect` and the `cg-*` agents hold `Write` for this purpose only: the report path
-named below, under `.notes/`, nothing else:
+Give each agent this brief and nothing that constrains its reading. `reviewer`, `security-expert`,
+`designer`, `architect` and the `cg-*` agents hold `Write` for the report path only. Name each path
+distinctly:
 
 ```
 Target: <the boundary from step 1>
@@ -118,211 +68,45 @@ Token budget: <the figure from step 1>
 Task: REVIEW. Decide for yourself which files to open.
 ```
 
-`ui-reviewer` and `ux-reviewer` hold no `Write`. Give them the same brief without the `Report path`
-line, and add instead: `Return your report in full in your reply.`
+- `ui-reviewer` and `ux-reviewer` hold no `Write`: omit the `Report path` line and add
+  `Return your report in full in your reply.` Read the other reports from disk.
+- Add project context if useful. Add no topics: no area, defect class or earlier finding to look at.
 
-Name each agent's path distinctly (its own slug and round number) so two agents, and two rounds,
-never collide. The orchestrator reads the written report from disk in step 4 for the agents that
-hold `Write`; for `ui-reviewer` and `ux-reviewer` it reads the report from their return message
-instead.
+## 3a. C++ change: two waves
 
-Project context (the platform, the hardware, where the conventions live) may be added. **Topics may
-not.** Each agent's checklist already defines its work; a brief that asks `designer` to hunt
-lifetime bugs, or `architect` to judge class structure, pulls the agent to another agent's altitude
-and displaces the work only it does. In the review this skill was built from, a brief of that kind
-turned every one of the designer's must-fix findings into a behaviour bug.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/review-change/cpp-change.md` before dispatching. It holds the
+gating table, the wave briefs and the skip lines. Run wave 1, wait, then run wave 2 (`designer`).
 
-### 3a. C++ change: two waves
+## 4. Merge
 
-A C++ change replaces step 3's table with two waves and a mechanical gate. The brief, the report
-path rule and the ban on topics from step 3 apply unchanged.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/review-change/merge-rules.md` before merging. You may delegate
+the assembly to a `general-purpose` agent, which holds `Read` on the source; brief it as
+`merge-rules.md` §Delegating the merge states.
 
-**Gate from the digest, not from judgement.** The `cg-*` agents and `architect` are gated
-mechanically: read the digest's §10 *Gating signals* table and nothing else to decide. Do not open
-source, and do not override a row because the change looks concurrent or generic to you. A signal
-recorded as `unknown` counts as present. `security-expert`, `ui-reviewer` and `ux-reviewer` keep
-their conditions from step 3's table; §10 has no row for them.
+Check the assembled report against the rules before closing the round. Resume an agent that stopped
+on a usage or rate limit with `SendMessage` once the limit resets; do not dispatch a new one.
 
-| Agent | Runs when | Evidence in §10 |
-|---|---|---|
-| `cg-interfaces`, `cg-classes`, `cg-resources`, `cg-statements`, `cg-philosophy` | Always. | `cpp` is `yes`. |
-| `cg-concurrency` | The change shows threads, atomics, mutexes or coroutines. | `concurrency` is `yes`. |
-| `cg-generic` | The change shows templates or concepts. | `templates` is `yes`. |
-| `reviewer` | Always. | None. |
-| `architect` | The change touches a public header, an IPC surface, a build dependency, config or schema, or a design document; or the user passed `--with architect`. | Any of `public_header`, `ipc_surface`, `build_dependency`, `config_schema`, `design_document` is `yes`; or the flag from step 1. |
-| `security-expert`, `ui-reviewer`, `ux-reviewer` | As in step 3's table. | None; not gated on §10. |
-| `designer` | Always, in wave 2. | None. |
+## 5. Close the run
 
-**Wave 1.** Dispatch every gated-in agent above except `designer`, in one message so they run
-concurrently. Each gets step 3's brief with its own report path. `reviewer` gets one more line,
-which tells it that Core Guidelines rules are covered:
-
-```
-Core Guidelines: <the report paths of the cg-* agents in this wave, one per line> — checked by the cg-* agents; do not read these reports.
-```
-
-Wait for all of them.
-
-**Wave 2.** Dispatch `designer` with step 3's brief and one more line:
-
-```
-Already reported: <the wave 1 report paths, one per line> — already reported, do not repeat; input for cause analysis, not scope. The cg-* deviation findings in these reports are yours to decide.
-```
-
-Pass the paths, never the findings copied into the brief. This line is not a topic: it names what
-the designer should not report again, and it lets the designer trace a class-level cause behind
-behaviour findings. The designer's checklist still defines its work. The `cg-*` agents do not rank;
-`designer` decides each `deviation` finding (fix, accept here, propose a project-wide entry, or
-reclassify as defect).
-
-**Record every skip.** For each agent left out, keep one line for the report.
-
-- A `cg-*` agent or `architect`: the agent, every section it owns that went unchecked, and the §10
-  row it needed with that row's value, for example
-  `cg-generic — skipped: T (Templates and generic programming), SL (The Standard Library) not checked; templates = no (grep over 6 changed C++ files, 0 hits)`.
-- `security-expert`, `ui-reviewer` or `ux-reviewer`: the agent, the step 3 condition, and why it did
-  not hold, for example `ui-reviewer — skipped: the change has a user interface; no UI file changed`.
-
-### 4. Merge
-
-The agents return independently; the report is yours to assemble. You may delegate the assembly to
-a merge agent of type `general-purpose`, which holds `Read` on the source. Its brief lists:
-
-- the target, and the output path `.notes/<slug>-r<N>-report.md`;
-- the report file paths of the agents that hold `Write`, and the reports of `ui-reviewer` and
-  `ux-reviewer` in full, since those exist only in their reply messages;
-- the skip lines recorded in step 3a;
-- the earlier reports found in step 1;
-- the backlog path `.notes/<slug>-backlog.md`.
-
-It reads the reports from disk, so the orchestrator's context does not hold every report. Every
-rule of this step binds the merge agent, including opening the source to re-check a carried
-must-fix. Tell it so in its brief, and check the assembled report against those rules before
-closing the round.
-
-**The report has one section per altitude, not one global ranking**: correctness (`reviewer`), system (`architect`), design
-(`designer`), Core Guidelines (the `cg-*` agents, one subsection per agent), and any other agent
-dispatched. Each section keeps its own `MUST-FIX` and
-`SHOULD-CONSIDER` order, by that agent's severity definitions; `NITPICK` findings do not stay in
-the section body — see below.
-
-The `cg-*` agents classify findings as `defect` or `deviation` and rank nothing. Place them so:
-
-| Class | Section | Rank |
-|---|---|---|
-| `defect` | Correctness, beside the `reviewer` findings. | You rank it as a bug: `MUST-FIX`. |
-| `deviation`, decided `reclassify as defect` | Correctness, beside the `reviewer` findings, with the designer's named failure. | You rank it as a bug, as a `defect` above. |
-| `deviation`, any other decision | Design, in the designer's decision table. | The designer's decision. A `fix` carries the designer's severity; `accept here` and `propose project-wide` are not open findings. |
-| `deviation`, not in the designer's decision table | Core Guidelines subsection of the agent that raised it. | `undecided`, with the cause: `designer did not run`, `designer stopped at the token budget`, or `designer left it out`. It does not gate the round. |
-
-A `defect` inside the scope of a `cg-deviations.md` entry is ranked as any other `defect`; the entry
-accepts deviations only.
-
-The Core Guidelines subsections keep each agent's coverage table and count line. Collect every
-`propose project-wide` line from the designer's table in one list at the end of the design section,
-for the author to add to `.claude/cure/cg-deviations.md`. When a `cg-*` report lists entries that
-the change itself adds or edits in that file, list them in the same place, marked `added by this
-change`.
-
-`security-expert` grades `critical`, `high`, `medium`, `low`, and an overall verdict of `CHANGES
-REQUIRED` or `SATISFIED`, not the four tags below directly. Map them when merging: `critical` and
-`high` to `MUST-FIX`, `medium` to `SHOULD-CONSIDER`, `low` to `NITPICK`, and a verdict of `CHANGES
-REQUIRED` to the round not passing the severity floor (`NOT SATISFIED`).
-
-**Triage every finding into exactly one of four tags**, or mark it `undecided`. `undecided` applies
-only to a `cg-*` deviation with no designer decision, per the table above; it is not a tag and does
-not gate the round. `MUST-FIX`, `SHOULD-CONSIDER`, and
-`NITPICK` are severities, per the dispatched agent's own definitions (mapped for `security-expert`
-above). `enhancement` is a separate tag, not a severity: it marks a proposal for new behaviour
-rather than a defect in the change under review. Carry the `enhancement` tag from the agent that
-raised the finding; the merge never assigns it to a finding the agent tagged with a severity
-instead — recasting a defect as an enhancement removes it from the severity floor, and that call
-belongs to the agent that read the source, not to the orchestrator.
-
-Route every `NITPICK` and every `enhancement` to `.notes/<slug>-backlog.md` instead of the round's
-report body; `MUST-FIX` and `SHOULD-CONSIDER` stay in the section. State the tag next to each
-finding, both in the merged report and in the backlog.
-
-A single global ranking was tried and failed: behaviour defects outrank structural ones on
-immediacy, so every design finding sank to a one-line bullet at the bottom and its proposed
-interfaces were cut. The structural findings were the part of the review no other agent could have
-produced.
-
-- **Every section gets the same depth.** A design finding carries its proposed types, declarations
-  and diagram as fully as a correctness finding carries its failing scenario and code excerpt.
-  Never compress one altitude to make room for another; if the report is too long, cut nitpicks in
-  every section.
-- **Carry the assessments through.** The designer's structure assessment and pattern assessment,
-  and the architect's component and boundary assessment and pattern assessment, go into their
-  sections verbatim or as tables — they are deliverables, not preamble.
-- **Carry every coverage table through.** Each `cg-*` agent's coverage table, and the designer's
-  and architect's coverage tables, go into their sections verbatim, or as a link to the agent's
-  report path with its per-status counts. A section without its coverage table, or a link to one,
-  is incomplete. The table is the only record of what was checked and what was not.
-- **List every skipped agent.** For a C++ change, add a *Skipped agents* table with the lines from
-  step 3a: the agent, the sections left unchecked, and the §10 row with its value, or, for
-  `security-expert`, `ui-reviewer` and `ux-reviewer`, the step 3 condition that did not hold. An
-  agent absent from the report and from this table is a gap in the merge.
-- **One defect, one entry.** When two agents raise the same defect, report it once, in the
-  section of the altitude it belongs to, and record that both reached it independently.
-  Agreement is a confidence signal, **not a rank boost**: agents at different altitudes can only
-  overlap on behaviour, so boosting agreement would promote behaviour over structure again.
-- **Keep the evidence.** Every entry keeps its `path:line` and its concrete failing scenario or
-  forces. Drop the reasoning and the entry becomes an assertion the author cannot act on. A
-  finding cited to the digest instead of the source is unverified.
-- **Keep the suggested change.** Proposed decompositions, interface declarations and pattern
-  recommendations are the designer's and architect's deliverable; a finding reduced to its
-  diagnosis loses the part the author asked for.
-- **State disagreements as disagreements.** Where two agents recommend incompatible changes, give
-  both with their tradeoffs and say which you would take first. Do not average them.
-- **Open with the first thing to address in each section**, then one line on the order across
-  sections. Summary counts, if any, count every section.
-- **Carry the open questions through.** A question an agent could not answer is not noise; it is
-  work for the author.
-- **Account for every earlier finding.** When step 1 found an earlier report, add a carry-over
-  table: each earlier finding is *re-raised* (with its new ID), *resolved* (with the commit), or
-  *not raised*. Re-check every must-fix that was not raised against the source yourself before you
-  drop it. If it still holds, keep it in its altitude's section, marked as carried by the merging
-  session. Independent agents drop findings between rounds; on unchanged code a must-fix that
-  disappears is a miss, not a fix.
-
-An agent that stops on a usage or rate limit has not finished. Resume that same agent with
-`SendMessage` once the limit resets; it keeps its context and its reading. Do not dispatch a new
-one: that pays for the reading again and counts as a second agent over the target.
-
-### 5. Close the run
-
-- **State whether the round passes the severity floor.** A round passes when no `MUST-FIX` or
-  `SHOULD-CONSIDER` finding is open across every section. Open `NITPICK`s and `enhancement`s do not
-  hold the round open; they sit in `.notes/<slug>-backlog.md` for whoever picks them up later. Say
-  the pass/fail plainly, before the summary counts.
-- Report the run cost: each agent's reading footer, and the number of agents dispatched. The figure
-  compared against the token budget (step 1) is always the per-leg figure below, never the
-  cumulative one.
-  - For a freshly dispatched agent, its reported token usage is the round's cost for that leg.
-  - For a resumed agent (re-check mode, or a later round), the harness reports cumulative context,
-    not the round's cost. The per-leg cost is the difference between this report and the agent's
-    previous report; compute and state that difference, not the cumulative figure. That per-leg
-    delta still understates the resumed agent's true cost: each request re-reads its full context,
-    so the reading is paid for again even though it does not show up in the delta.
-  - Flag any agent whose reported usage is at or over its token budget (step 1).
-- The fix step commits each round with explicit paths, new files included, before the round
-  closes. Record HEAD at the
-  start of this round — before the fix commit, when its agents were dispatched — as
-  `<last-round-ref>` for the next round's re-check test (step 1a). Update
-  `.notes/<slug>-ledger.md` with the round's finding ids and their status.
-- A fix that changes a rule beyond its finding needs a test for the changed behaviour in the same
-  round. The fix brief tells the implementer to return such a change as a question, not to
-  implement it under an assumption.
-- A fix brief states the scope of each finding's cause: local to the cited line, or also present in other files or sections.
-- Sweep the digest once the report is delivered — see the `note` skill.
-- If the report is large enough that the author will work from it over several sessions, persist it
-  where the project keeps documents and hand back the path, not the whole text.
+- State plainly, before the summary counts, whether the round passes the severity floor: it passes
+  when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open in any section. `NITPICK`s and
+  `enhancement`s sit in `.notes/<slug>-backlog.md` and do not hold the round open.
+- Report each agent's reading footer and per-leg token usage (for a resumed agent, the difference
+  from its previous report, never the cumulative figure), and the number of agents dispatched. Compare
+  the per-leg figure with the budget. Flag any agent at or over budget.
+- The fix step commits each round with explicit paths, new files included, before the round closes.
+  Record HEAD at the start of the round (before the fix commit) as `<last-round-ref>` for step 1a,
+  and update `.notes/<slug>-ledger.md` with the round's finding ids and status.
+- A fix that changes a rule beyond its finding needs a test in the same round. The fix brief tells
+  the implementer to return such a change as a question, and states each finding's cause scope:
+  local to the cited line, or also present elsewhere.
+- Sweep the digest once the report is delivered, per the `note` skill. Persist a report the author
+  works from over several sessions where the project keeps documents, and hand back the path.
 
 ## Never
 
-- **Never dispatch the same agent twice over one target** to raise confidence. Dispatch a second
-  *kind* of agent, or verify the specific finding.
-- **Never merge the altitudes into one ranking.** One section per altitude, each at full depth.
-- **Never re-run the collector to answer one question.** Read the file.
-- **Never drop an earlier must-fix without checking it.** Not raised this round is not resolved.
+- Never dispatch the same agent twice over one target for confidence. Dispatch a second kind
+  of agent or verify the finding.
+- Never merge the altitudes into one ranking.
+- Never re-run the collector to answer one question.
+- Never drop an earlier must-fix without checking it. Not raised this round is not resolved.

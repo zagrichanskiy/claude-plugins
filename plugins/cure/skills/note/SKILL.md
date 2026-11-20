@@ -12,18 +12,14 @@ delete: the global rule in `~/.claude/CLAUDE.md`.
 
 **`.notes/` at the repository root. Never beside real documents.**
 
-A working note sitting next to committed content is read as content. That is how a file whose own
-first line says "nothing here is decided" ends up cited as a decision.
-
-**Exclude it locally, not in `.gitignore`** — the exclusion is your working preference, not a fact
-about the project, and `.gitignore` is shared:
+**Exclude it locally, not in `.gitignore`**:
 
 ```
 grep -qxF '.notes/' "$(git rev-parse --git-dir)/info/exclude" 2>/dev/null ||
   echo '.notes/' >> "$(git rev-parse --git-dir)/info/exclude"
 ```
 
-Outside a repository, use `.notes/` in the working directory just the same.
+Outside a repository, use `.notes/` in the working directory.
 
 ## Anatomy
 
@@ -37,71 +33,23 @@ resolved_by:                 # the artifact, once it exists
 ---
 ```
 
-**`supersedes_when` is the field that matters.** It is written at creation, before anyone is
-attached to the file, and it names the thing whose existence ends this note: a merged pull request,
-a committed document, a decision recorded where the team looks. "When we're done" is not an answer —
-name the artifact.
+**`supersedes_when`** is written at creation. It names the artifact whose existence ends the note: a
+merged pull request, a committed document, a decision recorded where the team looks. "When we're
+done" is not an answer.
 
-A note that cannot name what would replace it is not a working note. It is either content that
-belongs in the repository proper, or nothing.
+A note that cannot name its replacement is not a working note. It is content that belongs in the
+repository, or nothing.
 
 ## Design note
 
-A design note records a design worked out in the conversation, so a fresh session can implement it
-without replaying the conversation. It is a working note in `.notes/<slug>.md`. It uses the five
-frontmatter keys above and no others. `supersedes_when` names the design document or the
-implementing pull request.
-
-```markdown
----
-title: <Title>
-status: working              # working | resolved
-created: <YYYY-MM-DD>
-supersedes_when: <the design document or the implementing pull request>
-resolved_by:                 # the artifact, once it exists
----
-
-# <Title>
-
-## Problem
-
-<The need or friction, and why it is worth doing.>
-
-## Decisions
-
-| Decision | Reason |
-|---|---|
-| <what was decided> | <why> |
-
-## Rejected
-
-| Alternative | Reason |
-|---|---|
-| <what was not chosen> | <why not> |
-
-## Open decisions
-
-<Unresolved forks and questions. Omit the section when none is open.>
-
-## Next steps
-
-1. <The first concrete action for an implementer.>
-```
-
-Rules:
-
-- Write from the conversation, not from a fresh guess. Record what was decided and why.
-- One idea per file. If the session covered several, ask which one, or write one file for each.
-- The slug is kebab-case and stable. If `.notes/<slug>.md` exists, update it. Do not overwrite
-  agreed Decisions or Rejected rows.
-- Report the path and a one-line summary. Do not start implementing unless asked.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/note/design-note.md` before writing a design note. It holds the template and the writing rules.
 
 ## Commands
 
 | Command | Effect |
 |---|---|
 | `/note <title>` | Create one in `.notes/`, asking for `supersedes_when` if it is not obvious |
-| `/note design <title>` | Create a design note in `.notes/` from the conversation, using the template in Design note |
+| `/note design <title>` | Create a design note in `.notes/` from the conversation (see Design note) |
 | `/note list` | Every working note in this repository, with age |
 | `/note sweep` | Check each against its `supersedes_when`, and offer deletions |
 | `/note resolve <name> <artifact>` | Record the artifact and delete the note |
@@ -112,10 +60,10 @@ For each note with `status: working`, decide whether the artifact named in `supe
 exists — look for it, do not guess. A merged pull request, a file in the tree, a section in a
 committed document.
 
-- **Exists, and covers everything the note held** — delete it. Say what went and what holds it now.
-- **Exists, but part of the note never made it** — name that part, and offer to promote it or keep
+- **Exists, and covers everything the note held**: delete it. Say what went and what holds it now.
+- **Exists, but part of the note never made it**: name that part, and offer to promote it or keep
   the note. Never delete an open question because most of the file is settled.
-- **Design note** — a note with both a `## Decisions` and a `## Rejected` heading. Other notes
+- **Design note**: a note with both a `## Decisions` and a `## Rejected` heading. Other notes
   follow the rules above. A design note follows the same outcome rules. These tests decide
   whether it is covered.
   - Covered by a document: every Decisions row, Rejected row and open decision is in the document.
@@ -123,16 +71,15 @@ committed document.
     Rejected row and open decision is in the body or a committed document.
   - A row or open decision that is not there is the part that never made it. Keep the note and
     list the missing rows.
-- **Does not exist** — leave it, and report the age.
+- **Does not exist**: leave it, and report the age.
 
-**Report ages.** A working note older than thirty days whose artifact never appeared is usually
-abandoned rather than pending; say so and ask.
+**Report ages.** A working note older than thirty days whose artifact never appeared is probably
+abandoned; say so and ask.
 
 ## When one turns up on its own
 
-Finding a stale working note while doing something else is worth one sentence: which artifact
-superseded it, and an offer to delete. Do not silently leave it — the next reader takes it for
-current.
+When you find a stale working note while doing something else, say in one sentence which artifact
+superseded it and offer to delete it.
 
 ## Never
 
