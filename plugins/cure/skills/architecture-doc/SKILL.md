@@ -5,27 +5,22 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent, AskUserQuestion
 
 # Architecture document
 
-This skill runs in the main session, because each section needs decisions from the user. The
-`cure:architect` agent drafts and reviews; the session asks, decides and records. The document
-rules (reader, size limit, left-out content, style, review) are in
-`${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/core.md`, *DOCUMENT*. A project's own documentation
-conventions take precedence over them.
+Run this skill in the main session, because each section needs decisions from the user. The `cure:architect` agent drafts and reviews. The session asks, decides and records. The session does not write section text itself.
+
+The document rules (reader, size limit, left-out content, style, review) are in `${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/core.md`, *DOCUMENT*. A project's own documentation conventions take precedence.
 
 ## Inputs
 
 | Input | Source |
 |---|---|
-| Layout | `${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/checklist-architecture.md`, section "Document skeleton — architecture document" |
+| Layout | `${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/checklist-architecture.md`, section "Document skeleton — architecture document". Read it on each run. Every section is optional. |
 | Handoff file | A path the user names. Ask for it when not given. |
 | Document path | The user names it. Record it in the handoff file. |
 | Diagram convention | The target project's, when one exists. Mermaid otherwise. |
 
-Every section of the layout is optional. This skill does not repeat the section list; read it from the
-layout file on each run.
-
 ## Handoff file
 
-The handoff file is the only state. Create it in step 1; update it at the end of every step.
+The handoff file is the only state. Create it in step 1. Update it at the end of every step.
 
 | Field | Content |
 |---|---|
@@ -40,83 +35,24 @@ The handoff file is the only state. Create it in step 1; update it at the end of
 
 ## Steps
 
+An unattended run (a goal or a job) has no user to confirm or answer. It takes each recommended option, records it, and skips step 3.4.
+
 1. Start or resume.
-   - Handoff file exists: read it, report the status of each section, and continue at the first
-     section that is not `done`.
-   - No handoff file: read the layout, find the project's diagram convention, ask the user for the
-     subject, the document path and the handoff path, then create the handoff file.
-2. Choose the sections. Propose which layout sections the subject needs and which it does not, with
-   one line of reason each. The user confirms or changes the list. In an unattended run (a goal or
-   a job), nobody confirms it: take the proposal. Record it. When the sections will not fit the
-   size limit, split the subject into several documents and record the split.
+   - Handoff file exists: read it, report the status of each section, and continue at the first section that is not `done`.
+   - No handoff file: read the layout, find the project's diagram convention, ask the user for the subject, the document path and the handoff path, then create the handoff file.
+2. Choose the sections. Propose which layout sections the subject needs and which it does not, with one line of reason each. The user confirms or changes the list. Record it. When the sections will not fit the size limit, split the subject into several documents and record the split.
 3. Work on one section at a time, in layout order.
-   1. Ask the user the questions the section needs, in one round. In an unattended run, decide
-      each open question by its recommended option and record it.
-   2. Record the answers in the handoff file. Dispatch `cure:architect` in DOCUMENT mode with
-      paths only: the layout file, the document path, the handoff path, the section title and the
-      project's diagram convention. Pass no pasted content. The brief says: write only the named
-      section and modify no other section. One exception: add a glossary entry to §2 (Concepts)
-      for a term the section needs, and record each added entry in the handoff file. The brief
-      also says: list each companion file in the handoff file.
-   3. Run the reader pass. Dispatch a general-purpose agent given only the text of the document
-      and its companion files up to and including the section, not the handoff file or the layout.
-      It reads as an engineer of the team and returns the places where it cannot follow what the
-      thing does or why. It does not ask for a definition of a term a team engineer knows.
-      Fix a gap that needs no new fact through `cure:architect` in DOCUMENT mode. A gap that needs
-      a fact becomes a question to the user. Do this before the user sees the section.
-   4. Present the draft. Agree changes with the user. Record each decision and each agreed change
-      in the handoff file. Dispatch `cure:architect` in DOCUMENT mode again with the same brief,
-      so that it applies the agreed changes. Repeat until the user accepts the draft. In an
-      unattended run, skip this step.
-   5. Run the exit check (below). Run the table checks first. Then run the review: at least one
-      round. Dispatch `cure:architect` in REVIEW mode with paths and the section title, and fix the
-      findings through DOCUMENT mode. Apply its proposed deletions. Decline a finding that adds
-      text without stating what the reader cannot do without it. Review again only while a
-      `MUST-FIX` or `SHOULD-CONSIDER` remains, at most 5 rounds; a `NITPICK` does not block. After
-      round 5 without `SATISFIED`, the section stays `agreed` and the open findings are reported
-      to the user, who decides.
-   6. Write the retrospective (below).
-   7. Set the section to `done`, report it in a few lines and stop (in an unattended run, report
-      at the end).
-4. Continue to the next section only when the user says so. In an unattended run, continue.
-
-## Exit check
-
-A section is `done` when all of these hold:
-
-| Check | Pass condition |
-|---|---|
-| Description | The section meets its description in the layout |
-| Size | The document so far stays within the size limit of `core.md` |
-| Left out | The section holds no content that `core.md` leaves out, and no writer context |
-| Open items | Open items are in the handoff file. For the open-decisions and risks section: all of them are in its tables, or it states there are none |
-| Diagrams | Each one, in the document and in companion files, renders and follows the project's convention. Mermaid: extract each block and run `npx -y @mermaid-js/mermaid-cli -i <file>.mmd -o <file>.svg` |
-| Consistency | Names and terms match the sections already `done` and the companion files |
-| Decisions | Each decision made in the session appears in the document or in the handoff file |
-| Review | At least one `cure:architect` REVIEW round ran, and the last ends with `SATISFIED` or its open findings were reported to the user after round 5 |
-
-A failed table check returns the section to step 3.4. Report it to the user. A REVIEW that ends with `NOT SATISFIED` follows step 3.5.
-
-## Retrospective
-
-Each section ends with a retrospective. Its format is "The retrospective" in
-`${CLAUDE_PLUGIN_ROOT}/skills/goal/SKILL.md`: sections Outcome, Where it went wrong, Proposed
-changes, in that order. `/cure:retro` turns its proposals into issues and deletes the file.
-
-| Item | Rule |
-|---|---|
-| Path | `~/.claude/retros/<date>-<repo>-<slug>.md`. `<date>` is `YYYY-MM-DD`, `<repo>` is the repository of the document, `<slug>` is `architecture-doc-<stem>-<section>`: the document file stem and the section title, lowercase, words joined by hyphens. When the file exists, append the new section's rows to it. Do not overwrite. |
-| Outcome | `met`, or `failed: <cause>, what is left` |
-| Where it went wrong | Rows `W1…Wn` with evidence: rework, a failed exit check, a question the user answered that the skill should have asked earlier, a layout section that did not fit |
-| Proposed changes | `Target / Change / Evidence (Wn) / Expected effect`. Targets: `cure:skills/architecture-doc/SKILL.md`, `cure:` path of the layout file, `repo:<path>`. |
-
-A proposal with no `Wn` evidence is not made. Write the file even when the table is empty. Never
-edit the skill or the layout from this skill.
+   1. Ask the user the questions the section needs, in one round.
+   2. Record the answers in the handoff file. Dispatch `cure:architect` in DOCUMENT mode with paths only: the layout file, the document path, the handoff path, the section title and the project's diagram convention. Pass no pasted content. The brief says: write only the named section and modify no other section, except to add a glossary entry to §2 (Concepts) for a term the section needs. Record each added entry in the handoff file. List each companion file in the handoff file.
+   3. Run the reader pass before the user sees the section. Dispatch a general-purpose agent given only the text of the document and its companion files up to and including the section, not the handoff file or the layout. It reads as an engineer of the team and returns the places where it cannot follow what the thing does or why. It does not ask for a definition of a term a team engineer knows. Fix a gap that needs no new fact through `cure:architect` in DOCUMENT mode. A gap that needs a fact becomes a question to the user.
+   4. Present the draft. Agree changes with the user. Record each decision and each agreed change in the handoff file. Dispatch `cure:architect` in DOCUMENT mode again with the same brief to apply the agreed changes. Repeat until the user accepts the draft.
+   5. Read `${CLAUDE_PLUGIN_ROOT}/skills/architecture-doc/exit-check.md` and run it. The review needs at least one round: dispatch `cure:architect` in REVIEW mode with paths and the section title, and fix the findings through DOCUMENT mode. Apply its proposed deletions. Decline a finding that adds text without stating what the reader cannot do without it. Review again only while a `MUST-FIX` or `SHOULD-CONSIDER` remains, at most 5 rounds. A `NITPICK` does not block. After round 5 without `SATISFIED`, the section stays `agreed` and the open findings are reported to the user, who decides.
+   6. Read `${CLAUDE_PLUGIN_ROOT}/skills/architecture-doc/retrospective.md` and write the retrospective.
+   7. Set the section to `done`, report it in a few lines and stop. An unattended run reports at the end.
+4. Continue to the next section only when the user says so. An unattended run continues.
 
 ## Rules
 
-- Draft and review through `cure:architect`. The session does not write section text itself.
-- Read the layout file on each run. Do not rely on a remembered section list.
 - Stop after each section. A user's earlier "continue" does not cover the next section.
 - A document names only what the user supplied or the sources show. Do not invent names.
 - Record every unresolved question as an open item, not as prose in the section.

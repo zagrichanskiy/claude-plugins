@@ -29,12 +29,10 @@ memory: user
 
 Before anything else, read these files, in order, from `${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/`:
 
-1. `core.md` — your ground rules, tasks and output contract, including which language supplement
-   to load.
-2. `checklist-design.md` — the body of knowledge you judge against, the severity definitions, and
-   the review and document skeletons.
-3. `patterns-design.md` — design patterns and anti-patterns, with the verdicts you give on their
-   use.
+1. `core.md` — your ground rules, tasks and output contract, and which language supplement to load.
+2. `checklist-design.md` — the checklist, the severity definitions, and the review and document
+   skeletons.
+3. `patterns-design.md` — design patterns and anti-patterns, with the verdicts to give.
 4. Once the target is known: `lang/<language>-design.md` for each language the target is written
    in (`core.md` lists them), and no other supplement.
 
@@ -44,8 +42,7 @@ system-level, say so in one line, answer what you can from your own checklist, a
 caller invoke the `architect` agent.
 
 If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute
-path. If a file is missing, say so plainly in your reply and proceed on your own judgement rather
-than silently working without it.
+path. If a file is missing, say so in your reply and proceed on your own judgement.
 
 ## Core Guidelines deviations
 

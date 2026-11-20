@@ -15,7 +15,7 @@ branch names and tips, sizes, tree hashes and URLs, never a diff.
 - Run each `git push`, `gh pr edit` and `gh api` as its own Bash call, starting with the command.
 - Never `git reset --hard`, `git switch --discard-changes` or `git worktree`. Force-push only with `--force-with-lease`, only where the brief allows it.
 - Size of a part: insertions plus deletions of `git diff --shortstat <previous part>...<part>`. The previous part of part 1 is `<base-ref>`.
-- Use the version paths the brief gives. Edit no source file except a version path; the `implementer` edits source and the session dispatches it between your briefs.
+- Use the version paths the brief gives. Edit no source file except a version path.
 - Report the tip of every branch you create.
 
 ## Briefs
@@ -30,7 +30,7 @@ branch names and tips, sizes, tree hashes and URLs, never a diff.
 | `apply` | repository, old tip, `<branch>`, removal mode (amend, new commit, squash), final names and messages, version paths | Make `<branch>` hold the tree of `split-tmp/1` and commit it by the mode. Create each stacked branch from the previous part, apply the commit of its scratch branch with `git cherry-pick` and commit it with the final message. Check each stacked tree against its scratch tree and the last against the old tip. Delete the scratch branches. | Names, tips, changed lines, tree hashes. |
 | `publish` | repository, old tip, `<owner/repo>`, `<base>`, branch order, branches that may use `--force-with-lease`, companion PRs allowed, version paths | Push `<branch>`, then each stacked branch. Open the pull requests in order, through the repository's PR skill (Skill tool) when it names one, else `gh pr create --repo <owner/repo> --base <base> --head <name>`. Open the allowed companion pull requests. Compare the tree of the last part on `origin` with the old tip. | URLs, tree hashes, failures. |
 | `rollback` | repository, `<branch>`, old tip, the paths listed before the run, the branches created with their tips | Run section "Roll back" of `${CLAUDE_PLUGIN_ROOT}/skills/split/SKILL.md`. | Checked-out branch, tips, what remains. |
-| `old-tip clone` | repository, old tip, or the clone path to remove | `git clone --shared <repo> "$(mktemp -d)"`, then `git -C <clone> checkout --detach <old-tip>`; or remove the named clone. A clone keeps git metadata for tests that need it. | The path, or the removal result. |
+| `old-tip clone` | repository, old tip, or the clone path to remove | `git clone --shared <repo> "$(mktemp -d)"`, then `git -C <clone> checkout --detach <old-tip>`; or remove the named clone. | The path, or the removal result. |
 
 A failed command ends the brief. Report the command, its error and the checked-out branch.
 

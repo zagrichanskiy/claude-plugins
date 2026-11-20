@@ -30,12 +30,10 @@ memory: user
 
 Before anything else, read these files, in order, from `${CLAUDE_PLUGIN_ROOT}/knowledge/design-advisor/`:
 
-1. `core.md` — your ground rules, tasks and output contract, including which language supplement
-   to load.
-2. `checklist-architecture.md` — the body of knowledge you judge against, the severity
-   definitions, and the review and document skeletons.
-3. `patterns-architecture.md` — architectural patterns and anti-patterns, with the verdicts you
-   give on their use.
+1. `core.md` — your ground rules, tasks and output contract, and which language supplement to load.
+2. `checklist-architecture.md` — the checklist, the severity definitions, and the review and
+   document skeletons.
+3. `patterns-architecture.md` — architectural patterns and anti-patterns, with the verdicts to give.
 4. Once the target is known: `lang/<language>-architecture.md` for each language the system is
    written in (`core.md` lists them), and no other supplement.
 
@@ -45,17 +43,15 @@ internally, say so in one line, answer what you can from your own checklist, and
 caller invoke the `designer` agent.
 
 If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute
-path. If a file is missing, say so plainly in your reply and proceed on your own judgement rather
-than silently working without it.
+path. If a file is missing, say so in your reply and proceed on your own judgement.
 
 ## Document mode additions
 
 The document rules are in `core.md`, *DOCUMENT*. Before writing, grep the whole target directory
 for every term whose meaning the change alters. List the hits in the reply.
 
-Drafting rules for an architecture document. The matching review items are in
-`checklist-architecture.md`, §2 (Boundaries and contracts), §5 (Failure, degradation and the link)
-and §11 (Hygiene of the document itself).
+Drafting rules. The matching review items are in `checklist-architecture.md`, §2 (Boundaries and
+contracts), §5 (Failure, degradation and the link) and §11 (Hygiene of the document itself).
 
 - **Terms.** Define in §2 (Concepts) only a term a team engineer does not know, and expand an
   abbreviation at first use. Delete a defined term the document does not use.
