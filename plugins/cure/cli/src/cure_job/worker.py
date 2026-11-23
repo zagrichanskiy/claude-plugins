@@ -1,20 +1,13 @@
-"""The ``claude`` arguments of a worker session beyond its name and prompt.
+"""The ``claude`` arguments the caller of ``launch`` and ``resume`` may choose: only the permission mode.
 
-The caller of ``launch`` and ``resume`` may choose only the permission mode
-(:class:`RunArguments`). The CLI adds the permission rules the worker needs to
-report back (:class:`WorkerSettings`).
+The permission rules a session needs to report back come from its kind
+(:func:`cure_job.kinds.settings_arguments`).
 """
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Sequence
 
 from .errors import CureJobError
-
-CURE_JOB = Path("bin", "cure-job")
-#: The variable a worker session reads its job id from.
-JOB_ID_VARIABLE = "CURE_JOB_ID"
 
 
 class RunArguments:
@@ -43,23 +36,3 @@ class RunArguments:
             raise CureJobError(f"refused {self.OPTION} {mode!r}; expected one of {', '.join(self.MODES)}")
         return mode
 
-
-class WorkerSettings:
-    """The ``--settings`` that allow a worker to run ``cure-job finish``, ``claim`` and ``release`` on its job,
-    and set :data:`JOB_ID_VARIABLE` in its environment."""
-
-    COMMANDS = ("finish", "claim", "release")
-    READS = ("config get", "list")
-
-    def __init__(self, plugin_root: Path, job_id: str):
-        self.cure_job = Path(plugin_root) / CURE_JOB
-        self.job_id = job_id
-
-    def rules(self) -> list[str]:
-        return ([f"Bash({self.cure_job} {command} {self.job_id} *)" for command in self.COMMANDS]
-                + [f"Bash({self.cure_job} {command} *)" for command in self.READS]
-                + [f"Bash({self.cure_job} finish --help)"])
-
-    def arguments(self) -> list[str]:
-        settings = {"permissions": {"allow": self.rules()}, "env": {JOB_ID_VARIABLE: self.job_id}}
-        return ["--settings", json.dumps(settings, separators=(",", ":"))]

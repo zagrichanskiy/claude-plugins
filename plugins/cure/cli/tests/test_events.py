@@ -5,13 +5,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from cure_job.events import Claim, Closed, Launched, SessionsRemoved, decode, encode
+from cure_job.events import Claim, Closed, SessionsRemoved, SessionStarted, decode, encode
 
 AT = datetime(2026, 10, 13, 17, 42, 5, tzinfo=timezone.utc)
 
 
 def test_launched_line_shape():
-    event = Launched(1, "261013-1742-video-core-fps-clamp", AT)
+    event = SessionStarted("work", 1, "261013-1742-video-core-fps-clamp", AT, 1)
     assert encode(event) == ('{"event":"launched","run":1,"session":"261013-1742-video-core-fps-clamp",'
                              '"at":"2026-10-13T17:42:05+00:00"}')
 
@@ -24,7 +24,7 @@ def test_closed_line_shape():
     assert encode(Closed("superseded")) == '{"event":"closed","reason":"superseded"}'
 
 
-@pytest.mark.parametrize("event", [Launched(2, "x-r2", AT), Claim("/work/a"), Closed(""), SessionsRemoved(AT)])
+@pytest.mark.parametrize("event", [SessionStarted("work", 2, "x-r2", AT, 2), Claim("/work/a"), Closed(""), SessionsRemoved(AT)])
 def test_decode_inverts_encode(event):
     assert decode(encode(event)) == event
 

@@ -50,6 +50,10 @@ path. If a file is missing, say so in your reply and proceed on your own judgeme
 The document rules are in `core.md`, *DOCUMENT*. Before writing, grep the whole target directory
 for every term whose meaning the change alters. List the hits in the reply.
 
+The user reviews the document. The caller passes only changes the user has agreed. Apply each one,
+then rewrite every section, table and diagram it affects. Remove every trace of a removed rule, term
+or mechanism. Keep the rejected alternative of each decision.
+
 Drafting rules. The matching review items are in `checklist-architecture.md`, §2 (Boundaries and
 contracts), §5 (Failure, degradation and the link) and §11 (Hygiene of the document itself).
 

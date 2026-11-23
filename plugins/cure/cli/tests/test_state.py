@@ -8,12 +8,12 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
-from cure_job.events import Approved, Claim, Closed, Launched, Reported, SessionsRemoved, StopIssued
+from cure_job.events import Approved, Claim, Closed, Reported, SessionsRemoved, SessionStarted, SessionStopped
 from cure_job.handoff import Device
 from cure_job.resource import DEVICE_BENCH
 from cure_job.result import ResultStatus
 from cure_job.state import LAUNCH_GRACE, RETENTION, State, derive, expired, is_ready, needs_sessions
-from tests.builders import NOW, make_record, result_of
+from tests.builders import NOW, make_record, result_of, listed
 
 BUSY, IDLE, STOPPED = SessionStatus.BUSY, SessionStatus.IDLE, SessionStatus.STOPPED
 A = "261013-1000-video-core-a"
@@ -21,17 +21,17 @@ B = "261013-1001-video-core-b"
 C = "261013-1002-video-core-c"
 
 
-def launched(job_id: str, run: int = 1, age: timedelta = timedelta(minutes=5)) -> Launched:
+def launched(job_id: str, run: int = 1, age: timedelta = timedelta(minutes=5)) -> SessionStarted:
     from cure_job.job_id import session_name
-    return Launched(run, session_name(job_id, run), NOW - age)
+    return SessionStarted("work", run, session_name(job_id, run), NOW - age, run)
 
 
 def state_of(record, sessions=None, now=NOW):
-    return derive([record], sessions or {}, now, frozenset())[0].state
+    return derive([record], listed(sessions or {}), now, frozenset())[0].state
 
 
 def states(records, sessions=None, now=NOW):
-    return {view.record.id: view.state for view in derive(records, sessions or {}, now, frozenset())}
+    return {view.record.id: view.state for view in derive(records, listed(sessions or {}), now, frozenset())}
 
 
 # --- one test per States row ------------------------------------------------------------------------
@@ -81,12 +81,12 @@ def test_row_6_stopped_session_is_launched_inside_the_grace_period():
 
 
 def test_row_6_stopped_session_is_lost_inside_the_grace_period_after_cure_job_stop():
-    record = make_record(A, events=(launched(A, age=timedelta(seconds=1)), StopIssued(1, NOW)))
+    record = make_record(A, events=(launched(A, age=timedelta(seconds=1)), SessionStopped("work", 1, NOW)))
     assert state_of(record, {A: STOPPED}) is State.LOST
 
 
 def test_row_6_stop_of_an_earlier_run_does_not_end_the_grace_of_the_latest():
-    record = make_record(A, events=(launched(A, 1), StopIssued(1, NOW), launched(A, 2, age=timedelta(seconds=1))))
+    record = make_record(A, events=(launched(A, 1), SessionStopped("work", 1, NOW), launched(A, 2, age=timedelta(seconds=1))))
     assert state_of(record, {A + "-r2": STOPPED}) is State.LAUNCHED
 
 
@@ -392,11 +392,9 @@ def test_stalled_state_checks_the_session_of_the_latest_launch():
     assert state_of(record, {A: BUSY, A + "-r2": IDLE}) is State.STALLED
 
 
-def test_stalled_has_a_session_and_is_open_but_not_launchable():
+def test_stalled_is_open():
     assert State.STALLED.value == "stalled"
-    assert State.STALLED.has_session
     assert State.STALLED.is_open
-    assert not State.STALLED.is_launchable
 
 
 def test_stalled_job_keeps_its_resources():

@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 from pathlib import Path
 
 from . import resource
-from .events import Approved, Claim, Closed, Event, Launched, Origin, Release, Reported, SessionsRemoved, StopIssued
+from .events import WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved
 from .handoff import Handoff
 from .result import Result
+from .sessions import JobSession, fold
 
 
 @dataclass(frozen=True)
@@ -37,28 +39,47 @@ class JobRecord:
         return self.has_goal and any(isinstance(event, Approved) and event.goal == self.goal_digest
                                      for event in self.events)
 
-    @property
-    def launches(self) -> tuple[Launched, ...]:
-        return tuple(event for event in self.events if isinstance(event, Launched))
+    @cached_property
+    def sessions(self) -> tuple[JobSession, ...]:
+        return fold(self.events, self.result is not None)
+
+    def latest(self, kind: str) -> JobSession | None:
+        return next((session for session in reversed(self.sessions) if session.kind == kind), None)
+
+    def open_sessions(self) -> tuple[JobSession, ...]:
+        """The latest session of each kind, where it has not ended."""
+        latest = {session.kind: session for session in self.sessions}
+        return tuple(session for session in latest.values() if not session.ended)
+
+    def restarts(self, kind: str) -> int:
+        """The starts of ``kind`` that followed a session of ``kind`` that had not ended."""
+        tail = 0
+        for session in self.sessions:
+            if session.kind == kind:
+                tail = 0 if session.ended else tail + 1
+        return max(tail - 1, 0)
 
     @property
     def run(self) -> int:
-        return len(self.launches)
+        """The number of work sessions."""
+        return sum(1 for session in self.sessions if session.kind == WORK)
 
     @property
     def session(self) -> str | None:
-        launches = self.launches
-        return launches[-1].session if launches else None
+        latest = self.latest(WORK)
+        return latest.name if latest is not None else None
+
+    @property
+    def session_names(self) -> tuple[str, ...]:
+        """The name of every session of every kind, in first-seen order, without repeats.
+
+        A resumed run records the session of the run before it, so a name can repeat."""
+        return tuple(dict.fromkeys(session.name for session in self.sessions))
 
     @property
     def reported(self) -> bool:
         """The origin session was told of the latest run's result."""
         return self.run > 0 and any(isinstance(event, Reported) and event.run == self.run for event in self.events)
-
-    @property
-    def stop_issued(self) -> bool:
-        """``cure-job stop`` ran for the latest run."""
-        return self.run > 0 and any(isinstance(event, StopIssued) and event.run == self.run for event in self.events)
 
     @property
     def sessions_removed(self) -> bool:

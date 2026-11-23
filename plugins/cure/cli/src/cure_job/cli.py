@@ -16,7 +16,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from .claude import Claude, ClaudeCli
 from . import config
@@ -25,6 +25,7 @@ from .commands.approve import ApproveCommand
 from .commands.claim import ClaimCommand
 from .commands.close import CloseCommand
 from .commands.config import ConfigCommand
+from .commands.end import EndCommand
 from .commands.finish import FinishCommand
 from .commands.launch import LaunchCommand
 from .commands.list import ListCommand
@@ -36,10 +37,12 @@ from .commands.release import ReleaseCommand
 from .commands.remove_sessions import RemoveSessionsCommand
 from .commands.reported import ReportedCommand
 from .commands.resume import ResumeCommand
+from .commands.start import StartCommand
 from .commands.stop import StopCommand
 from .errors import CureJobError
 from .goal import PLUGIN_ROOT
 from .help import HelpFormatter, style
+from .kinds import KINDS, SessionKind
 from .providers.jobs import JobsProvider
 from .store import JobStore
 
@@ -57,15 +60,17 @@ _flush_print = functools.partial(print, flush=True)
 class Cli:
     def __init__(self, *, root: Path, config_path: Path, claude: Claude, clock: Clock = local_now,
                  out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT,
-                 sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic):
+                 sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic,
+                 kinds: Mapping[str, SessionKind] = KINDS):
         self.out = out
         self.config_path = config_path
         self.version = config.plugin_version(plugin_root)
         self.config = config.load(config_path, root, self.version)
-        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config)
+        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config, kinds)
         self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
-                          LaunchCommand(self), ResumeCommand(self), ClaimCommand(self), ReleaseCommand(self),
-                          StopCommand(self), CloseCommand(self), OriginCommand(self), FinishCommand(self),
+                          LaunchCommand(self), ResumeCommand(self), StartCommand(self), ClaimCommand(self),
+                          ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
+                          FinishCommand(self), EndCommand(self),
                           ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), ConfigCommand(self)]
         self._parser = self._build_parser()
 

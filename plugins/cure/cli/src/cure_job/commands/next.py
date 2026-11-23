@@ -25,13 +25,13 @@ class NextCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
-        # An invalid job's launches are unknown, so it ranks as launched: it may hold any resource.
-        ranked = sorted([(lock_rank(view.record), view, job_row(view, listing.sessions)) for view in listing.views]
+        # An invalid job's work sessions are unknown, so it ranks as launched: it may hold any resource.
+        ranked = sorted([(lock_rank(view.record), view, job_row(view)) for view in listing.views]
                         + [((False, job.id), None, invalid_row(job)) for job in listing.invalid],
                         key=lambda entry: entry[0])
         elements = []
         for _, view, row in ranked:
-            found = actions(view, row, jobs.config)
+            found = actions(view, row, jobs.config, jobs.kinds)
             if found:
                 elements.append({**row, "actions": [action.name for action in found],
                                  "args": {action.name: dict(action.args) for action in found if action.args}})
