@@ -32,7 +32,7 @@ A small change does not affect customers: a fix, a small refactoring, a doc edit
 | `## Settled` | Decisions taken in the session, each with its reason. |
 | `## Work` | The steps, in order. No review-round cap: the goal skill's tier rule sets it. |
 | `## Done when` | Numbered checks that the job can run and show. |
-| `## Tools` | The repository's build, implement, review and verify agents and its PR skill. Take them from its `CLAUDE.md` and `.claude/`. |
+| `## Tools` | The repository's build, implement, review and verify agents, its prose reviewer and its PR skill. Take them from its `CLAUDE.md` files (its own and each ancestor directory's up to `$HOME`) and its `.claude/`. |
 | `## Open` | Questions only the user can answer. Omit the section when there are none. |
 
 Read `fields.md` before filling `ticket-summary`, `base`, `delivery`, `after` or a Resource risk line.
@@ -70,8 +70,6 @@ HANDOFF
 ```
 
 Write the handoff only through this command. Never create files under the state root yourself. When the command fails, show its error to the user and stop. Do not retry with a changed slug.
-
-A goal or handoff contains a tracker write (comment, field, status change) only when the user asked for that write in the session. Ticket creation by a branch split is set by the configured delivery, not by this rule.
 
 ## Waking the dispatcher
 

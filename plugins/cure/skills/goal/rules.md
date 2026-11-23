@@ -38,8 +38,6 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   `git switch -c <branch> <base>`; with `git switch <branch>` when it exists locally (a run after
   `needs-input`); with `git switch -c <branch> --track origin/<branch>` when it exists only on origin.
   Never `git switch -C`: it resets the branch and drops commits.
-- A goal or handoff contains a tracker write (comment, field, status change) only when the user asked
-  for it in the session. Ticket creation by a branch split is set by the configured delivery.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently. A fork whose options
   differ in nothing the user would see takes the recommended option, recorded as an assumption. A
@@ -106,6 +104,19 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   fixes and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before
   the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no
   round N+1 starts. A work item with a fresh-reader check adds its passes to each round (`fresh-reader.md`).
+- Prose review: each round also dispatches the prose reviewer that the goal's Tools section names,
+  on the prose of the diff: added or changed code comments, documents, the commit message and the PR
+  text. Before round 1 the orchestrator drafts the commit message and the PR text under `.notes/` and
+  passes their paths with the diff. Fixes to them follow the same round rules. The orchestrator makes
+  or amends the commit with the reviewed message (`git commit -F <draft>`) and passes the reviewed PR
+  text to the PR step (the PR skill or `gh pr create`). The prose reviewer's findings join the round
+  like a reviewer's. In Full, the orchestrator passes the prose reviewer from the goal's Tools section
+  when it runs `review-change`, which dispatches it. A goal whose Tools section names no prose
+  reviewer has no prose review step.
+- Prose severity: a finding that makes the text fail its reader (wrong, misleading, or forbidden by
+  the repository's rules, such as a comment that narrates the implementation) is `MUST-FIX`. Content
+  the reader does not need is `SHOULD-CONSIDER`. A finding on form only is `NITPICK`. A claim the
+  reviewer cannot verify goes to the implementer to check; when it cannot be checked, it is a question.
 - Fresh-reader check: a work item that names it follows `<plugin-root>/skills/goal/fresh-reader.md`.
   Read it again after a compaction before the item ends.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print its

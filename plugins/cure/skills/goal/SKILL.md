@@ -56,8 +56,6 @@ Then write the file where the mode file says.
   outright the decisions taken in conversation and the reasoning that would be re-litigated.
 - Keep the file short: it is the condition, not a design document.
 - Measure the file with `wc -c <file>` after writing and report the count.
-- A tracker write (comment, field, status change) goes into a goal or handoff only when the user asked
-  for it in the session.
 - Carry every work item inline, by id and text; never point at a note by `file:line`.
 - Keep rejected options out of the file.
 
@@ -71,6 +69,11 @@ Then write the file where the mode file says.
 <Where the work happens. Settled: the decisions and facts.>
 
 <Job mode only, after Settled: `## Open`, one `- ` item per fork (see `job.md` "Questions").>
+
+## Tools
+
+- Prose reviewer: <the prose reviewer the repository names (`delegation.md` "Name the tools"), or
+  "none: the repository names no prose reviewer; no round has a prose review step">.
 
 ## Work
 
