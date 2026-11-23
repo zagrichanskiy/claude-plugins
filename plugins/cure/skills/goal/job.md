@@ -1,23 +1,29 @@
 # Job run
 
 The caller invokes the skill with a handoff file and a job directory. The skill never asks the user
-in this mode. A worker session then runs the goal and cannot reach the user.
+in this mode.
 
 ## Input
 
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
 - Read the `CLAUDE.md` of each repository in `repos`.
-- Read `handoff.delivery`, `handoff.branch`, `handoff.resource-risk`, `split.limit` and `split.factor` with
-  `cure-job config get <key>` before writing the goal. Each prints JSON; the
-  built-in default applies when `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` has no value. When the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after` and no `branch` in its handoff uses the branch of its predecessor, as `base` does (see "Base per repository"); `handoff.branch` does not apply. `new` gives the job its own branch from `base`; resolve it to the literal name `<ticket>_<slug>` (`<slug>` without a ticket; a GitHub ticket `#N` is written `issue-<N>`), the same in every repository of the job. `current` is the branch checked out in the first repository of `repos`, the launch repository. Any other value is a literal branch name. Write the resolved literal name in the goal, never `new` or `current`. Branch handling is in `rules.md`. Do not ask a fork a value answers; mark
-  that decision `(default)` under Settled. Never read `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself.
-- Base of a job without `after`: the `base` the handoff states. When it states none, the default
-  branch of each repository in `repos`, detected per repository with
-  `git -C <repo> symbolic-ref --short refs/remotes/origin/HEAD` (strip the `origin/` prefix). When
-  that fails, use `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` run in the repository.
-  When both fail, write the base as an `## Open` item, as the chain rule does. No configuration key
-  holds a base. A job with `after` follows "Base per repository".
+- Read `handoff.delivery`, `handoff.branch`, `handoff.resource-risk`, `split.limit` and `split.factor`
+  with `cure-job config get <key>` before writing the goal. Each prints JSON. Never read
+  `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself. Do not ask a fork a
+  value answers; mark that decision `(default)` under Settled.
+- Branch: when the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after`
+  and no `branch` uses its predecessor's branch, as `base` does (see "Base per repository");
+  `handoff.branch` does not apply. `new` gives the job its own branch from `base`: write the literal
+  name `<ticket>_<slug>` (`<slug>` without a ticket; a GitHub ticket `#N` is `issue-<N>`), the same in
+  every repository of the job. `current` is the branch checked out in the first repository of `repos`,
+  the launch repository. Any other value is a literal name. Write the resolved literal name in the
+  goal, never `new` or `current`.
+- Base of a job without `after`: the `base` the handoff states. Otherwise the default branch of each
+  repository in `repos`: `git -C <repo> symbolic-ref --short refs/remotes/origin/HEAD` (strip the
+  `origin/` prefix), else `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` run in the
+  repository. When both fail, write the base as an `## Open` item. A job with `after` follows "Base
+  per repository".
 - Take the repository's build, implement, review and verify agents and its PR skill from the
   handoff's `## Tools` section.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
@@ -31,45 +37,25 @@ in this mode. A worker session then runs the goal and cannot reach the user.
 
 ## Base per repository
 
-Applies when the row of the job in `cure-job list --json` has `after`. Without it, `base` comes
-from the handoff or the default branch (see Input).
-
-For each repository R in the handoff's `repos`, set `base` as follows. Walk the chain from the
-row's `after`. Never use the handoff's `after:`.
-
-| Step | Rule |
-|---|---|
-| Start | The job named by the row's `after`. |
-| Changes R | R is in `repos` of the job's `handoff.md` (the row's `dir`). The row's `resources` also hold claimed repositories, which do not count. |
-| Stop, resolved | The first job that changes R. `base` is the branch named in that job's `goal.md`. |
-| Next job | The `after` of the current job's row. |
-| Stop, unresolved | A passed row has `after-state` `missing` or `invalid`. |
-| End of chain | No job changes R: `base` comes from the handoff or the default branch (see Input). |
-
-Write the base of each repository left unresolved as an `## Open` item. A job on the
-chain need not be `done` when the goal is written, but it has a `goal.md`: the caller drafts a
-successor's goal only after the predecessor's row has `goal` true. Every job on the chain is `done`
-when the successor launches, and the work item 1 base check tests the branch then.
-
-Write the base per repository in the goal's fact check. For a base taken from a predecessor or marked "Base: the PR branch of split part 1", the
-fact check is the one in `rules.md`, not `<base>` equals `origin/<base>`.
+When the job's row in `cure-job list --json` has `after`, read
+`<plugin-root>/skills/goal/base-chain.md` and follow it. Without `after`, `base` comes from the handoff
+or the default branch (see Input).
 
 ## Writing the goal
 
-- Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts
-  in the first repository, so a path relative to the origin session's directory does not resolve.
+- Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts in
+  the first repository.
 - A work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory names
   the directory as a literal absolute path under a trusted ancestor.
 
 ## Short holds in the goal
 
-The bench is not held from launch: `device: bench` does not add `device:bench` to the job's
-resources. The claimant claims it per step. The goal tells the claimant the following:
+`device: bench` does not add `device:bench` to the job's resources. The goal tells the claimant:
 
 - Claim `device:bench` before each step that uses the bench, and `build:<absolute path>` before each
   step that runs `bitbake`, `devtool` or `kas`. Release at the end of the step.
-- The rules are in `<plugin-root>/skills/goal/short-holds.md`. The goal repeats none of
-  them and names the build directory of each build step.
+- The rules are in `<plugin-root>/skills/goal/short-holds.md`. The goal repeats none of them and
+  names the build directory of each build step.
 - Verify steps that use the bench carry their own claim and release in the work items.
 
 ## Where it goes
@@ -80,18 +66,16 @@ resources. The claimant claims it per step. The goal tells the claimant the foll
 | Ledger | `.notes/ledger-<slug>.md` in the handoff's first repository |
 | Backlog | `.notes/<slug>-backlog.md` in the same repository |
 
-A Solo goal has no ledger and no backlog.
-
-Apply the `.notes/` exclusion for the ledger and the backlog, as the `note` skill describes. The job
-directory belongs to the CLI: the goal never deletes it.
+A Solo goal has no ledger and no backlog. Apply the `.notes/` exclusion for the ledger and the
+backlog, as the `note` skill describes. The goal never deletes the job directory.
 
 ## Questions
 
-The skill never asks the user in this mode. It records each fork in `<job>/goal.md`.
+Record each fork in `<job>/goal.md`.
 
 - A fork whose options differ in something the user would see is one `- ` item under a heading spelled exactly `## Open`
   in `goal.md`. The item states the situation, the options, the consequence of each and a
-  recommendation, on one line.
+  recommendation, for a reader who has not followed the run, on one line.
 - The handoff's `## Open` items, a base left unresolved and a fork `config get` does not answer are
   such forks.
 - A fork that a policy in `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md` covers: record
@@ -106,8 +90,7 @@ Settled: "Run <n>: the questions of the earlier `needs-input` exit are answered 
 continue from `<ledger path>`". Solo: "Run <n>: the questions of the earlier `needs-input` exit are
 answered above and closed; earlier work is in the tree".
 
-The line holds for both next steps: a resume of the kept session and a new run in a new session when
-the old one is gone.
+The line holds for a resume of the kept session and for a new run in a new session.
 
 When a goal is extended after a `done` run, the new Settled line names the commits (`<base>..HEAD`) as the state. The ledger is deleted. In Light and Full it also names the retrospective when that file still exists. Solo has no retrospective.
 
@@ -117,8 +100,7 @@ A job goal's Waiting line reads: "Waiting: never waits; takes the `needs-input:`
 
 ## Template text
 
-The worker sees only the goal file. Fill these slots when writing it: `<plugin-root>` with the
-plugin root from `SKILL.md`, `<id>` with the job id.
+Fill `<plugin-root>` with the plugin root from `SKILL.md` and `<id>` with the job id.
 
 The template's read-first line becomes:
 
@@ -149,7 +131,7 @@ Every exit runs in this order: (1) `<plugin-root>/bin/cure-job finish <id> --sta
 (`<plugin-root>/bin/cure-job finish --help` lists the options; never write `result.md` yourself); (2) `SendMessage`
 with the `notify:` line `finish` printed; (3) the final message. The `finish` command, its output
 and the `SendMessage` or its error are in the transcript before the final message. The final message
-restates each done-when item with its evidence (after a split, an item a moved work item owns has the branch of its part as its evidence, as `rules.md` states). An item is unproven only when its proof is
+restates each done-when item with its evidence (after a split, an item a moved work item owns has the branch of its part as its evidence, as `size-check.md` states). An item is unproven only when its proof is
 unavailable (a device, a login, a manual check), never when its check ran and failed; give a reason
 for each. Keep the goal file, the retrospective and the backlog; list the retrospective with
 `--retro`. Never touch the job directory.
@@ -172,13 +154,12 @@ run exits at once.
 
 Cap `<lines>`: when the handoff's Settled has "Estimate: ~N changed lines", `<lines>` is 2 x N (the largest N, when the job has several Estimate lines) rounded up to 100. Without the line, set it as for any goal. Record the estimate under Settled in the goal. Record the effective `delivery` under Settled too; the size check passes it to `cure:split`.
 
-Review cause: Light as in "Agent tier". Full, written whole: "a `MUST-FIX` or `SHOULD-CONSIDER` is
-open after review round <limit>" (limit = `reviews.Full`). When the handoff's `delivery` is `commit` (the default), the generated
-text carries no pull-request wording.
+Review cause: `delegation.md` "Agent tier", except Full, written whole: "a `MUST-FIX` or
+`SHOULD-CONSIDER` is open after review round <limit>" (limit = `reviews.Full`). When the handoff's
+`delivery` is `commit` (the default), the generated text carries no pull-request wording.
 
 The `lines` value of the `stats.md` row is measured the same way, per repository against its base
-commit, and the row carries the estimate as `est_lines`. A cap against the branch name would count only uncommitted lines when the job commits on
-`<base>` itself.
+commit, and the row carries the estimate as `est_lines`.
 
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The
 failure path skips this item."
