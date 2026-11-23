@@ -7,7 +7,8 @@ in this mode.
 
 - The job directory is the handoff's directory. The job id is that directory's name.
 - Read the handoff file as the conversation.
-- Read the `CLAUDE.md` of each repository in `repos`.
+- Read the `CLAUDE.md` files and the `.claude/` of each repository in `repos`. The `CLAUDE.md` files
+  are the repository's own and each ancestor directory's up to `$HOME`.
 - Read `handoff.delivery`, `handoff.branch`, `handoff.resource-risk`, `split.limit` and `split.factor`
   with `cure-job config get <key>` before writing the goal. Each prints JSON. Never read
   `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself. Do not ask a fork a
@@ -24,8 +25,9 @@ in this mode.
   `origin/` prefix), else `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` run in the
   repository. When both fail, write the base as an `## Open` item. A job with `after` follows "Base
   per repository".
-- Take the repository's build, implement, review and verify agents and its PR skill from the
-  handoff's `## Tools` section.
+- Take the repository's build, implement, review and verify agents, its prose reviewer and its PR
+  skill from the handoff's `## Tools` section. When the handoff names no prose reviewer, look for one
+  in those `CLAUDE.md` files and `.claude/`.
 - Copy each `Resource risk:` line of the handoff's Settled into the goal's Settled verbatim. Copy
   each `handoff.resource-risk` entry whose scope matches into Settled as its `text`, marked
   `(default)`, unless the handoff states a risk for the same resource. A scope `all` matches every

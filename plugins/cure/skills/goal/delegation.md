@@ -37,6 +37,7 @@ A Solo goal differs from the template:
 - No retrospective item, no ledger, no backlog. The stats row work item and done-when item stay.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
 - Rules: the lines "Tier: Solo.", Stops, Permission mode (only when the user chose one) and Waiting.
+- No `## Tools` section.
 
 ## Delegate, then reflect (Light and Full)
 
@@ -86,6 +87,9 @@ A Solo goal differs from the template:
   hardware agent, the PR skill. Never write "verify it works".
 - Take the names from the session's agent and skill list (job mode: the handoff's `## Tools`).
   Prefer the project's plugin over a general one.
+- Prose reviewer: the agent that the repository's `CLAUDE.md` files or `.claude/` name for reviewing
+  prose (job mode: `job.md` "Input"). Write it into the goal's Tools section. When the repository
+  names none, the Tools section states that the goal has no prose review step.
 - `implementer`, `test-author`, `qa`, `reviewer` and the other agents without a `Skill` tool cannot
   invoke a skill. For such an agent write "the orchestrator passes the skill's `SKILL.md` path to the
   agent; the agent reads that file and the docs it routes to". The path is

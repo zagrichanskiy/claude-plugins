@@ -36,6 +36,11 @@ a tag and does not gate the round.
   `CHANGES REQUIRED` or `SATISFIED`. Map `critical` and `high` to `MUST-FIX`, `medium` to
   `SHOULD-CONSIDER`, `low` to `NITPICK`. A verdict of `CHANGES REQUIRED` means the round does not
   pass the severity floor (`NOT SATISFIED`).
+- A prose reviewer that grades in its own words: a finding that makes the text fail its reader
+  (wrong, misleading, or forbidden by the repository's rules, such as a comment that narrates the
+  implementation) is `MUST-FIX`. Content the reader does not need is `SHOULD-CONSIDER`. Form only is
+  `NITPICK`. A claim the reviewer cannot verify goes to the implementer to check; when it cannot be
+  checked, it is a question.
 - Carry the `enhancement` tag from the agent that raised it. Never assign it to a finding the agent
   tagged with a severity: that call belongs to the agent that read the source.
 - Route every `NITPICK` and every `enhancement` to `.notes/<slug>-backlog.md`, not the report body.

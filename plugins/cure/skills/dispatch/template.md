@@ -33,6 +33,7 @@ after: <job id of the predecessor; omit when the job has none; part k of a split
 - Review: the repository's review agent.
 - Verify: the repository's verify agent or command.
 - PR: the repository's pull request skill.
+- Prose review: the prose reviewer the repository's `CLAUDE.md`, an ancestor `CLAUDE.md` or the repository's `.claude/` names, or none.
 
 ## Open
 

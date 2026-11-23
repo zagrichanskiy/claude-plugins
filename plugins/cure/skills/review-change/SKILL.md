@@ -55,6 +55,7 @@ change warrants, in one message so they run concurrently:
 | `architect` | The change touches a boundary, a resource budget, a deployment surface, or hardware, or introduces or changes an architectural pattern. |
 | `security-expert` | The change touches authentication, keys, trust boundaries, or a network protocol. |
 | `ui-reviewer`, `ux-reviewer` | The change has a user interface. |
+| The prose reviewer | The caller names one (a goal's Tools section). A caller that states none skips the lookup. A caller that states nothing falls back to the repository's `CLAUDE.md` files (its own and each ancestor directory's up to `$HOME`) or its `.claude/`, if one names it. |
 
 Give each agent this brief and nothing that constrains its reading. `reviewer`, `security-expert`,
 `designer`, `architect` and the `cg-*` agents hold `Write` for the report path only. Name each path
@@ -71,6 +72,9 @@ Task: REVIEW. Decide for yourself which files to open.
 - `ui-reviewer` and `ux-reviewer` hold no `Write`: omit the `Report path` line and add
   `Return your report in full in your reply.` Read the other reports from disk.
 - Add project context if useful. Add no topics: no area, defect class or earlier finding to look at.
+- The prose reviewer's `Target` is the prose of the diff: added or changed code comments, documents,
+  the commit message and the PR text. When it holds no `Write`, brief it as the `ui-reviewer` bullet
+  says. Its findings merge like any agent's. A C++ change dispatches it in wave 1 of step 3a.
 
 ## 3a. C++ change: two waves
 
