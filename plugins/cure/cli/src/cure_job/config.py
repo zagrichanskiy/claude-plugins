@@ -57,6 +57,7 @@ DEFAULTS: dict[str, object] = {
     "dashboard.job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
     "dashboard.job-scope": "workspace",
     "launch-grace-seconds": 60,
+    "worktree.root": "~/work/yocto/worktrees",
 }
 
 
@@ -64,7 +65,7 @@ GROUPS = tuple(dict.fromkeys(key.split(".")[0] for key in DEFAULTS if "." in key
 
 #: Removed keys by (group, name), and why.
 REMOVED = {
-    ("handoff", "base"): "a job's base is the base stated in the handoff, else the repository's default branch",
+    ("handoff", "base"): "a job's base is the base stated in the handoff, else resolved by cure:goal",
     ("prune", "done-days"): "a done job is pruned once its finish is reported and its sessions are removed",
     ("prune", "abandoned-days"): "an abandoned job is pruned once its sessions are removed",
     ("band", "jira-url"): 'write it as "tracker-url": "<jira-url>/browse/<key>"',
@@ -231,6 +232,12 @@ def _branch(value: object) -> str | None:
     return None
 
 
+def _directory(value: object) -> str | None:
+    if not isinstance(value, str) or not os.path.isabs(os.path.expanduser(value)):
+        return f"expected an absolute path or one under ~, got {json.dumps(value)}"
+    return None
+
+
 def _delivery(value: object) -> str | None:
     return None if value in ("commit", "pr") else f"expected \"commit\" or \"pr\", got {json.dumps(value)}"
 
@@ -341,6 +348,7 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "dashboard.job-states": _job_states,
     "dashboard.job-scope": _job_scope,
     "launch-grace-seconds": _int_range(10, 600),
+    "worktree.root": _directory,
 }
 
 #: The ``defaults.md`` keys whose rows hold one scalar, and their ``config.json`` keys.

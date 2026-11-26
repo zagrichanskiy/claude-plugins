@@ -14,7 +14,7 @@ from cure_job.handoff import Device, Handoff
 from cure_job.job_id import session_name
 from cure_job.result import ResultStatus
 from cure_job.sessions import JobSession, Liveness, liveness
-from cure_job.state import (LAUNCH_GRACE, Phase, State, derive, is_open, is_ready, needs_sessions, phase_of,
+from cure_job.state import (LAUNCH_GRACE, Phase, State, derive, needs_sessions, phase_of,
                             project)
 from tests.builders import NOW, make_record, result_of
 from tests.test_cli import Harness
@@ -86,7 +86,6 @@ def test_live_is_every_liveness_but_gone_and_ended():
 ])
 def test_phase_reads_the_files_and_events_only(record, expected):
     assert phase_of(record) is expected
-    assert is_open(record) is not expected.is_terminal
 
 
 def test_terminal_phases_are_done_failed_and_abandoned():
@@ -162,26 +161,18 @@ def test_a_terminal_job_reports_no_liveness(record):
     assert view_of(record, {A: Session(SessionStatus.BUSY)}).sessions["work"].liveness is None
 
 
-def test_held_is_set_from_the_holders_and_the_after_wait():
-    holder = make_record(A, approved=True)
-    blocked = make_record(B, approved=True)
-    views = {view.record.id: view for view in derive([holder, blocked], {}, NOW, frozenset())}
-    assert not views[A].held and views[B].held and views[B].blocked_by == (A,)
-    assert views[B].phase is Phase.APPROVED and views[B].state is State.HELD
-
-
 def test_held_is_set_for_an_unmet_after_without_a_holder():
     base = make_record(B, repos=("/work/other",), approved=True)
     waiting = replace(base, handoff=Handoff(base.handoff.repos, Device.NONE, after=A))
     view = derive([make_record(A, goal=True), waiting], {}, NOW, frozenset())[1]
-    assert view.held and view.blocked_by == () and view.state is State.HELD
+    assert view.held and view.state is State.HELD
 
 
 def test_a_terminal_job_is_never_held():
     holder = make_record(A, approved=True)
     closed = make_record(B, approved=True, events=(Closed("x"),))
     view = derive([holder, closed], {}, NOW, frozenset())[1]
-    assert not view.held and view.blocked_by == ()
+    assert not view.held
 
 
 # --- needs_sessions ---------------------------------------------------------------------------------------------------
@@ -199,7 +190,7 @@ def test_the_session_list_is_needed_exactly_for_an_open_job_with_an_open_session
 
 # --- the 0.62.0 rules -------------------------------------------------------------------------------------------------
 
-def reference_state(record, status, blocked_by, waits):
+def reference_state(record, status):
     """The open-job rule of 0.62.0, before the split into phase and liveness."""
     if record.result is not None:
         return State.NEEDS_INPUT
@@ -214,11 +205,9 @@ def reference_state(record, status, blocked_by, waits):
             return State.RUNNING if within_grace else State.STALLED
         starting = status is None or (status is SessionStatus.STOPPED and not latest.stop_recorded)
         return State.LAUNCHED if starting and within_grace else State.LOST
-    if blocked_by or waits:
-        return State.HELD
     if not record.has_goal:
         return State.QUEUED
-    return State.APPROVED if is_ready(record) else State.AWAITING_APPROVAL
+    return State.APPROVED if record.approved else State.AWAITING_APPROVAL
 
 
 EVENT_SETS = [(), (work(age=INSIDE),), (work(age=PAST),), (work(age=INSIDE), SessionStopped("work", 1, NOW)),
@@ -235,7 +224,7 @@ def test_state_matches_the_0_62_rules(events, result, goal, approved, status, ho
     latest = record.latest("work")
     listing = {latest.name: Session(status)} if latest is not None and status is not None else {}
     view = derive([*records, record], listing, NOW, frozenset())[-1]
-    assert view.state is reference_state(record, status, view.blocked_by, False)
+    assert view.state is reference_state(record, status)
 
 
 # --- list --json ------------------------------------------------------------------------------------------------------

@@ -13,7 +13,7 @@ Plugin root: `${CLAUDE_PLUGIN_ROOT}`. Only this file has the variable expanded. 
 ## Steps
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/template.md`.
-2. Fill the template from the session's context (Fields).
+2. Fill the template from the session's context (Fields). When the job edits or may edit the same files as an open job, ask the one overlap question of `fields.md` ("after").
 3. Estimate and split (section "Estimate and split"). It yields the drafts: one handoff, or one per part.
 4. Create the tickets of a split (read `split-tickets.md`). Write each handoff with `cure-job new`, the parts in order. Keep the printed job id and `notify:` line.
 5. Send the dispatcher the `notify:` line of each job (Waking the dispatcher).
@@ -28,7 +28,7 @@ A small change does not affect customers: a fix, a small refactoring, a doc edit
 | `repos` | Absolute git toplevels, from `git -C <dir> rev-parse --show-toplevel`. The first is the launch directory: the repository the change is made in, also when the session runs in another repository. When the change edits several repositories, the first is the one the job delivers to, by its branch or PR. |
 | `device` | `bench` when the work needs the hardware bench, else `none`. It declares the use. The job claims the bench for each step at run time. |
 | `outcome` | One sentence. |
-| `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. A job with `after` and no `branch` inherits the predecessor's branch. |
+| `ticket`, `branch` | A small change: the session's current work branch and its ticket. Other work: only when the user stated them. Other work with no stated branch: omit the key; `handoff.branch` (default `new`) gives the job its own branch. A job with `after` and no `branch` inherits the predecessor's branch, except one stacked for overlapping files (`fields.md`, "after"). |
 | `## Settled` | Decisions taken in the session, each with its reason. |
 | `## Work` | The steps, in order. No review-round cap: the goal skill's tier rule sets it. |
 | `## Done when` | Numbered checks that the job can run and show. |

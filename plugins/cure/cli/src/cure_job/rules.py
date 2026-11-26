@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING, Callable, Mapping, Sequence
 
 from . import resource as resource_names
 from .claude import Session
-from .errors import CureJobError, JobStateError, ResourceHeld, SessionGone, StoreError
+from .errors import CureJobError, JobStateError, SessionGone, StoreError
 from .job import JobRecord
 from .sessions import listed_live
-from .state import JobView, State, holders, is_ready
+from .state import JobView, State
 from .store import InvalidJob
 
 if TYPE_CHECKING:
@@ -126,14 +126,6 @@ def _path(record: JobRecord, artifact: Artifact) -> str:
     return str(record.dir / artifact.value)
 
 
-def _resource_held(facts: Check) -> ResourceHeld:
-    """The first resource of the job that another job holds, with its holder."""
-    record = facts.record
-    held = holders(view.record for view in facts.views)
-    name = next(name for name in sorted(record.resources) if held.get(name) not in (None, record.id))
-    return ResourceHeld(name, held[name])
-
-
 # --- start guards a kind may declare ----------------------------------------------------------------------------------
 
 def approved_first(facts: Check) -> CureJobError | None:
@@ -148,13 +140,6 @@ def after_satisfied(facts: Check) -> CureJobError | None:
     view = facts.view
     if view.state is State.HELD and view.after is not None and not view.after.satisfied:
         return JobStateError(f"after {view.after.id} is {view.after.state.value}")
-    return None
-
-
-def ready_not_held(facts: Check) -> CureJobError | None:
-    view = facts.view
-    if view.state is State.HELD and view.blocked_by and is_ready(facts.record):
-        return _resource_held(facts)
     return None
 
 
@@ -183,10 +168,6 @@ def goal_exists(facts: Check) -> CureJobError | None:
     if not record.has_goal:
         return JobStateError(f"job {record.id} has no goal file: {_path(record, Artifact.GOAL)} does not exist")
     return None
-
-
-def not_blocked(facts: Check) -> CureJobError | None:
-    return _resource_held(facts) if facts.view.blocked_by else None
 
 
 def no_invalid_job(facts: Check) -> CureJobError | None:
@@ -426,7 +407,7 @@ _START_NEEDS = frozenset({Fact.KIND, Fact.KINDS, Fact.SESSIONS})
 RULES: Mapping[Op, Rule] = {
     Op.START: Rule(Reads.LISTING, (_kind_start_guards, *_GENERIC_START, _takes_input), _START_NEEDS),
     Op.CONTINUE: Rule(Reads.LISTING, (_not_own_session, _resume_needs_input, _kept_session_listed, goal_exists,
-                                      not_blocked, no_invalid_job, *_GENERIC_START), _START_NEEDS),
+                                      no_invalid_job, *_GENERIC_START), _START_NEEDS),
     Op.CLOSE: Rule(Reads.LISTING, (_no_live_session, _open)),
     Op.STOP: Rule(Reads.LISTING, (_has_session,)),
     Op.REMOVE_SESSIONS: Rule(Reads.LISTING, (_done_or_abandoned,)),

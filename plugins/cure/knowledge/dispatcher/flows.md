@@ -10,9 +10,9 @@
 6. Write every answer into `goal.md` through `cure:goal` before `approve`: a later edit revokes the approval.
 7. Launch an `approved` job with `cure-job launch <id>`, or `-- --permission-mode <mode>` when the goal's Rules state one. Show the output. On a missing-plugin-path exit 1, follow "Answer and resume" step 4.
 
-Before `launch`, when the target checkout has uncommitted changes and the user gave no instruction, ask in the question round. The job stays `approved` until the user answers. An answer that edits `goal.md` revokes the approval: write it, then approve again.
+Before `launch`, when the target checkout has uncommitted changes and the user gave no instruction, ask in the question round: the job's worktree starts from the committed HEAD and does not see them. The job stays `approved` until the user answers. An answer that edits `goal.md` revokes the approval: write it, then approve again.
 
-States: `held` is blocked by a launched or `approved` job or an unmet `after`, and holds nothing. `awaiting-approval` is unblocked with a goal and no valid approval. `approved` holds every resource it names. Only a change of the `goal.md` digest revokes an approval; to withdraw one, close the job or re-draft the goal. A `needs-input` job and later runs need no approval.
+States: `held` waits for an unmet `after` and holds nothing. `awaiting-approval` has a goal and no valid approval. A job claims no repository: jobs on one repository run in parallel, each in its own worktree. Only a change of the `goal.md` digest revokes an approval; to withdraw one, close the job or re-draft the goal. A `needs-input` job and later runs need no approval.
 
 ## Asking
 

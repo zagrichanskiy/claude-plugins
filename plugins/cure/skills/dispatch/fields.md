@@ -12,15 +12,14 @@ Pass the title to `cure-job new` as `--ticket-summary`, in the form of "Writing 
 
 ## base and delivery
 
-Set them only when the user stated them. Set `base` also when the job is stacked on a predecessor's branch without `after`. Otherwise omit the key. `cure:goal` resolves an omitted `base` from the default branch of each repository. `delivery` is `commit` or `pr`; an omitted `delivery` comes from `handoff.delivery`.
+Set them only when the user stated them. Set `base` also when the job is stacked on a predecessor's branch without `after`. Otherwise omit the key. `cure:goal` resolves an omitted `base` from the branch checked out in the user's checkout under branch `current`, else from the default branch of each repository. `delivery` is `commit` or `pr`; an omitted `delivery` comes from `handoff.delivery`.
 
 ## after
 
-Set `after` only when this job builds on the result of an open job of the same stack (any state other than `done`, `failed` or `abandoned`). The value is that job's id, one only. Otherwise omit the key.
+Set `after` when this job builds on the result of an open job (any state other than `done`, `failed` or `abandoned`), or when it edits or may edit the same files as an open job and the user chose to stack it. The value is that job's id, one only. Otherwise omit the key.
 
-- A job stacked only because it edits the same files gets no `after`.
+- Overlap: for each open job in `<plugin-root>/bin/cure-job list --json`, read `handoff.md` in its `dir`. When its `repos` share a repository with this job and this job edits or may edit the same files as its `## Work`, name that job and ask the user one question: stack this job on it with `after`, or run both in parallel and fix conflicts later. With several such jobs, the stack option names the latest. When the user stacks it, write the Settled line `Stacked on <id>: overlapping files`; the job then gets its own branch by `handoff.branch`, and `after` only orders it and gives its base.
 - Its `base` is the predecessor's branch.
-- The repository resource runs the jobs in order. A failed predecessor does not close it.
 - `cure-job new` refuses an id with no job.
 - The successor stays `held` until the predecessor is `done`.
 

@@ -32,12 +32,18 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   list), item 1 runs the changed rule against the workspace it runs against, for example
   `repo forall -c 'git remote get-url origin'`, and records the output. A counter-example the rule
   misclassifies is a question.
+- A job session works in its worktrees, `<worktree.root>/<repo name>/<job id>` for each repository of
+  the handoff, and starts in the first. `cure-job launch` creates them and a resume reuses them. Every
+  edit, build, `git -C` and done-when command uses the worktree path. The repository path the handoff
+  lists is the user's checkout: the job never edits it or switches its branch.
 - Branch: the goal names the job's branch as a literal name. A branch exists when it is local or on
   origin. A branch missing on run 1 is not an item 1 mismatch. The step after the fact check (the
   orchestrator's in Light and Full, the session's in Solo) creates it in each repository with
   `git switch -c <branch> <base>`; with `git switch <branch>` when it exists locally (a run after
   `needs-input`); with `git switch -c <branch> --track origin/<branch>` when it exists only on origin.
-  Never `git switch -C`: it resets the branch and drops commits.
+  Never `git switch -C`: it resets the branch and drops commits. When `git switch` refuses a branch
+  checked out in a finished job's worktree under `worktree.root`, run `git -C <that worktree> switch
+  --detach` and switch again; in any other worktree (the user's checkout) it is a question at item 1.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently. A fork whose options
   differ in nothing the user would see takes the recommended option, recorded as an assumption. A

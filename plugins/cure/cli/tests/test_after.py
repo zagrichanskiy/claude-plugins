@@ -74,19 +74,19 @@ def test_done_when_1_new_with_an_existing_after_succeeds_and_lists_it(h, tmp_pat
 
 # --- Done when 2 ---------------------------------------------------------------------------------------
 
-def test_done_when_2_successor_is_held_with_empty_blocked_by_until_the_predecessor_is_done(h, tmp_path):
+def test_done_when_2_successor_is_held_until_the_predecessor_is_done(h, tmp_path):
     pred = h.new(tmp_path, repos=(X,))
     h.approve(pred)
     succ = h.new(tmp_path, repos=(Y,), after=pred)
     h.approve(succ)
     row = rows(h)[succ]
-    assert (row["state"], row["blocked-by"], row["after"], row["after-state"]) == ("held", [], pred, "approved")
+    assert (row["state"], row["after"], row["after-state"]) == ("held", pred, "approved")
     assert h.run("launch", pred) == 0
     assert rows(h)[succ]["after-state"] == "running"
     assert rows(h)[succ]["state"] == "held"
     result_file(h, pred).write_text(DONE_RESULT, encoding="utf-8")
     row = rows(h)[succ]
-    assert (row["state"], row["blocked-by"], row["after-state"]) == ("approved", [], "done")
+    assert (row["state"], row["after-state"]) == ("approved", "done")
 
 
 def test_done_when_2_a_needs_input_predecessor_keeps_the_successor_held(h, tmp_path):
@@ -94,7 +94,7 @@ def test_done_when_2_a_needs_input_predecessor_keeps_the_successor_held(h, tmp_p
     succ = h.new(tmp_path, repos=(Y,), after=pred)
     h.approve(succ)
     row = rows(h)[succ]
-    assert (row["state"], row["blocked-by"], row["after-state"]) == ("held", [], "needs-input")
+    assert (row["state"], row["after-state"]) == ("held", "needs-input")
 
 
 def test_done_when_2_a_done_predecessor_with_an_unproven_item_keeps_the_successor_held(h, tmp_path):
@@ -213,12 +213,11 @@ def test_done_when_7_an_after_held_successor_holds_nothing_and_a_later_job_on_it
     pred, _ = _needs_input_job(h, tmp_path)
     succ = h.new(tmp_path, repos=(Y,), after=pred)
     h.approve(succ)
-    assert (rows(h)[succ]["state"], rows(h)[succ]["blocked-by"]) == ("held", [])
+    assert rows(h)[succ]["state"] == "held"
     later = h.new(tmp_path, repos=(Y,))
     h.approve(later)
     listed = rows(h)
-    assert (listed[later]["state"], listed[later]["blocked-by"]) == ("approved", [])
-    assert listed[succ]["state"] == "held" and listed[succ]["blocked-by"] == [later]
+    assert (listed[later]["state"], listed[succ]["state"]) == ("approved", "held")
 
 
 # --- Done when 8 and 10 --------------------------------------------------------------------------------
@@ -275,7 +274,8 @@ def test_done_when_8_the_walk_passes_a_job_that_claimed_the_repository_without_l
     h.approve(pred)
     assert h.run("launch", pred) == 0
     succ = h.new(tmp_path, repos=(Y,), after=pred)
-    assert h.run("claim", pred, Y) == 0
+    # A repository claim of an earlier version; this one refuses it.
+    h.cli.jobs.claim(pred, [Y])
     listed = rows(h)
     assert Y in listed[pred]["resources"]
     assert walk(listed, succ, Y) is None
@@ -335,20 +335,6 @@ def test_done_when_11_next_gives_no_action_for_the_successor_of_an_invalid_prede
     found = next_actions(h)
     assert succ not in found
     assert found[pred]["actions"] == ["repair"]
-
-
-def test_done_when_11_an_after_held_successor_blocked_by_a_higher_id_gets_no_note_starved(h, tmp_path):
-    pred = h.new(tmp_path, repos=(X,))
-    h.approve(pred)
-    assert h.run("launch", pred) == 0
-    succ = h.new(tmp_path, repos=(Y,), after=pred)
-    h.approve(succ)
-    later = h.new(tmp_path, repos=(Y,))
-    h.approve(later)
-    assert h.run("launch", later) == 0
-    row = rows(h)[succ]
-    assert (row["state"], row["after-state"], row["blocked-by"]) == ("held", "running", [later])
-    assert next_actions(h).get(succ, {"actions": []})["actions"] == []
 
 
 @pytest.mark.parametrize("goal", [False, True], ids=["no-goal", "unapproved-goal"])

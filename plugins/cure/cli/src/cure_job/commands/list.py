@@ -33,8 +33,6 @@ class ListCommand(Command):
         width = max((len(row["id"]) for row in rows), default=0)
         for row in rows:
             line = f"{row['id']:<{width}}  {row['state']}"
-            if row["blocked-by"]:
-                line += "  blocked-by=" + ",".join(row["blocked-by"])
             if row["after"]:
                 line += f"  after={row['after']}:{row['after-state']}"
             if row["prs"]:
@@ -53,7 +51,7 @@ INVALID = "invalid"
 
 def invalid_row(job: InvalidJob) -> dict:
     return {"id": job.id, "state": INVALID, "dir": str(job.dir), "run": None, "session": None,
-            "origin": None, "resources": [], "blocked-by": [], "goal": None, "approved": None, "problem": job.problem,
+            "origin": None, "resources": [], "goal": None, "approved": None, "problem": job.problem,
             "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
             "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
             "workspace": None, "phase": None, "sessions": {}}
@@ -70,7 +68,6 @@ def job_row(view: JobView) -> dict:
         "session": record.session,
         "origin": record.origin,
         "resources": sorted(record.resources),
-        "blocked-by": list(view.blocked_by),
         "goal": record.has_goal,
         "approved": record.approved,
         "open": record.open_items,

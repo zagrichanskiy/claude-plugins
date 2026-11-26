@@ -69,10 +69,6 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     elif state is State.APPROVED:
         if settled:
             found.append(Action("launch"))
-    elif (state is State.HELD and (view.after is None or view.after.satisfied)
-          and any(holder > record.id for holder in view.blocked_by)):
-        # A held approved job that a higher id blocks can wait with no bound.
-        found.append(Action("note-starved"))
     for name, session in view.sessions.items():
         kind = kinds.get(name)
         # A kind this version does not know gets no action.

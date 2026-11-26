@@ -22,11 +22,11 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Mapping, NamedTuple, NoReturn, Sequence
 
-from .. import resource as resource_names
+from .. import worktree
 from ..claude import Claude, Session
 from ..clock import Clock
 from ..config import Config
-from ..errors import CureJobError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob
+from ..errors import GitError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob
 from ..events import Approved, Claim, Closed, Origin, Release, Reported
 from ..goal import PLUGIN_ROOT
 from ..handoff import parse_submitted, stamp
@@ -38,7 +38,7 @@ from ..kinds import KINDS, SessionKind
 from ..kinds import WORK as WORK_KIND
 from ..rules import Check, Op, check
 from ..runner import Continuation, SessionRunner, Stopped
-from ..state import HALF_CREATED_AGE, JobView, derive, expired, holders, is_open, lock_rank, needs_sessions, retention
+from ..state import HALF_CREATED_AGE, JobView, derive, expired, holders, needs_sessions, retention
 from ..store import InvalidJob, JobStore, Snapshot
 
 
@@ -65,7 +65,7 @@ class JobsProvider:
         # The wait of ``claim --wait``; a test passes a fake pair so that it never waits.
         self.sleep = sleep
         self.monotonic = monotonic
-        self.runner = SessionRunner(store, claude, clock, plugin_root, sleep, monotonic, kinds)
+        self.runner = SessionRunner(store, claude, clock, plugin_root, sleep, monotonic, kinds, config["worktree.root"])
 
     def new(self, text: str, slug: str, origin: str | None = None, ticket_summary: str | None = None) -> str:
         """Queue the handoff ``text`` as a new job reporting back to ``origin`` and return the job id.
@@ -162,15 +162,11 @@ class JobsProvider:
 
         Every name is granted or none. A held resource is polled for up to ``wait`` seconds, then raises
         :class:`ResourceHeld`. Each poll takes and drops the store lock; no sleep runs under it.
-        Only short holds are waited for, and a run that holds a short hold claims nothing new,
+        Every name is a short hold, and a run that holds a short hold claims nothing new,
         so no two runs wait for each other.
         """
         if not 0 <= wait <= CLAIM_WAIT_MAX_SECONDS:
             raise ValueError(f"wait {wait} is outside 0..{CLAIM_WAIT_MAX_SECONDS}")
-        if wait:
-            repos = [name for name in names if not resource_names.is_short_hold(name)]
-            if repos:
-                raise CureJobError(f"{repos[0]} is a repository; claim --wait accepts only device: and build:")
         deadline = self.monotonic() + wait
         while True:
             with self.store.locked():
@@ -188,15 +184,11 @@ class JobsProvider:
         record = self._find_record(snapshot, job_id)
         check(Op.CLAIM, Check(record, "claim", invalid=snapshot.invalid, names=names))
         # Holders need only the records: a lost holder keeps its holds.
-        open_records = {other.id: other for other in snapshot.records if is_open(other)}
         held = holders(snapshot.records)
         for name in names:
             holder = held.get(name)
             if holder not in (None, job_id):
-                other = open_records[holder]
-                # A launched holder keeps the resource even against a lower id.
-                if other.run > 0 or lock_rank(other) < lock_rank(record):
-                    return name, holder
+                return name, holder
         self.store.append_events(job_id, [Claim(name, record.run) for name in dict.fromkeys(names)
                                           if name not in record.resources])
         return None
@@ -204,11 +196,8 @@ class JobsProvider:
     def release(self, job_id: str, name: str) -> None:
         """End the short hold of ``job_id`` on ``name``. Returns when the job does not hold it.
 
-        Reads only this job. A repository is held until the job ends.
-        An abandoned job holds nothing, so a release has nothing to end and gets no write.
+        Reads only this job. An abandoned job holds nothing, so a release has nothing to end and gets no write.
         """
-        if not resource_names.is_short_hold(name):
-            raise CureJobError(f"{name} is a repository; it is held until the job ends")
         record = self.store.load(job_id)
         if record.closed is None and name in record.resources:
             self.store.append_event(job_id, Release(name))
@@ -291,8 +280,9 @@ class JobsProvider:
         return [entry.path for entry in self.store.half_created()
                 if now - entry.mtime > HALF_CREATED_AGE and self.store.remove_half_created(entry)]
 
-    def prune(self) -> list[str]:
-        """Remove every :func:`expired` job that no open job names as ``after``. Return the removed ids."""
+    def prune(self, failed: Callable[[str, GitError], None] | None = None) -> list[str]:
+        """Remove every :func:`expired` job that no open job names as ``after``, with its worktrees but not
+        its branches. Return the removed ids. A job whose worktree removal fails stays and goes to ``failed``."""
         now = self.clock()
         kept_for = retention(self.config)
         views = self.views()
@@ -300,6 +290,15 @@ class JobsProvider:
         removed = []
         for view in views:
             if expired(view, now, kept_for) and view.record.id not in predecessors:
+                record = view.record
+                try:
+                    worktree.remove_all(record.worktree_root or self.config["worktree.root"], record.handoff.repos,
+                                        record.id)
+                except GitError as e:
+                    if failed is None:
+                        raise
+                    failed(record.id, e)
+                    continue
                 self.store.remove(view.record.id)
                 removed.append(view.record.id)
         return removed

@@ -54,5 +54,8 @@
     ],
     "job-scope": "workspace"
   },
-  "launch-grace-seconds": 60
+  "launch-grace-seconds": 60,
+  "worktree": {
+    "root": "~/work/yocto/worktrees"
+  }
 }

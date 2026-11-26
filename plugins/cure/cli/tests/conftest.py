@@ -1,9 +1,12 @@
-"""Isolation for every test: no real ``claude`` binary and nothing under the real home directory."""
+"""Isolation for every test: no real ``claude`` or ``git`` and nothing under the real home directory."""
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
+
+from cure_job import worktree
+from tests.fakes import FakeGit
 
 FAKE_CLAUDE = Path(__file__).resolve().parent / "fake_claude.py"
 
@@ -22,6 +25,12 @@ def isolated_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_CLAUDE_STATE", str(state))
     monkeypatch.delenv("PYTHONPATH", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_MESSAGING_SOCKET", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def fake_git(monkeypatch):
+    """A module that runs real git overrides this fixture."""
+    monkeypatch.setattr(worktree, "git", FakeGit())
 
 
 @pytest.fixture

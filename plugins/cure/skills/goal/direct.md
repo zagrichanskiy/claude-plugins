@@ -5,7 +5,7 @@ The user invokes `/cure:goal` in a working session and runs the goal in a sessio
 ## Where it goes
 
 `.notes/goal-<slug>.md` in the repository the work happens in, `.notes/` excluded through
-`$(git rev-parse --git-dir)/info/exclude` as the `note` skill describes.
+`$(git rev-parse --git-path info/exclude)` as the `note` skill describes.
 
 A goal file is a working file. Its end is the merge of the work it describes. Say so in the report,
 and delete it when that lands.

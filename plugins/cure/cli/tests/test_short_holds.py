@@ -142,13 +142,13 @@ def test_claim_of_several_resources_writes_none_when_one_is_held(h, pair):
     h.jobs.claim(first, [BENCH])
     with pytest.raises(ResourceHeld):
         h.jobs.claim(second, ["/work/free", BENCH])
-    assert h.resources(second) == frozenset({REPO_B})
+    assert h.resources(second) == frozenset()
 
 
 def test_claim_of_several_free_resources_takes_all(h, pair):
     first, _ = pair
     h.jobs.claim(first, [BENCH, "/work/free"])
-    assert h.resources(first) == frozenset({REPO_A, BENCH, "/work/free"})
+    assert h.resources(first) == frozenset({BENCH, "/work/free"})
 
 
 # --- Done when 2: device: bench no longer blocks at launch -----------------------------------------------------
@@ -275,7 +275,6 @@ def test_run_scoped_run_one_claim_is_absent_from_resources_after_finish(h, pair)
     assert BENCH in h.resources(first)
     h.jobs.finish(first, NEEDS_INPUT)
     assert BENCH not in h.resources(first)
-    assert REPO_A in h.resources(first)
 
 
 def test_run_scoped_run_one_claim_is_absent_from_resources_after_run_two_starts(h, pair):
@@ -312,11 +311,12 @@ def test_a_finished_run_frees_the_bench_for_another_job(h, pair):
 
 # --- release ----------------------------------------------------------------------------------
 
-def test_release_of_a_repo_exits_one(h, pair, capsys):
+def test_release_of_a_repo_exits_two(h, pair, capsys):
     first, _ = pair
-    assert h.run("release", first, REPO_A) == 1
-    assert "held until the job ends" in capsys.readouterr().err
-    assert REPO_A in h.resources(first)
+    with pytest.raises(SystemExit) as caught:
+        h.run("release", first, REPO_A)
+    assert caught.value.code == 2
+    assert "is not a short hold" in capsys.readouterr().err
 
 
 def test_second_release_of_a_device_exits_zero(h, pair):
@@ -393,8 +393,8 @@ def test_a_release_cancels_a_legacy_claim(h, pair):
 
 # --- resource.py ------------------------------------------------------------------------------------------
 
-def test_kind_names_repo_device_and_build():
-    assert resource.kind("/work/a") is resource.Kind.REPO
+def test_kind_names_device_and_build_only():
+    assert resource.kind("/work/a") is None
     assert resource.kind(BENCH) is resource.Kind.DEVICE
     assert resource.kind("build:/work/a/build") is resource.Kind.BUILD
 
@@ -418,10 +418,14 @@ def test_build_refuses_a_relative_path():
         resource.build("relative/build")
 
 
-def test_parse_accepts_bench_build_and_repo_and_normalises_each(tmp_path):
+def test_parse_accepts_bench_and_build_and_normalises_each(tmp_path):
     assert resource.parse(BENCH) == BENCH
     assert resource.parse(f"build:{tmp_path}/x/../") == "build:" + str(tmp_path.resolve())
-    assert resource.parse("/work/extra/../a/") == "/work/a"
+
+
+def test_parse_refuses_a_repository_path():
+    with pytest.raises(ValueError, match="not a short hold"):
+        resource.parse("/work/a")
 
 
 def test_parse_refuses_a_relative_build_path():
@@ -522,10 +526,12 @@ def test_release_on_a_closed_job_exits_zero_and_leaves_the_log_untouched(h, pair
     assert (log.read_bytes(), log.stat().st_mtime_ns) == before
 
 
-def test_release_of_a_repo_on_a_closed_job_still_exits_one(h, pair):
+def test_release_of_a_repo_on_a_closed_job_still_exits_two(h, pair):
     first, _ = pair
     _closed_with_bench(h, first)
-    assert h.run("release", first, "/work/extra") == 1
+    with pytest.raises(SystemExit) as caught:
+        h.run("release", first, "/work/extra")
+    assert caught.value.code == 2
 
 
 def test_release_on_a_done_job_exits_zero_and_writes_nothing(h, pair):

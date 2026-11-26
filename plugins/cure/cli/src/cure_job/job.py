@@ -7,7 +7,7 @@ from functools import cached_property
 from pathlib import Path
 
 from . import resource
-from .events import WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved
+from .events import WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved, SessionStarted
 from .handoff import Handoff
 from .result import Result
 from .sessions import JobSession, fold
@@ -97,17 +97,21 @@ class JobRecord:
         return origins[-1].address if origins else self.handoff.origin
 
     @property
+    def worktree_root(self) -> str | None:
+        return next((event.worktree_root for event in self.events
+                     if isinstance(event, SessionStarted) and event.worktree_root is not None), None)
+
+    @property
     def resources(self) -> frozenset[str]:
-        """The handoff's resources, held to job end, and the claimed ones. A short-hold claim
-        counts while its run is the latest and has no result, current or archived, until a
-        release. A claim without a run counts for the whole job."""
+        """The claimed resources. A short-hold claim counts while its run is the latest and has no
+        result, current or archived, until a release. A claim without a run counts for the whole job."""
         claimed: set[str] = set()
         for event in self.events:
             if isinstance(event, Claim) and self._claim_counts(event):
                 claimed.add(event.resource)
             elif isinstance(event, Release) and resource.is_short_hold(event.resource):
                 claimed.discard(event.resource)
-        return self.handoff.resources | claimed
+        return frozenset(claimed)
 
     def _claim_counts(self, claim: Claim) -> bool:
         if claim.run is None or not resource.is_short_hold(claim.resource):

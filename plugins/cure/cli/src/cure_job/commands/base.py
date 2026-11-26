@@ -83,7 +83,7 @@ def kind_arg(kinds: Mapping[str, "SessionKind"], work: str | None = None) -> Cal
 
 
 #: The resource names ``claim`` and ``release`` accept, for help and errors.
-RESOURCE_CHOICES = f"{resource.DEVICE_BENCH}, build:<absolute path> or an absolute repository path"
+RESOURCE_CHOICES = f"{resource.DEVICE_BENCH} or build:<absolute path>"
 
 
 def resource_arg(text: str) -> str:

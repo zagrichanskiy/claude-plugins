@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import timedelta
 
 import pytest
 
 from cure_job.errors import (ClaudeError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob)
 from cure_job.claude import SessionStatus
+from cure_job.config import DEFAULTS
 from cure_job.events import Claim, Closed, Reported, SessionsRemoved, SessionStarted
 from cure_job.frontmatter import parse
 from cure_job.providers.jobs import JobsProvider
@@ -114,12 +116,6 @@ def test_views_are_empty_without_jobs(jobs):
     assert jobs.views() == []
 
 
-def test_views_first_job_approved_second_held(jobs, clock):
-    first = new_job(jobs, clock, approved=True)
-    second = new_job(jobs, clock)
-    assert state_map(jobs) == {first: State.APPROVED, second: State.HELD}
-
-
 def test_views_ask_for_sessions_only_when_a_state_depends_on_them(jobs, claude, clock):
     new_job(jobs, clock, approved=True)
     jobs.views()
@@ -173,11 +169,12 @@ def test_listing_names_a_malformed_dispatch_file(jobs, store, clock):
 
 # --- launch -----------------------------------------------------------------------------------------
 
-def test_launch_starts_the_session_in_the_first_repo_with_the_goal_prompt(jobs, claude, store, clock):
+def test_launch_starts_the_session_in_the_first_repo_worktree_with_the_goal_prompt(jobs, claude, store, clock, tmp_path):
     job_id = new_job(jobs, clock, approved=True)
     session = jobs.launch(job_id)
     assert session == job_id
-    assert claude.started == [(job_id, REPO, f"/goal @{store.goal_path(job_id)}", settings_args(job_id))]
+    worktree = str(tmp_path / "home" / "work" / "yocto" / "worktrees" / "video-core" / job_id)
+    assert claude.started == [(job_id, worktree, f"/goal @{store.goal_path(job_id)}", settings_args(job_id))]
 
 
 def test_launch_sets_cure_job_id_in_the_session_settings(jobs, claude, clock):
@@ -227,7 +224,7 @@ def test_launch_records_a_launched_event(jobs, store, clock):
     job_id = new_job(jobs, clock, approved=True)
     jobs.launch(job_id)
     assert tuple(event for event in store.load(job_id).events if isinstance(event, SessionStarted)) == (
-        SessionStarted("work", 1, job_id, clock.now, 1),)
+        SessionStarted("work", 1, job_id, clock.now, 1, worktree_root=os.path.expanduser(DEFAULTS["worktree.root"])),)
 
 
 def test_launch_leaves_the_job_launched_then_running(jobs, claude, clock):
@@ -262,16 +259,6 @@ def test_launch_refuses_states_other_than_launchable(jobs, claude, store, clock,
         jobs.close(first)
     with pytest.raises(JobStateError):
         jobs.launch(target)
-    assert claude.started == []
-
-
-def test_launch_refuses_a_job_whose_resource_is_held_naming_holder_and_resource(jobs, claude, clock):
-    holder = new_job(jobs, clock, approved=True)
-    waiting = new_job(jobs, clock, approved=True)
-    with pytest.raises(ResourceHeld) as caught:
-        jobs.launch(waiting)
-    assert caught.value.holder == holder and caught.value.resource == REPO
-    assert str(caught.value) == f"{REPO} is held by {holder}"
     assert claude.started == []
 
 
@@ -377,8 +364,9 @@ def test_claim_a_new_resource_appends_a_claim_event(jobs, store, clock):
 
 def test_claim_of_a_resource_the_job_already_names_writes_nothing(jobs, store, clock):
     job_id = launched_job(jobs, clock)
+    jobs.claim(job_id, [DEVICE_BENCH])
     before = store.load(job_id).events
-    jobs.claim(job_id, [REPO])
+    jobs.claim(job_id, [DEVICE_BENCH])
     assert store.load(job_id).events == before
 
 
@@ -388,13 +376,6 @@ def test_claim_twice_writes_one_event(jobs, store, clock):
     jobs.claim(job_id, [DEVICE_BENCH])
     claims = [event for event in store.load(job_id).events if isinstance(event, Claim)]
     assert claims == [Claim(DEVICE_BENCH, 1)]
-
-
-def test_claim_makes_a_higher_job_that_names_the_resource_held(jobs, clock):
-    first = launched_job(jobs, clock, repos=("/work/a",))
-    second = new_job(jobs, clock, repos=("/work/b", "/work/c"))
-    jobs.claim(first, ["/work/c"])
-    assert state_map(jobs) == {first: State.RUNNING, second: State.HELD}
 
 
 def test_claim_unknown_job(jobs):
@@ -421,12 +402,13 @@ def test_claim_refuses_a_job_that_is_not_open(jobs, store, clock, finish):
 
 
 def test_claim_refused_when_a_lower_open_job_names_the_resource(jobs, store, clock):
-    low = launched_job(jobs, clock, repos=("/work/a", "/work/c"))
+    low = launched_job(jobs, clock, repos=("/work/a",))
+    jobs.claim(low, ["build:/work/c"])
     high = launched_job(jobs, clock, repos=("/work/b",))
     before = store.load(high).events
     with pytest.raises(ResourceHeld) as caught:
-        jobs.claim(high, ["/work/c"])
-    assert (caught.value.resource, caught.value.holder) == ("/work/c", low)
+        jobs.claim(high, ["build:/work/c"])
+    assert (caught.value.resource, caught.value.holder) == ("build:/work/c", low)
     assert store.load(high).events == before
 
 
@@ -457,15 +439,13 @@ def test_claim_allowed_over_a_higher_job_that_was_not_launched(jobs, clock):
 # --- close ------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("setup, expected", [
-    ("queued", State.QUEUED), ("held", State.HELD), ("awaiting-approval", State.AWAITING_APPROVAL),
+    ("queued", State.QUEUED), ("awaiting-approval", State.AWAITING_APPROVAL),
     ("lost", State.LOST), ("needs-input", State.NEEDS_INPUT),
 ])
 def test_close_abandons_a_job_in_each_closable_state(jobs, claude, store, clock, setup, expected):
     first = new_job(jobs, clock, goal=setup != "queued", approved=setup not in ("queued", "awaiting-approval"))
     target = first
-    if setup == "held":
-        target = new_job(jobs, clock)
-    elif setup in ("lost", "needs-input"):
+    if setup in ("lost", "needs-input"):
         jobs.launch(first)
         if setup == "lost":
             claude.statuses[first] = SessionStatus.STOPPED

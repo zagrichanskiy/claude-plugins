@@ -58,7 +58,8 @@ def test_resume_continues_the_needs_input_session_as_the_next_run(h, tmp_path):
     assert h.lines == [session]
     assert h.claude.stopped == [fake_id(session)]
     goal = h.root / "jobs" / job_id / "goal.md"
-    assert h.claude.resumed == [(session, fake_uuid(session), "/work/video-core", f"/goal @{goal}", settings_args(job_id))]
+    worktree = str(tmp_path / "home" / "work" / "yocto" / "worktrees" / "video-core" / job_id)
+    assert h.claude.resumed == [(session, fake_uuid(session), worktree, f"/goal @{goal}", settings_args(job_id))]
     assert len(h.claude.started) == 1
     assert [(entry["run"], entry["session"]) for entry in launches(h, job_id)] == [(1, session), (2, session)]
     assert (h.root / "jobs" / job_id / "result-1.md").is_file()

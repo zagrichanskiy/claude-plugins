@@ -96,14 +96,14 @@ def test_wait_claim_of_a_build_is_refused_while_the_run_holds_the_bench(h, pair,
 def test_claim_of_an_unheld_repository_is_refused_while_the_run_holds_the_bench(h, pair, capsys):
     first, _ = pair
     assert h.run("claim", first, BENCH) == 0
-    assert h.run("claim", first, REPO_B) == 1
+    assert h.run("claim", first, "build:/w") == 1
     assert f"release {BENCH} first" in capsys.readouterr().err
 
 
 def test_reclaiming_a_held_resource_is_accepted_while_the_run_holds_the_bench(h, pair):
     first, _ = pair
     assert h.run("claim", first, BENCH) == 0
-    assert h.run("claim", first, BENCH, REPO_A) == 0
+    assert h.run("claim", first, BENCH) == 0
 
 
 def test_claim_is_accepted_again_after_the_short_hold_is_released(h, pair):
@@ -113,16 +113,20 @@ def test_claim_is_accepted_again_after_the_short_hold_is_released(h, pair):
     assert h.run("claim", first, "build:/w") == 0
 
 
-def test_wait_claim_of_a_repository_exits_one_when_the_run_holds_nothing_short(h, pair, capsys):
+@pytest.mark.parametrize("wait", [(), ("--wait", "5")])
+def test_claim_of_a_repository_exits_two(h, pair, capsys, wait):
     first, _ = pair
-    assert h.run("claim", "--wait", "5", first, REPO_B) == 1
-    assert "claim --wait accepts only device: and build:" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as caught:
+        h.run("claim", *wait, first, REPO_B)
+    assert caught.value.code == 2
+    assert "is not a short hold" in capsys.readouterr().err
     assert h.time.sleeps == []
 
 
 def test_wait_claim_mixing_a_repository_and_the_bench_writes_nothing(h, pair):
     first, _ = pair
-    assert h.run("claim", "--wait", "5", first, BENCH, REPO_A) == 1
+    with pytest.raises(SystemExit):
+        h.run("claim", "--wait", "5", first, BENCH, REPO_A)
     assert BENCH not in h.resources(first)
 
 
