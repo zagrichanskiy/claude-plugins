@@ -102,6 +102,12 @@ class JobRecord:
                      if isinstance(event, SessionStarted) and event.worktree_root is not None), None)
 
     @property
+    def slot(self) -> str | None:
+        """The directory of the workspace slot the job claimed last."""
+        return next((resource.slot_path(event.resource) for event in reversed(self.events)
+                     if isinstance(event, Claim) and resource.slot_path(event.resource) is not None), None)
+
+    @property
     def resources(self) -> frozenset[str]:
         """The claimed resources. A short-hold claim counts while its run is the latest and has no
         result, current or archived, until a release. A claim without a run counts for the whole job."""

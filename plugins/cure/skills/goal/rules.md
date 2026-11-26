@@ -10,11 +10,12 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   `origin/<base>`. Other mismatch: record it, use the corrected value.
 - Base from a predecessor job, or Settled "Base: the PR branch of split part 1": compare `<base>`
   with the local branch, not `origin/<base>`, because the predecessor commits locally and pushes
-  nothing. A part 1 branch that exists only on origin has no local branch: first run
-  `git branch --track <base> origin/<base>`. When `origin/<base>` exists, run
-  `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Never base the
-  work on `origin/<base>` here: that drops the predecessor's commits. Any other base keeps the check
-  above.
+  nothing. In a workspace slot, `cure-job launch` copies the predecessor's local branches into the
+  job's slot, so `<base>` is a local branch there. A part 1 branch that exists only on origin has no
+  local branch: first run `git branch --track <base> origin/<base>`. When `origin/<base>` exists,
+  run `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Never base
+  the work on `origin/<base>` here: that drops the predecessor's commits. Any other base keeps the
+  check above.
 - Work item 1 records one base commit per repository, the commit the job started on, in the ledger
   (Solo: the transcript). For a branch that exists on run 1 (locally, else as `origin/<branch>`) it is
   `git -C <repo> rev-parse <branch>` (else `origin/<branch>`). Otherwise it is
@@ -33,8 +34,12 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   `repo forall -c 'git remote get-url origin'`, and records the output. A counter-example the rule
   misclassifies is a question.
 - A job session works in its worktrees, `<worktree.root>/<repo name>/<job id>` for each repository of
-  the handoff, and starts in the first. `cure-job launch` creates them and a resume reuses them. Every
-  edit, build, `git -C` and done-when command uses the worktree path. The repository path the handoff
+  the handoff, and starts in the first. When the first repository is inside a `repo` tool workspace,
+  the job works in a workspace slot instead, a copy of that workspace with its own checkouts and build
+  directories, and starts in the slot copy of the first repository. A goal path that starts with
+  `<slot>` is under the slot directory, the path of the `slot:` resource in the job's row of
+  `cure-job list --json`. `cure-job launch` creates them and a resume reuses them. Every edit, build,
+  `git -C` and done-when command uses the worktree or slot path. The repository path the handoff
   lists is the user's checkout: the job never edits it or switches its branch.
 - Branch: the goal names the job's branch as a literal name. A branch exists when it is local or on
   origin. A branch missing on run 1 is not an item 1 mismatch. The step after the fact check (the

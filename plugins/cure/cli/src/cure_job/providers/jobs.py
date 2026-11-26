@@ -65,7 +65,8 @@ class JobsProvider:
         # The wait of ``claim --wait``; a test passes a fake pair so that it never waits.
         self.sleep = sleep
         self.monotonic = monotonic
-        self.runner = SessionRunner(store, claude, clock, plugin_root, sleep, monotonic, kinds, config["worktree.root"])
+        self.runner = SessionRunner(store, claude, clock, plugin_root, sleep, monotonic, kinds, config["worktree.root"],
+                                    config["slots.root"], config["slots.count"])
 
     def new(self, text: str, slug: str, origin: str | None = None, ticket_summary: str | None = None) -> str:
         """Queue the handoff ``text`` as a new job reporting back to ``origin`` and return the job id.
@@ -282,7 +283,7 @@ class JobsProvider:
 
     def prune(self, failed: Callable[[str, GitError], None] | None = None) -> list[str]:
         """Remove every :func:`expired` job that no open job names as ``after``, with its worktrees but not
-        its branches. Return the removed ids. A job whose worktree removal fails stays and goes to ``failed``."""
+        its branches or its slot. Return the removed ids. A job whose worktree removal fails stays and goes to ``failed``."""
         now = self.clock()
         kept_for = retention(self.config)
         views = self.views()
@@ -292,8 +293,9 @@ class JobsProvider:
             if expired(view, now, kept_for) and view.record.id not in predecessors:
                 record = view.record
                 try:
-                    worktree.remove_all(record.worktree_root or self.config["worktree.root"], record.handoff.repos,
-                                        record.id)
+                    if record.slot is None:
+                        worktree.remove_all(record.worktree_root or self.config["worktree.root"],
+                                            record.handoff.repos, record.id)
                 except GitError as e:
                     if failed is None:
                         raise

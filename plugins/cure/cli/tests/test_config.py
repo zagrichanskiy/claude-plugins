@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 30
+    assert len(DEFAULTS) == 32
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 
@@ -661,3 +661,29 @@ def test_launch_grace_seconds_sets_when_an_idle_session_is_stalled(h, tmp_path, 
     assert run_silently(h, "list", "--json") == 0
     (row,) = json.loads(h.lines[0])
     assert row["state"] == state
+
+
+@pytest.mark.parametrize("value", [0, 21, -1, "5", 2.5])
+def test_slots_count_outside_one_to_twenty_is_a_config_problem(h, capsys, value):
+    configure(h, {"slots": {"count": value}})
+    assert h.run("config", "check") == 1
+    assert "config.json: slots.count: " in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", [1, 5, 20])
+def test_slots_count_from_one_to_twenty_is_accepted(h, value):
+    configure(h, {"slots": {"count": value}})
+    assert h.run("config", "check") == 0
+
+
+@pytest.mark.parametrize("value", ["relative/slots", 5])
+def test_a_slots_root_that_is_not_an_absolute_path_is_a_config_problem(h, capsys, value):
+    configure(h, {"slots": {"root": value}})
+    assert h.run("config", "check") == 1
+    assert "slots.root: expected an absolute path" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", ["/srv/slots", "~/slots"])
+def test_a_slots_root_that_is_absolute_or_under_home_is_accepted(h, value):
+    configure(h, {"slots": {"root": value}})
+    assert h.run("config", "check") == 0

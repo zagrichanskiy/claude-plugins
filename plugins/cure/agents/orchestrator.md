@@ -61,11 +61,12 @@ Write these files with `Bash` heredocs, only at these paths:
   `origin/<base>`. Other mismatch: record it, use the corrected value.
 - Base from a predecessor job, or Settled "Base: the PR branch of split part 1": compare `<base>`
   with the local branch, not `origin/<base>`, because the predecessor commits locally and pushes
-  nothing. A part 1 branch that exists only on origin has no local branch: first run
-  `git branch --track <base> origin/<base>`. When `origin/<base>` exists, run
-  `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Never base the
-  work on `origin/<base>` here: that drops the predecessor's commits. Any other base keeps the check
-  above.
+  nothing. In a workspace slot, `cure-job launch` copies the predecessor's local branches into the
+  job's slot, so `<base>` is a local branch there. A part 1 branch that exists only on origin has no
+  local branch: first run `git branch --track <base> origin/<base>`. When `origin/<base>` exists,
+  run `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Never base
+  the work on `origin/<base>` here: that drops the predecessor's commits. Any other base keeps the
+  check above.
 - Work item 1 records one base commit per repository, the commit the job started on, in the ledger
   (Solo: the transcript). For a branch that exists on run 1 (locally, else as `origin/<branch>`) it is
   `git -C <repo> rev-parse <branch>` (else `origin/<branch>`). Otherwise it is
@@ -84,8 +85,12 @@ Write these files with `Bash` heredocs, only at these paths:
   `repo forall -c 'git remote get-url origin'`, and records the output. A counter-example the rule
   misclassifies is a question.
 - A job session works in its worktrees, `<worktree.root>/<repo name>/<job id>` for each repository of
-  the handoff, and starts in the first. `cure-job launch` creates them and a resume reuses them. Every
-  edit, build, `git -C` and done-when command uses the worktree path. The repository path the handoff
+  the handoff, and starts in the first. When the first repository is inside a `repo` tool workspace,
+  the job works in a workspace slot instead, a copy of that workspace with its own checkouts and build
+  directories, and starts in the slot copy of the first repository. A goal path that starts with
+  `<slot>` is under the slot directory, the path of the `slot:` resource in the job's row of
+  `cure-job list --json`. `cure-job launch` creates them and a resume reuses them. Every edit, build,
+  `git -C` and done-when command uses the worktree or slot path. The repository path the handoff
   lists is the user's checkout: the job never edits it or switches its branch.
 - Branch: the goal names the job's branch as a literal name. A branch exists when it is local or on
   origin. A branch missing on run 1 is not an item 1 mismatch. The step after the fact check (the
@@ -212,7 +217,7 @@ the end of the step. `claim` and `release` accept no other name: one exits 2 and
 | Held by another job | `claim --wait` polls every 10 s, for at most the `--wait` seconds, and exits 0 when it holds every resource. On timeout it exits 1 with `error: <resource> is held by <holder id>` on stderr. Call it again. |
 | Claim refused | Exit 1 at once, without waiting. Act on the Action column below: most messages end the step as `failed:`; the `release <held> first` refusal is retried after `release`. `--wait` outside 0..540 exits 2 (`invalid seconds` or `is outside 0..540`) and is not retried. |
 | Wait budget | Wait for short holds for at most `short-hold.wait-total-minutes` minutes in total over all calls (default 120; read it with `<plugin-root>/bin/cure-job config get short-hold.wait-total-minutes`). Each run starts a new budget: a resume after `needs-input:` is a new run. When the budget is spent, take the `needs-input:` exit with the question "short-hold timeout: <resource> held by <holder id>". |
-| Foreign edits | Before each build claim, run `git -C <repo> status --porcelain` for each repository that another open job names in `<plugin-root>/bin/cure-job list --json`. Record each dirty one with that job's id: in the ledger in Light and Full, in the final message in Solo (Solo has no ledger). A build failure on another job's edits is named before fix rounds are spent on it. Where verify allows, build the job's own recipes instead of the image. Name the foreign edits as the cause in the retrospective. |
+| Foreign edits | Before each build claim, run `git -C <repo> status --porcelain` for each repository that another open job names in `<plugin-root>/bin/cure-job list --json`. Record each dirty one with that job's id: in the ledger in Light and Full, in the final message in Solo (Solo has no ledger). A build failure on another job's edits is named before fix rounds are spent on it. Where verify allows, build the job's own recipes instead of the image. Name the foreign edits as the cause in the retrospective. A job in a workspace slot skips this check: no other job or session writes in its slot. |
 | Scope | A claim counts only while its run is the latest run and `result.md` does not exist. A finish, a `needs-input` exit, a resume or a relaunch drops it. |
 
 `claim` stderr messages (each starts with `error: `):

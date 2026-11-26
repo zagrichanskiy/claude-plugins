@@ -9,15 +9,17 @@ import os
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, NamedTuple, Sequence
 
-from . import worktree
+from . import resource, slot, worktree
 from .claude import Claude, Session
 from .clock import Clock
 from .config import DEFAULTS
 from .errors import ClaudeError, ClaudeOutcomeUnknown, StoreError
-from .events import SessionEnded, SessionsRemoved, SessionStarted, SessionStopped
+from .errors import SlotError
+from .events import Claim, SessionEnded, SessionsRemoved, SessionStarted, SessionStopped
 from .job import JobRecord
 from .kinds import KINDS, End, SessionKind, StartContext, settings_arguments
 from .sessions import listed_live
+from .state import phase_of
 from .store import JobStore
 
 #: How long a stop waits for the listing to drop a stopped session, and how often it reads the
@@ -41,7 +43,8 @@ class Stopped(NamedTuple):
 class SessionRunner:
     def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path,
                  sleep: Callable[[float], None], monotonic: Callable[[], float],
-                 kinds: Mapping[str, SessionKind] = KINDS, worktree_root: str = DEFAULTS["worktree.root"]):
+                 kinds: Mapping[str, SessionKind] = KINDS, worktree_root: str = DEFAULTS["worktree.root"],
+                 slots_root: str = DEFAULTS["slots.root"], slots_count: int = DEFAULTS["slots.count"]):
         self.store = store
         self.claude = claude
         self.clock = clock
@@ -51,6 +54,8 @@ class SessionRunner:
         self.monotonic = monotonic
         self.kinds = kinds
         self.worktree_root = worktree_root
+        self.slots_root = slots_root
+        self.slots_count = slots_count
 
     def start(self, record: JobRecord, kind: SessionKind, operation: str, claude_args: Sequence[str] = (),
               input_text: str | None = None, continuation: Continuation | None = None) -> str:
@@ -66,7 +71,8 @@ class SessionRunner:
         agent = kind.agent(ctx)
         arguments = [*(["--agent", agent] if agent is not None else []), *settings_arguments(kind, ctx),
                      *kind.default_args, *claude_args]
-        cwd = str(self._worktree(record))
+        cwd = str(self._directory(record))
+        in_worktree = record.worktree_root is None and slot.find_workspace(record.handoff.repos[0]) is None
         if continuation is not None:
             # Resuming a live session starts a copy, so it is stopped first.
             self._stop_session(continuation.name, continuation.listed)
@@ -96,7 +102,7 @@ class SessionRunner:
             self.store.append_event(job_id, SessionStarted(kind.name, n, name, self.clock(),
                                                            n if result_kind else record.run,
                                                            tuple(path.name for path in inputs.values()),
-                                                           None if record.worktree_root else self._root(record)))
+                                                           self._root(record) if in_worktree else None))
         except StoreError as e:
             what = f"session {name}" if result_kind else f"{kind.name} session {n}, {name},"
             raise StoreError(f"job {job_id}: {what} may be running and is not recorded; "
@@ -107,6 +113,48 @@ class SessionRunner:
                                            "list shows it launched, then running or lost") from unknown
             raise ClaudeOutcomeUnknown(f"{unknown}; recorded as {kind.name} session {n}, {name}") from unknown
         return name
+
+    def _directory(self, record: JobRecord) -> Path:
+        """The directory of the first repository in the job's slot when it is in a ``repo`` tool workspace, else
+        in its worktree. The first session of a job readies its slot and checks out the job's branch there."""
+        repos = record.handoff.repos
+        workspace = slot.find_workspace(repos[0])
+        if workspace is None:
+            return self._worktree(record)
+        path = self._take_slot(record)
+        if not record.sessions:
+            self._open_slot(record, workspace, path)
+        return path / os.path.relpath(os.path.abspath(repos[0]), workspace)
+
+    def _take_slot(self, record: JobRecord) -> Path:
+        """The job's slot. A job without one claims the lowest numbered slot no open job holds."""
+        if record.slot is not None:
+            return Path(record.slot)
+        root = os.path.expanduser(self.slots_root)
+        with self.store.locked():
+            held = {other.slot for other in self.store.snapshot().records if not phase_of(other).is_terminal}
+            for n in range(1, self.slots_count + 1):
+                name = resource.slot(os.path.join(root, str(n)))
+                if resource.slot_path(name) not in held:
+                    self.store.append_event(record.id, Claim(name, record.run))
+                    return Path(resource.slot_path(name))
+        raise SlotError(f"no free slot: open jobs hold all {self.slots_count} slots under {root}")
+
+    def _open_slot(self, record: JobRecord, workspace: Path, path: Path) -> None:
+        """Ready ``path``, copy the local branches of the ``after`` predecessor's slot into it, then check out the
+        job's branch, or the branch of its predecessor when it names none.
+
+        ``prune`` keeps the predecessor's record while this job is open, so its slot is known here."""
+        slot.ready(workspace, path)
+        before = self.store.load(record.handoff.after) if record.handoff.after is not None else None
+        after = None
+        if before is not None and before.slot is not None:
+            slot.copy_branches(workspace, Path(before.slot), path, record.handoff.repos)
+            if before.handoff.branch is not None:
+                after = Path(before.slot), before.handoff.branch
+        branch = record.handoff.branch or (after[1] if after is not None else None)
+        if branch is not None:
+            slot.start_branches(workspace, path, record.handoff.repos, branch, after)
 
     def _worktree(self, record: JobRecord) -> Path:
         """The directory of the first repository in its worktree, after creating the missing worktrees."""
