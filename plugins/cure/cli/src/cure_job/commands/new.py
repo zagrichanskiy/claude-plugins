@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from .. import job_id
+from ..errors import CureJobError
 from ..frontmatter import is_writable
 from ..providers.jobs import JobsProvider
-from .base import Command, notify_line
+from .base import Command, notify_line, read_stdin
 
 _STDIN = "-"
 
@@ -37,7 +37,10 @@ class NewCommand(Command):
 
     def _read(self, path: str) -> str:
         if path == _STDIN:
-            return sys.stdin.read()
+            try:
+                return read_stdin()
+            except (OSError, UnicodeDecodeError) as e:
+                raise CureJobError(f"cannot read {path}: {e}") from e
         try:
             with open(path, encoding="utf-8") as source:
                 return source.read()

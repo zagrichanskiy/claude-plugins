@@ -327,7 +327,7 @@ def test_done_when_11_next_closes_an_approved_successor_whose_predecessor_is_gon
     row = next_actions(h)[succ]
     assert row["state"] == "held"
     assert row["actions"] == ["close-successor"]
-    assert row["args"] == {"close-successor": {"after": pred, "after-state": state}}
+    assert row["args"] == [{"after": pred, "after-state": state}]
 
 
 def test_done_when_11_next_gives_no_action_for_the_successor_of_an_invalid_predecessor(h, tmp_path):

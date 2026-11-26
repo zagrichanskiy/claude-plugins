@@ -107,19 +107,20 @@ class JobsProvider:
         check(Op.START, self._check(listing, view, "launch", functools.cache(self.claude.sessions), WORK_KIND))
         return self.runner.start(record, WORK_KIND, "launch", claude_args)
 
-    def resume(self, job_id: str, claude_args: Sequence[str] = ()) -> str:
+    def resume(self, job_id: str, claude_args: Sequence[str] = (), caller_job: str | None = None) -> str:
         """Continue the session of a needs-input job as its next run and return the session name.
 
         The session keeps its name, so the new run records the same session. A
         session that is no longer listed raises :class:`SessionGone`: the caller
-        starts a new run with ``launch`` instead.
+        starts a new run with ``launch`` instead. ``caller_job`` is the job of the
+        calling session; a job's own session is refused.
         """
         snapshot = self.store.snapshot()
         sessions = self.claude.sessions()
         listing = self._listing(snapshot, sessions)
         view = self._find(listing, job_id)
         record = view.record
-        check(Op.CONTINUE, self._check(listing, view, "resume", lambda: sessions, WORK_KIND))
+        check(Op.CONTINUE, self._check(listing, view, "resume", lambda: sessions, WORK_KIND, caller_job=caller_job))
         name = record.session
         return self.runner.start(record, WORK_KIND, "resume", claude_args,
                                  continuation=Continuation(name, sessions[name]))
@@ -129,7 +130,8 @@ class JobsProvider:
         """Start the next session of ``kind`` for ``job_id`` and return the session name."""
         listing = self.listing()
         view = self._find(listing, job_id)
-        check(Op.START, self._check(listing, view, "start", functools.cache(self.claude.sessions), kind))
+        check(Op.START, self._check(listing, view, "start", functools.cache(self.claude.sessions), kind,
+                                    has_input=input_text is not None))
         return self.runner.start(view.record, kind, "start", claude_args, input_text)
 
     def end(self, job_id: str, kind: SessionKind, summary: Sequence[str] = ()) -> None:
@@ -139,9 +141,10 @@ class JobsProvider:
         self.runner.end(record, kind, summary)
 
     def _check(self, listing: Listing, view: JobView, operation: str,
-               sessions: Callable[[], Mapping[str, Session]] | None = None, kind: SessionKind | None = None) -> Check:
+               sessions: Callable[[], Mapping[str, Session]] | None = None, kind: SessionKind | None = None,
+               has_input: bool = False, caller_job: str | None = None) -> Check:
         return Check(view.record, operation, view=view, views=listing.views, invalid=listing.invalid,
-                     sessions=sessions, kind=kind, kinds=self.kinds)
+                     sessions=sessions, kind=kind, kinds=self.kinds, has_input=has_input, caller_job=caller_job)
 
     def approve(self, job_id: str, by: str = "user") -> None:
         """Record the approval of the current ``goal.md`` of an unlaunched job without open items.

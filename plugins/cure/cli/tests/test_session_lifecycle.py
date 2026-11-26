@@ -66,6 +66,19 @@ def test_resume_continues_the_needs_input_session_as_the_next_run(h, tmp_path):
     assert (listed["state"], listed["run"], listed["session"]) == ("running", 2, session)
 
 
+def test_resume_by_the_session_of_the_job_itself_is_refused_and_the_job_stays_needs_input(h, tmp_path, monkeypatch,
+                                                                                          capsys):
+    job_id, _ = needs_input(h, tmp_path)
+    monkeypatch.setenv("CURE_JOB_ID", job_id)
+    assert h.run("resume", job_id) == 1
+    assert "its own session cannot resume it" in capsys.readouterr().err
+    assert h.claude.resumed == []
+    assert h.listed()[job_id]["state"] == "needs-input"
+    monkeypatch.setenv("CURE_JOB_ID", "261013-1000-video-core-other")
+    assert h.run("resume", job_id) == 0
+    assert h.listed()[job_id]["state"] == "running"
+
+
 def test_resume_of_a_stopped_session_stops_nothing(h, tmp_path):
     job_id, session = needs_input(h, tmp_path)
     h.claude.statuses[session] = SessionStatus.STOPPED

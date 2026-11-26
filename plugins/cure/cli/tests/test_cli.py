@@ -129,10 +129,24 @@ def test_new_from_file_prints_the_id_alone(h, tmp_path):
 
 @pytest.mark.parametrize("dash", [True, False])
 def test_new_reads_stdin_when_file_is_dash_or_absent(h, monkeypatch, dash):
-    monkeypatch.setattr(sys, "stdin", io.StringIO(handoff_text()))
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(handoff_text().encode("utf-8"))))
     argv = ["new", "--slug", "x"] + (["-"] if dash else [])
     assert h.cli.run(argv) == 0
     assert h.lines == ["261013-1800-video-core-x", 'notify: SendMessage dispatcher "job 261013-1800-video-core-x"']
+
+
+def test_new_reads_stdin_as_utf8_in_any_locale(h, monkeypatch):
+    text = handoff_text() + "\u2014 \u00e9\n"
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(text.encode("utf-8")), encoding="latin-1"))
+    assert h.run("new", "--slug", "x") == 0
+    assert "\u2014 \u00e9\n" in (h.root / "jobs" / h.lines[0] / "handoff.md").read_text(encoding="utf-8")
+
+
+def test_new_refuses_stdin_that_is_not_utf8(h, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"\xff\xfe"), encoding="latin-1"))
+    assert h.run("new", "--slug", "x") == 1
+    assert "cannot read -: 'utf-8' codec can't decode" in capsys.readouterr().err
+    assert not (h.root / "jobs").exists()
 
 
 def test_new_with_invalid_handoff_returns_one(h, tmp_path, capsys):
@@ -286,7 +300,7 @@ def test_next_json_gives_ask_timeout_the_resource_and_holder(h, tmp_path):
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
     assert item["actions"] == ["ask-timeout"]
-    assert item["args"] == {"ask-timeout": {"resource": "device:bench", "holder": "other-job"}}
+    assert item["args"] == [{"resource": "device:bench", "holder": "other-job"}]
 
 
 def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_question(h, tmp_path):
@@ -295,7 +309,7 @@ def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
     assert item["actions"] == ["ask-timeout"]
-    assert item["args"] == {"ask-timeout": {"resource": "", "holder": None}}
+    assert item["args"] == [{"resource": "", "holder": None}]
 
 
 def test_next_json_lists_jobs_in_lock_order_with_row_fields_actions_and_args(h, tmp_path):

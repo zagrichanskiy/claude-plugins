@@ -10,7 +10,7 @@ from typing import Callable, Iterable, Mapping, NamedTuple, Sequence
 
 from .claude import Claude, Session
 from .clock import Clock
-from .errors import ClaudeError, ClaudeOutcomeUnknown, CureJobError, StoreError
+from .errors import ClaudeError, ClaudeOutcomeUnknown, StoreError
 from .events import SessionEnded, SessionsRemoved, SessionStarted, SessionStopped
 from .job import JobRecord
 from .kinds import KINDS, End, SessionKind, StartContext, settings_arguments
@@ -56,8 +56,6 @@ class SessionRunner:
         job_id = record.id
         n = sum(1 for session in record.sessions if session.kind == kind.name) + 1
         name = continuation.name if continuation is not None else kind.session_name(job_id, n)
-        if input_text is not None and kind.input is None:
-            raise CureJobError(f"a {kind.name} session takes no input")
         inputs = {kind.input: self.store.input_path(job_id, kind.input, n)} if input_text is not None else {}
         ctx = StartContext(record, self.store, self.plugin_root, operation, n, name, inputs)
         prompt = kind.prepare(ctx)

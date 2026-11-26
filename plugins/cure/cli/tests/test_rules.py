@@ -24,7 +24,7 @@ BAD = "261013-0900-video-core-bad"
 INVALID = (InvalidJob(BAD, Path("/state/jobs") / BAD, "dispatch.jsonl line 1 does not read"),)
 OLD = timedelta(minutes=5)
 
-GOAL_KIND = replace(WORK, name="goal-writer", start_states=frozenset({State.QUEUED}), start_guards=(),
+GOAL_KIND = replace(WORK, name="drafter", start_states=frozenset({State.QUEUED}), start_guards=(),
                     writes=frozenset({Artifact.GOAL}), end=End.EVENT)
 PROBE_KIND = replace(WORK, name="probe", start_states=frozenset({State.APPROVED}), start_guards=(),
                      writes=frozenset(), end=End.EVENT)
@@ -212,6 +212,41 @@ def test_resume_refuses_while_a_session_that_writes_the_goal_is_open():
 
 def test_resume_of_a_needs_input_job_whose_kept_session_is_listed_live_goes_ahead():
     check(Op.CONTINUE, facts(NEEDS_INPUT, operation="resume", listing=LIVE_B))
+
+
+# --- an input ------------------------------------------------------------------------------------------------------
+
+def test_start_refuses_an_input_for_a_kind_without_one():
+    given = replace(facts(make_record(B, approved=True), kind=PROBE_KIND, operation="start"), has_input=True)
+    raised = refusal(Op.START, given)
+    assert type(raised) is CureJobError
+    assert str(raised) == "a probe session takes no input"
+
+
+def test_start_takes_an_input_for_a_kind_with_one():
+    kind = replace(PROBE_KIND, input="input")
+    check(Op.START, replace(facts(make_record(B, approved=True), kind=kind, operation="start"), has_input=True))
+
+
+def test_another_start_refusal_precedes_the_input_refusal():
+    record = make_record(B, approved=True, events=(other(PROBE_KIND.name, B),))
+    given = replace(facts(record, listing={f"{B}-probe": Session(SessionStatus.BUSY)}, kind=PROBE_KIND,
+                          operation="start"), has_input=True)
+    assert str(refusal(Op.START, given)).startswith(f"job {B} has live probe session")
+
+
+# --- the resume guard ---------------------------------------------------------------------------------------------
+
+def test_resume_refuses_the_session_of_the_job_itself():
+    given = replace(facts(NEEDS_INPUT, operation="resume", listing=LIVE_B), caller_job=B)
+    raised = refusal(Op.CONTINUE, given)
+    assert type(raised) is JobStateError
+    assert "its own session cannot resume it" in str(raised)
+
+
+@pytest.mark.parametrize("caller", [None, A])
+def test_resume_goes_ahead_for_no_caller_or_another_jobs_session(caller):
+    check(Op.CONTINUE, replace(facts(NEEDS_INPUT, operation="resume", listing=LIVE_B), caller_job=caller))
 
 
 # --- one live session per job ---------------------------------------------------------------------------------------

@@ -112,11 +112,31 @@ def test_start_prints_the_name_copies_the_input_and_records_the_start(h, tmp_pat
     assert (row["state"], row["sessions"]["probe"]["liveness"]) == ("approved", "busy")
 
 
-def test_start_reads_the_input_from_stdin(h, tmp_path, monkeypatch):
+def test_start_reads_the_input_from_stdin_as_utf8_in_any_locale(h, tmp_path, monkeypatch):
     job_id = h.new(tmp_path)
-    monkeypatch.setattr("sys.stdin", io.StringIO("from stdin"))
+    monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO("from stdin \u2014 \u00e9".encode("utf-8")),
+                                                      encoding="latin-1"))
     assert h.run("start", job_id, "probe", "--input", "-") == 0
-    assert (h.root / "jobs" / job_id / "input-1.md").read_text(encoding="utf-8") == "from stdin"
+    assert (h.root / "jobs" / job_id / "input-1.md").read_text(encoding="utf-8") == "from stdin \u2014 \u00e9"
+
+
+def test_start_reads_crlf_from_stdin_as_from_a_file(h, tmp_path, monkeypatch):
+    from_file, from_stdin = h.new(tmp_path), h.new(tmp_path)
+    source = tmp_path / "crlf.md"
+    source.write_bytes(b"one\r\ntwo\r\n")
+    assert h.run("start", from_file, "probe", "--input", str(source)) == 0
+    monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(b"one\r\ntwo\r\n"), encoding="latin-1"))
+    assert h.run("start", from_stdin, "probe", "--input", "-") == 0
+    copied = [(h.root / "jobs" / job_id / "input-1.md").read_bytes() for job_id in (from_file, from_stdin)]
+    assert copied == [b"one\ntwo\n", b"one\ntwo\n"]
+
+
+def test_start_refuses_stdin_that_is_not_utf8(h, tmp_path, monkeypatch, capsys):
+    job_id = h.new(tmp_path)
+    monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(b"\xff\xfe"), encoding="latin-1"))
+    assert h.run("start", job_id, "probe", "--input", "-") == 1
+    assert "cannot read the input -: 'utf-8' codec can't decode" in capsys.readouterr().err
+    assert h.claude.started == []
 
 
 def test_a_failed_start_records_nothing_and_its_retry_reuses_the_number(h, tmp_path):
@@ -192,6 +212,12 @@ def test_launch_stops_the_ended_probe_session_and_stop_without_a_kind_reports_wo
     assert h.listed()[job_id]["state"] == "lost"
 
 
+def test_stop_help_names_the_latest_session_of_one_kind_or_every_kind(h, capsys):
+    with pytest.raises(SystemExit):
+        h.cli.run(["-h"])
+    assert "stop the latest session of a job, of one kind or of every kind" in " ".join(capsys.readouterr().out.split())
+
+
 def test_stop_with_a_kind_stops_only_that_kind(h, tmp_path):
     job_id, probe = start_probe(h, tmp_path)
     assert h.run("stop", job_id, "probe") == 0
@@ -220,6 +246,22 @@ def test_a_session_of_a_kind_this_version_does_not_know_reads_and_gets_no_action
 
 
 # --- next ------------------------------------------------------------------------------------------------------------
+
+def test_next_gives_each_action_its_own_args_when_two_sessions_restart(root, tmp_path):
+    second = replace(PROBE, name="second", session_name=lambda job_id, n: f"{job_id}-second-{n}")
+    h = Harness(root, kinds={**KINDS_WITH_PROBE, second.name: second})
+    job_id = h.new(tmp_path)
+    with (root / "jobs" / job_id / "dispatch.jsonl").open("a") as log:
+        for kind in (PROBE, second):
+            log.write(encode(SessionStarted(kind.name, 1, kind.session_name(job_id, 1), h.clock(), 0,
+                                            ("input-1.md",))) + "\n")
+    h.clock.advance(OLD)
+    assert h.run("next", "--json") == 0
+    [row] = json.loads(h.lines[-1])
+    assert row["actions"] == ["launch", "restart-session", "restart-session"]
+    assert row["args"] == [{}, {"kind": "probe", "inputs": ["input-1.md"], "restarts": 0},
+                           {"kind": "second", "inputs": ["input-1.md"], "restarts": 0}]
+
 
 def probe_record(status, *, kind=PROBE, inputs=("input-1.md",)):
     record = make_record(A, approved=True, events=(SessionStarted(kind.name, 1, "p", NOW - OLD, 0, inputs),))
