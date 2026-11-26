@@ -6,11 +6,11 @@ handoff's `repos`, walk the chain from the row's `after`. Never use the handoff'
 | Step | Rule |
 |---|---|
 | Start | The job named by the row's `after`. |
-| Changes R | R is in `repos` of the job's `handoff.md` (the row's `dir`). The row's `resources` also hold claimed repositories, which do not count. |
+| Changes R | R is in `repos` of the job's `handoff.md` (the row's `dir`). |
 | Stop, resolved | The first job that changes R. `base` is the branch named in that job's `goal.md`. |
 | Next job | The `after` of the current job's row. |
 | Stop, unresolved | A passed row has `after-state` `missing` or `invalid`. |
-| End of chain | No job changes R: `base` comes from the handoff or the default branch (`job.md` "Input"). |
+| End of chain | No job changes R: `base` is resolved as without `after` (`job.md` "Input"). |
 
 Write the base of each repository left unresolved as an `## Open` item. Write the base per repository
 in the goal's fact check. For a base taken from a predecessor or marked "Base: the PR branch of split

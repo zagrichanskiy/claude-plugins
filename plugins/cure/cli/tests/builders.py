@@ -35,10 +35,12 @@ def listed(statuses: dict[str, SessionStatus]) -> dict[str, Session]:
     return {name: Session(status) for name, status in statuses.items()}
 
 
-def handoff_text(repos=(REPO,), device="none", after: str | None = None) -> str:
+def handoff_text(repos=(REPO,), device="none", after: str | None = None, branch: str | None = None) -> str:
     lines = ["---", "repos:"] + [f"  - {repo}" for repo in repos] + [f"device: {device}"]
     if after is not None:
         lines.append(f"after: {after}")
+    if branch is not None:
+        lines.append(f"branch: {branch}")
     lines += ["---", "", "# Outcome", ""]
     return "\n".join(lines)
 

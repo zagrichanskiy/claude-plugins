@@ -19,8 +19,7 @@ from .goal import RULES, missing_paths, retarget, tier
 from .job import JobRecord
 from .job_id import session_name
 from .rules import (Artifact, Guard, after_satisfied, approved_first, finish_launched, finish_no_result, finish_open,
-                    goal_exists, kept_session_not_live, no_invalid_job, not_blocked, ready_not_held,
-                    state_in_start_states)
+                    goal_exists, kept_session_not_live, no_invalid_job, state_in_start_states)
 from .state import State
 from .store import JobStore
 
@@ -134,8 +133,8 @@ WORK = SessionKind(
            "Bash({cure_job} release {job_id} *)", "Bash({cure_job} config get *)", "Bash({cure_job} list *)",
            "Bash({cure_job} finish --help)"),
     start_states=frozenset({State.APPROVED, State.LOST, State.NEEDS_INPUT}),
-    start_guards=(approved_first, after_satisfied, ready_not_held, state_in_start_states, kept_session_not_live,
-                  goal_exists, not_blocked, no_invalid_job),
+    start_guards=(approved_first, after_satisfied, state_in_start_states, kept_session_not_live, goal_exists,
+                  no_invalid_job),
     end_guards=(finish_open, finish_no_result, finish_launched),
     writes=frozenset(),
     end=End.RESULT,

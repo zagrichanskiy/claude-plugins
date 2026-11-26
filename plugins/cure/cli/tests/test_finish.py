@@ -9,12 +9,13 @@ import pytest
 from cure_job.claude import SessionStatus
 from cure_job.cli import Cli
 from cure_job.clock import format_local, local_now, parse_local
-from cure_job.errors import JobStateError, ResourceHeld
+from cure_job.errors import JobStateError
 from cure_job.providers.jobs import JobsProvider
 from cure_job.result import Report, ResultStatus, parse_result
 from cure_job.store import JobStore
 from tests.builders import handoff_text, set_age
 from tests.fakes import FakeClaude, FakeClock
+from tests.test_worktrees import make_repo
 
 LOCAL = datetime(2026, 10, 14, 17, 42, 5, tzinfo=timezone(timedelta(hours=3)))
 REPO = "/work/video-core"
@@ -293,17 +294,16 @@ def test_f1_write_result_never_replaces_an_existing_result_md(store, jobs, clock
 
 # --- F10: owner answer pending; remove this test alone to drop the launch guard ----------------------
 
-def test_f10_launch_refuses_a_lower_id_job_when_a_launched_job_holds_the_repository(jobs, store, clock):
+def test_f10_launch_does_not_refuse_a_lower_id_job_on_the_repository_of_a_launched_job(jobs, store, clock, tmp_path):
+    repo = str(make_repo(tmp_path / "src", "video-core"))
     clock.now = datetime(2026, 10, 25, 1, 30, tzinfo=timezone(timedelta(hours=3)))
-    first = jobs.new(handoff_text((REPO,)), "x")
+    first = jobs.new(handoff_text((repo,)), "x")
     store.goal_path(first).write_text("goal", encoding="utf-8")
     jobs.approve(first)
     jobs.launch(first)
     clock.now = datetime(2026, 10, 25, 1, 10, tzinfo=timezone(timedelta(hours=2)))
-    second = jobs.new(handoff_text((REPO,)), "y")
+    second = jobs.new(handoff_text((repo,)), "y")
     assert second < first
     store.goal_path(second).write_text("goal", encoding="utf-8")
     jobs.approve(second)
-    with pytest.raises(ResourceHeld) as caught:
-        jobs.launch(second)
-    assert caught.value.holder == first
+    jobs.launch(second)

@@ -32,9 +32,9 @@ DROPPED_PRUNE_MESSAGES = {
 }
 DROPPED_PRUNE_KEYS = tuple(DROPPED_PRUNE_MESSAGES)
 REMOVED_MESSAGE = ('handoff: "base" is removed; a job\'s base is the base stated in the handoff, '
-                   "else the repository's default branch")
+                   "else resolved by cure:goal")
 INIT_DROPPED = ('defaults.md: handoff: "base" is removed; row dropped; a job\'s base is the base stated '
-                "in the handoff, else the repository's default branch")
+                "in the handoff, else resolved by cure:goal")
 
 
 def nest(flat):
@@ -82,7 +82,7 @@ def run_silently(h, *argv):
 def test_done_when_1_config_get_without_a_file_prints_every_key_with_its_default(h):
     assert h.run("config", "get") == 0
     assert json.loads(h.lines[0]) == nest(DEFAULTS)
-    assert len(DEFAULTS) == 29
+    assert len(DEFAULTS) == 30
     assert REMOVED_KEY not in DEFAULTS
     assert not [key for key in DEFAULTS if key in DROPPED_PRUNE_KEYS]
 

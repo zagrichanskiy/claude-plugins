@@ -9,18 +9,19 @@ in this mode.
 - Read the handoff file as the conversation.
 - Read the `CLAUDE.md` files and the `.claude/` of each repository in `repos`. The `CLAUDE.md` files
   are the repository's own and each ancestor directory's up to `$HOME`.
-- Read `handoff.delivery`, `handoff.branch`, `handoff.resource-risk`, `split.limit` and `split.factor`
+- Read `handoff.delivery`, `handoff.branch`, `handoff.resource-risk`, `split.limit`, `split.factor` and `worktree.root`
   with `cure-job config get <key>` before writing the goal. Each prints JSON. Never read
   `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` itself. Do not ask a fork a
   value answers; mark that decision `(default)` under Settled.
 - Branch: when the handoff omits `branch`, apply `handoff.branch` (default `new`). A job with `after`
   and no `branch` uses its predecessor's branch, as `base` does (see "Base per repository");
-  `handoff.branch` does not apply. `new` gives the job its own branch from `base`: write the literal
-  name `<ticket>_<slug>` (`<slug>` without a ticket; a GitHub ticket `#N` is `issue-<N>`), the same in
-  every repository of the job. `current` is the branch checked out in the first repository of `repos`,
-  the launch repository. Any other value is a literal name. Write the resolved literal name in the
-  goal, never `new` or `current`.
-- Base of a job without `after`: the `base` the handoff states. Otherwise the default branch of each
+  `handoff.branch` does not apply. The exception is a handoff whose Settled has `Stacked on <id>:
+  overlapping files`: `handoff.branch` applies. `new` gives the job its own branch from `base`: write
+  the literal name `<ticket>_<slug>` (`<slug>` without a ticket; a GitHub ticket `#N` is `issue-<N>`),
+  the same in every repository. `current` works as `new`, from the base the next bullet sets. Any
+  other value is a literal name. Write the resolved name in the goal, never `new` or `current`.
+- Base of a job without `after`: the `base` the handoff states. Otherwise, under `current`, the branch
+  checked out in the user's checkout of each repository. Otherwise the default branch of each
   repository in `repos`: `git -C <repo> symbolic-ref --short refs/remotes/origin/HEAD` (strip the
   `origin/` prefix), else `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` run in the
   repository. When both fail, write the base as an `## Open` item. A job with `after` follows "Base
@@ -40,13 +41,14 @@ in this mode.
 ## Base per repository
 
 When the job's row in `cure-job list --json` has `after`, read
-`<plugin-root>/skills/goal/base-chain.md` and follow it. Without `after`, `base` comes from the handoff
-or the default branch (see Input).
+`<plugin-root>/skills/goal/base-chain.md` and follow it. Without `after`, see Input.
 
 ## Writing the goal
 
-- Write each done-when command with absolute paths or `git -C <absolute path>`. The worker starts in
-  the first repository.
+- The job works in one worktree per repository, `<worktree.root>/<repo name>/<job id>`, where
+  `<repo name>` is the basename of `git -C <repo> rev-parse --show-toplevel`. Write each path of the
+  goal and each done-when command with the worktree path, expanded to an absolute path without `~`,
+  or `git -C <worktree>`, never the repository path the handoff lists. The worker starts in the worktree of the first repository.
 - A work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory names
   the directory as a literal absolute path under a trusted ancestor.
 
@@ -65,8 +67,8 @@ or the default branch (see Input).
 | File | Path |
 |---|---|
 | Goal | `<job>/goal.md`. The `.notes/` exclusion is skipped for it. |
-| Ledger | `.notes/ledger-<slug>.md` in the handoff's first repository |
-| Backlog | `.notes/<slug>-backlog.md` in the same repository |
+| Ledger | `.notes/ledger-<slug>.md` in the worktree of the handoff's first repository |
+| Backlog | `.notes/<slug>-backlog.md` in the same worktree |
 
 A Solo goal has no ledger and no backlog. Apply the `.notes/` exclusion for the ledger and the
 backlog, as the `note` skill describes. The goal never deletes the job directory.

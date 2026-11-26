@@ -37,7 +37,7 @@ Until the error is fixed, `prune` removes no job and `approve --by auto` exits 1
 
 | State | Note |
 |---|---|
-| `held` | Nothing unless `draft`, `ask-approval`, `note-starved` or `close-successor` applies. A `held` job holds nothing. |
+| `held` | Nothing unless `draft`, `ask-approval` or `close-successor` applies. A `held` job holds nothing. |
 | `held`, `after-state` `invalid` | Do nothing for the successor: `draft`, `ask-approval` and auto-approval do not apply. The predecessor's `repair` action asks the user. Do not close the successor. |
 | `launched`, `running` | For `launch-grace-seconds` seconds (`cure-job config get launch-grace-seconds`; default 60) after a launch or resume, a session that `claude agents` does not list yet, or lists stopped, shows as `launched`, not `lost`. After `cure-job stop`, a session listed stopped shows as `lost` at once. |
 | `done`, `abandoned` | Nothing left to report or remove. |

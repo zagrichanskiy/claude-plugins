@@ -10,6 +10,7 @@ import pytest
 
 from tests.builders import handoff_text
 from tests.conftest import FAKE_CLAUDE
+from tests.test_worktrees import make_repo
 
 LAUNCHER = Path(__file__).resolve().parents[2] / "bin" / "cure-job"
 COMMANDS = ["new", "list", "launch", "claim", "close", "prune"]
@@ -72,8 +73,7 @@ def test_exit_codes_through_the_launcher(workdir):
 
 
 def test_cli_check_scenario(tmp_path, workdir, root, fake_state):
-    repo = tmp_path / "repo"
-    repo.mkdir()
+    repo = make_repo(tmp_path, "repo")
     handoff = tmp_path / "handoff.md"
     handoff.write_text(handoff_text((str(repo),)), encoding="utf-8")
 
@@ -91,18 +91,18 @@ def test_cli_check_scenario(tmp_path, workdir, root, fake_state):
     (root / "jobs" / first / "goal.md").write_text("goal", encoding="utf-8")
     assert list_states(workdir) == [(first, "awaiting-approval"), (second, "queued")]
     assert run(workdir, "approve", first, "--by", "user").returncode == 0
-    assert list_states(workdir) == [(first, "approved"), (second, "held")]
+    assert list_states(workdir) == [(first, "approved"), (second, "queued")]
 
     # Step 3: launch through the fake claude.
     launched = run(workdir, "launch", first)
     assert launched.returncode == 0, launched.stderr
     assert launched.stdout.strip() == first
-    assert list_states(workdir) == [(first, "running"), (second, "held")]
+    assert list_states(workdir) == [(first, "running"), (second, "queued")]
     calls = [json.loads(line) for line in (fake_state / "calls.jsonl").read_text(encoding="utf-8").splitlines()]
     start = [call for call in calls if call["argv"][0] == "--bg"][0]
     assert start["argv"][:3] == ["--bg", "--name", first]
     assert start["argv"][-1] == f"/goal @{root / 'jobs' / first / 'goal.md'}"
-    assert start["cwd"] == str(repo.resolve())
+    assert start["cwd"] == str((tmp_path / "home" / "work" / "yocto" / "worktrees" / "repo" / first).resolve())
 
     # Step 4: the job session writes result.md.
     (root / "jobs" / first / "result.md").write_text("---\nstatus: done\n---\n", encoding="utf-8")

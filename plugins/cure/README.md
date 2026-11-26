@@ -9,7 +9,7 @@ Config file: `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}
 Question policies: `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md`, beside `config.json`. The dispatcher reads it before each question round and appends a policy when the user calls a question not needed. The CLI does not read it.
 
 - The defaults live only in the key table of `config.py`.
-- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `band`, `dashboard`; `launch-grace-seconds` is top-level).
+- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `band`, `dashboard`, `worktree`; `launch-grace-seconds` is top-level).
 - Lookup names stay dotted: `cure-job config get handoff.delivery`.
 
 | Command | Effect |
@@ -34,17 +34,21 @@ A bad key takes its default; an unparsable file gives all defaults. An unknown k
 Old layouts:
 
 - A flat dotted key is the error `config.json: handoff.delivery: flat key; write it as {"handoff": {"delivery": ...}}`.
-- `base` in the `handoff` group is the error `config.json: handoff: "base" is removed; a job's base is the base stated in the handoff, else the repository's default branch`.
+- `base` in the `handoff` group is the error `config.json: handoff: "base" is removed; a job's base is the base stated in the handoff, else resolved by cure:goal`.
 - `jira-url` in the `band` group is the error `config.json: band: "jira-url" is removed; write it as "tracker-url": "<jira-url>/browse/<key>"`. The dispatcher's rewrite writes that `band.tracker-url`.
 - The dispatcher rewrites a file with only these problems to the nested layout.
 - `config init` drops a `base` row of `defaults.md` with the note `defaults.md: handoff: "base" is removed; row dropped; ...`.
 
 Branch and base:
 
-- A job without `after` takes the handoff's `base`, else each repository's default branch (`origin/HEAD`, fallback `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`).
+- A job without `after` takes the handoff's `base`, else under `current` the branch checked out in the user's checkout of each repository, else each repository's default branch (`origin/HEAD`, fallback `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`).
 - `handoff.branch` applies when a handoff omits `branch`. Default `new`: the job gets its own branch from the job's base, named `<ticket>_<slug>` (`issue-<N>` for a GitHub ticket `#N`), or `<slug>` without a ticket, the same in every repository.
-- A job with `after` and no `branch` inherits the predecessor's branch.
-- `current` uses the launch repository's checked-out branch. Any other value is a literal branch name.
+- A job with `after` and no `branch` inherits the predecessor's branch, unless its handoff Settled has `Stacked on <id>: overlapping files`; that job gets its own branch by `handoff.branch`.
+- `current` gives the job its own branch as `new` does, from the job's base. Any other value is a literal branch name.
+
+Worktrees: every job runs in its own git worktrees, so jobs on one repository run in parallel and the user's checkout is never edited. A job claims no repository. `worktree.root` (default `~/work/yocto/worktrees`, `~` expanded) holds one worktree per repository of the handoff at `<worktree.root>/<repo name>/<job id>`. `<repo name>` is the basename of the repository's git toplevel.
+
+`cure-job launch` creates each missing worktree detached at the repository's HEAD, or for a job with `after` at the HEAD of the predecessor's worktree of that repository where it exists. It records `worktree.root` at the first launch and uses that root afterwards. The session starts in the worktree directory of the first repository. The run session creates or switches the job's branch. A relaunch and `resume` reuse the worktrees. `finish` keeps them. `cure-job prune` removes a pruned job's worktrees with `git worktree remove` and keeps its branches.
 
 ## Job band
 

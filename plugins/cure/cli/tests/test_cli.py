@@ -31,11 +31,11 @@ class Harness:
     def run(self, *argv: str) -> int:
         return self.cli.run(list(argv))
 
-    def new(self, tmp_path, slug="x", repos=("/work/video-core",), device="none", after=None) -> str:
+    def new(self, tmp_path, slug="x", repos=("/work/video-core",), device="none", after=None, branch=None) -> str:
         """Create a job through the command line and return its id; each call is a minute later."""
         self.clock.advance(timedelta(minutes=1))
         source = tmp_path / "handoff.md"
-        source.write_text(handoff_text(repos, device, after), encoding="utf-8")
+        source.write_text(handoff_text(repos, device, after, branch), encoding="utf-8")
         self.lines.clear()
         assert self.run("new", "--slug", slug, str(source)) == 0
         return self.lines[0]
@@ -163,27 +163,6 @@ def test_list_without_jobs_prints_nothing(h):
     assert h.lines == []
 
 
-def test_list_text_has_one_aligned_line_per_job_with_blocked_by(h, tmp_path):
-    first = h.new(tmp_path, slug="a")
-    h.approve(first)
-    second = h.new(tmp_path, slug="a-much-longer-slug")
-    h.lines.clear()
-    assert h.run("list") == 0
-    width = len(second)
-    assert h.lines == [f"{first.ljust(width)}  approved", f"{second}  held  blocked-by={first}"]
-
-
-def test_list_text_joins_several_blockers_with_commas(h, tmp_path):
-    first = h.new(tmp_path, repos=("/work/a",))
-    h.approve(first)
-    second = h.new(tmp_path, repos=("/work/b",))
-    h.approve(second)
-    third = h.new(tmp_path, repos=("/work/a", "/work/b"))
-    h.lines.clear()
-    h.run("list")
-    assert h.lines[2].endswith(f"held  blocked-by={first},{second}")
-
-
 def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
     first = h.new(tmp_path)
     h.approve(first)
@@ -196,12 +175,12 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
     assert [item["id"] for item in data] == [first, second]
     assert data[0] == {
         "id": first, "state": "approved", "dir": str(h.root / "jobs" / first), "run": 0, "session": None,
-        "resources": ["/work/video-core"], "blocked-by": [], "goal": True, "approved": True,
+        "resources": [], "goal": True, "approved": True,
         "problem": None, "origin": None, "open": 0,
         "waiting-for": None, "reported": False, "sessions-removed": False,
         "prs": [], "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
         "workspace": "/work/video-core", "phase": "approved", "sessions": {}}
-    assert data[1]["state"] == "held" and data[1]["blocked-by"] == [first]
+    assert data[1]["state"] == "queued"
 
 
 def test_list_json_exposes_ticket_summary_branch_and_workspace(h, tmp_path):
@@ -347,8 +326,9 @@ def test_launch_passes_arguments_after_double_dash_without_the_dash(h, tmp_path)
 
 
 def test_launch_of_a_held_job_returns_one(h, tmp_path, capsys):
-    h.approve(h.new(tmp_path))
-    second = h.new(tmp_path)
+    first = h.new(tmp_path)
+    h.approve(first)
+    second = h.new(tmp_path, after=first)
     h.approve(second)
     assert h.run("launch", second) == 1
     assert "error:" in capsys.readouterr().err
@@ -372,10 +352,10 @@ def _launched(h, tmp_path, **kwargs):
 def test_claim_prints_nothing_and_resource_is_normalised(h, tmp_path):
     job_id = _launched(h, tmp_path)
     h.lines.clear()
-    assert h.run("claim", job_id, "/work/extra/../other/") == 0
+    assert h.run("claim", job_id, "build:/work/extra/../other/") == 0
     assert h.lines == []
     h.run("list", "--json")
-    assert "/work/other" in json.loads(h.lines[0])[0]["resources"]
+    assert "build:/work/other" in json.loads(h.lines[0])[0]["resources"]
 
 
 def test_claim_device_bench(h, tmp_path):

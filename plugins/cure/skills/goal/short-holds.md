@@ -3,7 +3,7 @@
 `<plugin-root>` below is this file's path without its trailing `/skills/goal/short-holds.md`.
 
 A short hold is a `device:*` or `build:*` resource. A job claims it for one step and releases it at
-the end of the step. Repositories are not short holds: `release` refuses them (exit 1).
+the end of the step. `claim` and `release` accept no other name: one exits 2 and is not retried.
 
 | Item | Rule |
 |---|---|
@@ -12,7 +12,7 @@ the end of the step. Repositories are not short holds: `release` refuses them (e
 | When to claim | Before each bench step, and before each step that runs a command that takes `bitbake.lock` (`bitbake`, `devtool`, `kas`). The claimant claims before it dispatches an agent for the step. |
 | What to claim | Every short hold the step needs, in one call per step, all or none: `<plugin-root>/bin/cure-job claim <id> --wait <short-hold.wait-seconds> device:bench build:<absolute path>`. When one resource is held by another job, none is granted. |
 | `build:` name | The worker fills it at claim time: the absolute bitbake TOPDIR (the directory that holds `bitbake.lock`) of the build the step runs. The handoff never names a `build:` resource. A relative path is refused. A symlink or `..` path is stored as its realpath. Equal names conflict. |
-| One hold at a time | While the run holds a short hold, it releases that hold before it claims anything else. A claim that names a resource the run does not hold exits 1 with `release <held> first`. `claim --wait` of a repository exits 1. Name every resource of the step in the first claim. |
+| One hold at a time | While the run holds a short hold, it releases that hold before it claims anything else. A claim that names a resource the run does not hold exits 1 with `release <held> first`. Name every resource of the step in the first claim. |
 | Hold | Keep the holds across the consecutive commands of the step. Do not release and claim again between two bitbake commands. |
 | When to release | At the end of the step, on success or failure, after the agent returns: `<plugin-root>/bin/cure-job release <id> <resource>`, once per resource. |
 | Foreground | Run the claim in the foreground with a Bash timeout of 600000 ms. Never run it in the background. If the tool times out anyway, run `release` for every resource named in that claim before anything else, then claim again. |
@@ -34,7 +34,6 @@ the end of the step. Repositories are not short holds: `release` refuses them (e
 | `job <id> is invalid: <problem>` or `claim refused: job <id> is invalid and may hold any resource; ...` | Invalid job: a failure, not a hold | `failed:` |
 | `unknown job <id>: ... holds no handoff.md` | Wrong id | `failed:` |
 | `job <id> holds <held>; release <held> first` | The run holds a short hold and named another resource | Release, then claim every resource of the step in one call |
-| `<repo> is a repository; claim --wait accepts only device: and build:` | A repository was named with `--wait` | Claim only `device:` and `build:` with `--wait`, otherwise `failed:` |
 
 `release` exits 0 whenever the job does not hold the resource after the call, so a retry is harmless.
-It exits 1 for an unknown or invalid job, and for a repository name.
+It exits 1 for an unknown or invalid job.

@@ -15,8 +15,8 @@ delete: the global rule in `~/.claude/CLAUDE.md`.
 **Exclude it locally, not in `.gitignore`**:
 
 ```
-grep -qxF '.notes/' "$(git rev-parse --git-dir)/info/exclude" 2>/dev/null ||
-  echo '.notes/' >> "$(git rev-parse --git-dir)/info/exclude"
+grep -qxF '.notes/' "$(git rev-parse --git-path info/exclude)" 2>/dev/null ||
+  echo '.notes/' >> "$(git rev-parse --git-path info/exclude)"
 ```
 
 Outside a repository, use `.notes/` in the working directory.

@@ -23,6 +23,8 @@ class SessionStarted:
     run: int
     #: The input copies in the job directory.
     inputs: tuple[str, ...] = ()
+    #: The expanded ``worktree.root``, on the first start that records it; later starts reuse it.
+    worktree_root: str | None = None
 
     def __post_init__(self) -> None:
         # A work start is stored as a ``launched`` line, which holds neither a separate n nor inputs.
@@ -150,6 +152,8 @@ def encode(event: Event) -> str:
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     else:
         fields = {"event": _CLOSED, "reason": event.reason}
+    if isinstance(event, SessionStarted) and event.worktree_root is not None:
+        fields["worktree-root"] = event.worktree_root
     return json.dumps(fields, separators=(",", ":"))
 
 
@@ -161,7 +165,8 @@ def decode(line: str) -> Event | None:
     kind = fields.get("event")
     if kind == _LAUNCHED:
         run = _int(fields, "run")
-        return SessionStarted(WORK, run, _text(fields, "session"), parse_local(_text(fields, "at")), run)
+        return SessionStarted(WORK, run, _text(fields, "session"), parse_local(_text(fields, "at")), run,
+                              worktree_root=_worktree_root(fields))
     if kind == _REPORTED:
         return Reported(_int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _STOPPED:
@@ -180,7 +185,8 @@ def decode(line: str) -> Event | None:
         return Origin(_text(fields, "address"), parse_local(_text(fields, "at")))
     if kind == _SESSION_STARTED:
         return SessionStarted(_session_kind(fields), _int(fields, "n"), _text(fields, "session"),
-                              parse_local(_text(fields, "at")), _int(fields, "run"), _texts(fields, "inputs"))
+                              parse_local(_text(fields, "at")), _int(fields, "run"), _texts(fields, "inputs"),
+                              _worktree_root(fields))
     if kind == _SESSION_STOPPED:
         return SessionStopped(_session_kind(fields), _int(fields, "n"), parse_local(_text(fields, "at")))
     if kind == _SESSION_ENDED:
@@ -209,6 +215,10 @@ def _texts(fields: dict, key: str) -> tuple[str, ...]:
     if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
         raise ValueError(f"{key} is missing or not a list of strings")
     return tuple(values)
+
+
+def _worktree_root(fields: dict) -> str | None:
+    return _text(fields, "worktree-root") if "worktree-root" in fields else None
 
 
 def _text(fields: dict, key: str) -> str:

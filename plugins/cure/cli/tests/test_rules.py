@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from cure_job.claude import Session, SessionStatus
-from cure_job.errors import CureJobError, JobStateError, ResourceHeld, SessionGone, StoreError
+from cure_job.errors import CureJobError, JobStateError, SessionGone, StoreError
 from cure_job.events import Claim, Closed, Origin, SessionStarted
 from cure_job.job_id import session_name
 from cure_job.kinds import KINDS, WORK, End
@@ -16,7 +16,7 @@ from cure_job.result import ResultStatus
 from cure_job.rules import RULES, Artifact, Check, Op, Reads, check, goal_settled, state_in_start_states
 from cure_job.state import LAUNCH_GRACE, State, derive
 from cure_job.store import InvalidJob
-from tests.builders import NOW, REPO, make_record, result_of
+from tests.builders import NOW, make_record, result_of
 
 A = "261013-1000-video-core-a"
 B = "261013-1001-video-core-b"
@@ -75,16 +75,12 @@ LIVE_B = {session_name(B, 1): Session(SessionStatus.BUSY, uuid="u")}
      JobStateError, f"job {B} is awaiting-approval; approve its goal first"),
     (Op.START, facts(after_a(make_record(B, approved=True)), others=(make_record(A),), invalid=INVALID),
      JobStateError, f"after {A} is queued"),
-    (Op.START, facts(make_record(B, approved=True), others=(LAUNCHED_A,), invalid=INVALID),
-     ResourceHeld, f"{REPO} is held by {A}"),
     (Op.START, facts(make_record(B), invalid=INVALID),
      JobStateError, f"job {B} is queued; launch needs approved, lost, needs-input"),
     (Op.START, facts(replace(NEEDS_INPUT, goal_digest=None), listing=LIVE_B, invalid=INVALID),
      JobStateError, f"job {B} is needs-input and its session {session_name(B, 1)} is live"),
     (Op.START, facts(replace(LOST, goal_digest=None), others=(LAUNCHED_A,), invalid=INVALID),
      JobStateError, f"job {B} has no goal file"),
-    (Op.START, facts(LOST, others=(LAUNCHED_A,), invalid=INVALID),
-     ResourceHeld, f"{REPO} is held by {A}"),
     (Op.START, facts(LOST, invalid=INVALID),
      StoreError, f"launch refused: job {BAD} is invalid"),
     (Op.CONTINUE, facts(LOST, operation="resume", invalid=INVALID),
@@ -93,8 +89,6 @@ LIVE_B = {session_name(B, 1): Session(SessionStatus.BUSY, uuid="u")}
      SessionGone, f"job {B}: session {session_name(B, 1)} no longer exists"),
     (Op.CONTINUE, facts(replace(NEEDS_INPUT, goal_digest=None), operation="resume", listing=LIVE_B, invalid=INVALID),
      JobStateError, f"job {B} has no goal file"),
-    (Op.CONTINUE, facts(NEEDS_INPUT, operation="resume", listing=LIVE_B, others=(LAUNCHED_A,), invalid=INVALID),
-     ResourceHeld, f"{REPO} is held by {A}"),
     (Op.ORIGIN, facts(replace(LOST, events=LOST.events + (Origin("o", NOW),)), operation="origin"),
      JobStateError, f"job {B} already has origin o"),
     (Op.CLAIM, record_facts(make_record(B, events=(Closed(""),)), "claim", INVALID),
@@ -124,11 +118,6 @@ def test_the_earlier_guard_of_a_row_wins(op, given, error, text):
     raised = refusal(op, given)
     assert type(raised) is error
     assert str(raised).startswith(text)
-
-
-def test_a_resource_held_refusal_keeps_its_resource_and_holder():
-    raised = refusal(Op.START, facts(LOST, others=(LAUNCHED_A,)))
-    assert (raised.resource, raised.holder) == (REPO, A)
 
 
 # --- the rows -------------------------------------------------------------------------------------------------------

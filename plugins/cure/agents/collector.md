@@ -33,8 +33,8 @@ The caller gives a target and a digest path. Resolve a missing one yourself and 
   out of the repository without touching the shared `.gitignore`:
 
   ```sh
-  grep -qxF '.notes/' "$(git rev-parse --git-dir)/info/exclude" 2>/dev/null ||
-    echo '.notes/' >> "$(git rev-parse --git-dir)/info/exclude"
+  grep -qxF '.notes/' "$(git rev-parse --git-path info/exclude)" 2>/dev/null ||
+    echo '.notes/' >> "$(git rev-parse --git-path info/exclude)"
   ```
 
 For a target spanning several repositories, resolve each and state which parts you could not reach.

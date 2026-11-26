@@ -3,9 +3,7 @@
 This module holds the States table, the lock rule and the retention rule. No
 lock file exists. Lock order puts a job with a launched event first, then
 ascending id. In lock order, a launched open job holds each resource it names
-that no job before it holds. A ready job (see :func:`is_ready`) whose
-``after`` predecessor, if any, is done holds every resource it names when no
-job before it holds any of them, else none. Every other job holds nothing.
+that no job before it holds. Every other job holds nothing.
 """
 from __future__ import annotations
 
@@ -148,9 +146,7 @@ class JobView:
     phase: Phase
     #: The latest session of each kind.
     sessions: Mapping[str, SessionView]
-    #: The holders of the resources the job names. An unsatisfied ``after`` is not among them.
-    blocked_by: tuple[str, ...]
-    #: Another job holds a resource the job names, or the job's ``after`` predecessor is not done.
+    #: The job's ``after`` predecessor is not done.
     held: bool
     after: After | None
     ended_at: datetime | None
@@ -166,28 +162,16 @@ def needs_sessions(records: Iterable[JobRecord]) -> bool:
     return any(record.open_sessions() and not phase_of(record).is_terminal for record in records)
 
 
-def is_open(record: JobRecord) -> bool:
-    """The job is not done, failed or abandoned. Needs no session list."""
-    return not phase_of(record).is_terminal
-
-
 def lock_rank(record: JobRecord) -> tuple[bool, str]:
     """The lock order. A launched job is already using its resources; after a
     backward clock step it can sort above a newer job (local-time ids)."""
     return (record.run == 0, record.id)
 
 
-def is_ready(record: JobRecord) -> bool:
-    """The open job may start its first run: unlaunched, no result, and an approval of its current goal.
-
-    The run-1 launch test, and with the ``after`` test the lock rule's test for an unlaunched job."""
-    return record.run == 0 and record.result is None and record.approved
-
-
 def holders(records: Iterable[JobRecord]) -> dict[str, str]:
     """Each held resource mapped to its holder, by the lock rule.
 
-    ``records`` are every readable job, the ended ones included: an ``after`` needs its predecessor."""
+    ``records`` are every readable job, the ended ones included."""
     records = list(records)
     return _holders(records, {record.id: _terminal_state(record) for record in records})
 
@@ -197,22 +181,15 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, Session], now: d
     """One view per record, ascending id. ``sessions`` maps a session name to its listing.
     ``invalid_ids`` names the jobs whose files do not read."""
     ordered = sorted(records, key=lambda record: record.id)
-    # Whether a job is open needs neither sessions nor locks, and the holders
-    # need the open set and the done predecessors, so the terminal states are settled first.
     terminal = {record.id: _terminal_state(record) for record in ordered}
-    holding = _holders(ordered, terminal)
     by_id = {record.id: record for record in ordered}
-    parts: dict[str, tuple[Phase, dict[str, SessionView], tuple[str, ...], bool]] = {}
+    parts: dict[str, tuple[Phase, dict[str, SessionView], bool]] = {}
     states: dict[str, State] = {}
     for record in ordered:
         phase = phase_of(record)
         views = _session_views(record, phase, sessions, now, launch_grace)
-        blocked_by: tuple[str, ...] = ()
-        held = False
-        if not phase.is_terminal:
-            blocked_by = tuple(sorted({holding.get(name) for name in record.resources} - {None, record.id}))
-            held = bool(blocked_by) or _waits(record, terminal)
-        parts[record.id] = (phase, views, blocked_by, held)
+        held = not phase.is_terminal and _waits(record, terminal)
+        parts[record.id] = (phase, views, held)
         work = views.get(WORK)
         states[record.id] = project(phase, held, work.liveness if work is not None else None)
     return [JobView(record, *parts[record.id], _after(record, by_id, states, invalid_ids),
@@ -237,8 +214,6 @@ def _holders(records: Iterable[JobRecord], terminal: Mapping[str, State | None])
         if record.run > 0:
             for name in record.resources:
                 found.setdefault(name, record.id)
-        elif is_ready(record) and not _waits(record, terminal) and not found.keys() & record.resources:
-            found.update(dict.fromkeys(record.resources, record.id))
     return found
 
 

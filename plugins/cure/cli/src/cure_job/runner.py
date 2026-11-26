@@ -5,11 +5,14 @@ The caller runs the refusals of :mod:`cure_job.rules` first. A start then prepar
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, NamedTuple, Sequence
 
+from . import worktree
 from .claude import Claude, Session
 from .clock import Clock
+from .config import DEFAULTS
 from .errors import ClaudeError, ClaudeOutcomeUnknown, StoreError
 from .events import SessionEnded, SessionsRemoved, SessionStarted, SessionStopped
 from .job import JobRecord
@@ -38,7 +41,7 @@ class Stopped(NamedTuple):
 class SessionRunner:
     def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path,
                  sleep: Callable[[float], None], monotonic: Callable[[], float],
-                 kinds: Mapping[str, SessionKind] = KINDS):
+                 kinds: Mapping[str, SessionKind] = KINDS, worktree_root: str = DEFAULTS["worktree.root"]):
         self.store = store
         self.claude = claude
         self.clock = clock
@@ -47,6 +50,7 @@ class SessionRunner:
         self.sleep = sleep
         self.monotonic = monotonic
         self.kinds = kinds
+        self.worktree_root = worktree_root
 
     def start(self, record: JobRecord, kind: SessionKind, operation: str, claude_args: Sequence[str] = (),
               input_text: str | None = None, continuation: Continuation | None = None) -> str:
@@ -62,6 +66,7 @@ class SessionRunner:
         agent = kind.agent(ctx)
         arguments = [*(["--agent", agent] if agent is not None else []), *settings_arguments(kind, ctx),
                      *kind.default_args, *claude_args]
+        cwd = str(self._worktree(record))
         if continuation is not None:
             # Resuming a live session starts a copy, so it is stopped first.
             self._stop_session(continuation.name, continuation.listed)
@@ -71,7 +76,6 @@ class SessionRunner:
         archived = result_kind and self.store.archive_result(job_id, record.run)
         for stem in inputs:
             self.store.write_input(job_id, stem, n, input_text)
-        cwd = record.handoff.launch_dir
         unknown = None
         try:
             if continuation is not None:
@@ -91,7 +95,8 @@ class SessionRunner:
         try:
             self.store.append_event(job_id, SessionStarted(kind.name, n, name, self.clock(),
                                                            n if result_kind else record.run,
-                                                           tuple(path.name for path in inputs.values())))
+                                                           tuple(path.name for path in inputs.values()),
+                                                           None if record.worktree_root else self._root(record)))
         except StoreError as e:
             what = f"session {name}" if result_kind else f"{kind.name} session {n}, {name},"
             raise StoreError(f"job {job_id}: {what} may be running and is not recorded; "
@@ -102,6 +107,18 @@ class SessionRunner:
                                            "list shows it launched, then running or lost") from unknown
             raise ClaudeOutcomeUnknown(f"{unknown}; recorded as {kind.name} session {n}, {name}") from unknown
         return name
+
+    def _worktree(self, record: JobRecord) -> Path:
+        """The directory of the first repository in its worktree, after creating the missing worktrees."""
+        def predecessor() -> tuple[str, str] | None:
+            if record.handoff.after is None:
+                return None
+            other = self.store.load(record.handoff.after)
+            return other.worktree_root or self.worktree_root, other.id
+        return worktree.open_all(self._root(record), record.handoff.repos, record.id, predecessor)
+
+    def _root(self, record: JobRecord) -> str:
+        return record.worktree_root or os.path.expanduser(self.worktree_root)
 
     def end(self, record: JobRecord, kind: SessionKind, summary: Sequence[str]) -> None:
         """Record the end of the latest session of ``kind``, an ``End.EVENT`` kind."""

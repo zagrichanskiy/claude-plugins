@@ -88,13 +88,6 @@ def test_states_with_nothing_to_do_get_no_action(record, sessions):
     assert names(record, sessions) == []
 
 
-def test_held_job_gets_no_action():
-    records = [make_record(A, approved=True), make_record(B, approved=True)]
-    view = {v.record.id: v for v in derive(records, {}, NOW, frozenset())}[B]
-    assert view.state is State.HELD
-    assert actions(view, {}) == []
-
-
 def test_awaiting_approval_job_gets_ask_approval():
     assert names(make_record(A, goal=True)) == ["ask-approval"]
 

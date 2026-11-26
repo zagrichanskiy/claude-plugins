@@ -1,6 +1,6 @@
 """The handoff: the fields of ``handoff.md`` that the CLI consumes.
 
-``repos`` names the resources a job locks. ``device`` declares bench use; the
+``repos`` names the repositories a job gets a worktree of. ``device`` declares bench use; the
 bench is a short hold the job claims per step. ``origin``, optional,
 names the session the job reports back to; ``cure-job new`` writes it, and a
 submitted handoff that names it is refused. ``after``, optional, names the
@@ -11,11 +11,11 @@ belongs to the dispatcher and is not checked here.
 from __future__ import annotations
 
 import enum
+import os
 from dataclasses import dataclass
 from datetime import datetime
 
 from . import job_id as ids
-from . import resource
 from .clock import format_local
 from .errors import HandoffError
 from .frontmatter import FrontmatterError, Value, as_list, is_writable, parse, render_value, set_scalars
@@ -43,10 +43,6 @@ class Handoff:
     def launch_dir(self) -> str:
         return self.repos[0]
 
-    @property
-    def resources(self) -> frozenset[str]:
-        return frozenset(self.repos)
-
 
 def parse_handoff(text: str) -> Handoff:
     return _handoff(_entries(text))
@@ -70,10 +66,9 @@ def _entries(text: str) -> dict[str, Value]:
 def _handoff(entries: dict[str, Value]) -> Handoff:
     repos: list[str] = []
     for entry in as_list(entries.get("repos")):
-        try:
-            name = resource.repo(entry)
-        except ValueError as e:
-            raise HandoffError(f"repos: {e}") from e
+        if not os.path.isabs(entry):
+            raise HandoffError(f"repos: {entry!r} is not an absolute path")
+        name = os.path.normpath(entry)
         if name not in repos:
             repos.append(name)
     if not repos:

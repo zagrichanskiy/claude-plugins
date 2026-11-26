@@ -1,8 +1,9 @@
-"""Test doubles for the two seams of ``JobsProvider``: the ``claude`` binary and the clock."""
+"""Test doubles for the seams of ``JobsProvider``: the ``claude`` binary, the clock and ``git``."""
 from __future__ import annotations
 
 import zlib
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Sequence
 
 from cure_job.claude import Session, SessionStatus
@@ -86,3 +87,16 @@ class FakeClock:
 
     def advance(self, delta: timedelta) -> None:
         self.now += delta
+
+
+class FakeGit:
+    """``worktree.Git`` without git: a repository path is its own toplevel, a worktree is an empty directory."""
+
+    def toplevel(self, repo: str) -> str:
+        return repo
+
+    def add(self, repo: str, path: Path, base: Path | None) -> None:
+        path.mkdir(parents=True)
+
+    def remove(self, repo: str, path: Path) -> None:
+        pass

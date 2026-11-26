@@ -49,6 +49,10 @@ class PluginError(CureJobError):
     """A file the cure plugin ships is missing."""
 
 
+class GitError(CureJobError):
+    """A ``git`` command on a repository of a job or its worktree failed."""
+
+
 class ClaudeError(CureJobError):
     """The ``claude`` binary is missing, timed out, failed or printed unusable output."""
 
