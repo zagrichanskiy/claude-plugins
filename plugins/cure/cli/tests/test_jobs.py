@@ -10,7 +10,7 @@ import pytest
 from cure_job.errors import (ClaudeError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob)
 from cure_job.claude import SessionStatus
 from cure_job.config import DEFAULTS
-from cure_job.events import Claim, Closed, Reported, SessionsRemoved, SessionStarted
+from cure_job.events import Claim, Closed, Reported, SessionsRemoved, SessionStarted, WorktreeOpened
 from cure_job.frontmatter import parse
 from cure_job.providers.jobs import JobsProvider
 from cure_job.resource import DEVICE_BENCH
@@ -327,15 +327,34 @@ def test_launch_start_failure_records_no_event(jobs, claude, store, clock):
 def test_launch_event_write_failure_names_the_unrecorded_session(jobs, claude, store, clock, monkeypatch):
     job_id = new_job(jobs, clock, approved=True)
 
-    def fail(*args, **kwargs):
-        raise StoreError("disk full")
+    real = store.append_event
 
-    monkeypatch.setattr(store, "append_event", fail)
+    def fail_started(job, event):
+        if isinstance(event, SessionStarted):
+            raise StoreError("disk full")
+        real(job, event)
+
+    monkeypatch.setattr(store, "append_event", fail_started)
     with pytest.raises(StoreError) as caught:
         jobs.launch(job_id)
     assert job_id in str(caught.value)
     assert "not recorded" in str(caught.value)
     assert claude.started
+
+
+def test_a_failed_worktree_opened_write_stops_the_launch_before_claude_starts(jobs, claude, store, clock, monkeypatch):
+    job_id = new_job(jobs, clock, approved=True)
+    real = store.append_event
+
+    def fail_opened(job, event):
+        if isinstance(event, WorktreeOpened):
+            raise StoreError("disk full")
+        real(job, event)
+
+    monkeypatch.setattr(store, "append_event", fail_opened)
+    with pytest.raises(StoreError):
+        jobs.launch(job_id)
+    assert not claude.started
 
 
 def test_launch_runs_sessions_at_most_once(jobs, claude, clock):

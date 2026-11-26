@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from cure_job.claude import SessionStatus
+from cure_job.errors import ClaudeError
 from cure_job.config import DEFAULTS
 from tests.test_approve import DONE_RESULT, NEEDS_INPUT_RESULT, rows
 from tests.test_cli import Harness
@@ -226,7 +227,8 @@ def test_prune_keeps_the_worktree_of_a_job_it_does_not_prune(h, tmp_path, repo, 
     assert path.is_dir()
 
 
-def test_a_worktree_that_git_refuses_to_remove_keeps_its_job_and_others_are_pruned(h, tmp_path, repo, worktrees, capsys):
+def test_a_worktree_that_git_refuses_to_remove_is_left_to_the_user_and_the_job_is_pruned_with_the_others(
+        h, tmp_path, repo, worktrees, capsys):
     (repo / "tracked").write_text("a", encoding="utf-8")
     git(repo, "add", "tracked")
     git(repo, "commit", "-q", "-m", "tracked")
@@ -234,7 +236,53 @@ def test_a_worktree_that_git_refuses_to_remove_keeps_its_job_and_others_are_prun
     pruned, pruned_path = finished(h, tmp_path, repo, slug="b", branch="feat-b")
     (blocked_path / "tracked").write_text("edited", encoding="utf-8")
     h.lines.clear()
-    assert h.run("prune") == 1
-    assert h.lines == [pruned]
-    assert f"job {blocked}: " in capsys.readouterr().err
-    assert blocked_path.is_dir() and (h.root / "jobs" / blocked).is_dir() and not pruned_path.exists()
+    assert h.run("prune") == 0
+    assert sorted(h.lines) == sorted([blocked, pruned])
+    assert f"job {blocked}: worktree {blocked_path} left for the user to remove: " in capsys.readouterr().err
+    assert blocked_path.is_dir() and not pruned_path.exists()
+    assert not (h.root / "jobs" / blocked).exists()
+
+
+def test_a_worktree_git_refuses_to_remove_is_reported_once_and_later_prunes_succeed(h, tmp_path, repo, worktrees, capsys):
+    (repo / "tracked").write_text("a", encoding="utf-8")
+    git(repo, "add", "tracked")
+    git(repo, "commit", "-q", "-m", "tracked")
+    blocked, blocked_path = finished(h, tmp_path, repo, slug="a", branch="feat-a")
+    (blocked_path / "tracked").write_text("edited", encoding="utf-8")
+    h.run("prune")
+    first = capsys.readouterr().err
+    assert len([line for line in first.splitlines() if f"job {blocked}: " in line]) == 1
+    assert h.run("prune") == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_a_job_whose_first_start_failed_reuses_its_worktree_under_the_old_root_after_the_root_changed(
+        h, tmp_path, repo, worktrees):
+    job_id = h.new(tmp_path, repos=(str(repo),), branch="feat-a")
+    h.approve(job_id)
+    h.claude.fail_start = ClaudeError("claude: cannot start")
+    assert h.run("launch", job_id) == 1
+    h.claude.fail_start = None
+    old = worktrees / "video-core" / job_id
+    assert old.is_dir()
+    configure(h, {"worktree": {"root": str(tmp_path / "moved")}})
+    assert h.run("launch", job_id) == 0
+    assert session_cwd(h) == old
+    assert not (tmp_path / "moved").exists()
+    assert len(git(repo, "worktree", "list").splitlines()) == 2
+
+
+def test_pruning_a_job_whose_first_start_failed_removes_its_worktree_under_the_old_root_after_the_root_changed(
+        h, tmp_path, repo, worktrees):
+    job_id = h.new(tmp_path, repos=(str(repo),), branch="feat-a")
+    h.approve(job_id)
+    h.claude.fail_start = ClaudeError("claude: cannot start")
+    assert h.run("launch", job_id) == 1
+    old = worktrees / "video-core" / job_id
+    assert old.is_dir()
+    configure(h, {"worktree": {"root": str(tmp_path / "moved")}})
+    assert h.run("close", job_id) == 0
+    assert h.run("remove-sessions", job_id) == 0
+    assert h.run("prune") == 0
+    assert not old.exists()
+    assert len(git(repo, "worktree", "list").splitlines()) == 1

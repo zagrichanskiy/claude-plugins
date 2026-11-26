@@ -44,11 +44,17 @@ def open_all(root: str, repos: Sequence[str], job_id: str, predecessor: Callable
     return path / os.path.relpath(os.path.realpath(repos[0]), os.path.realpath(toplevel))
 
 
-def remove_all(root: str, repos: Sequence[str], job_id: str) -> None:
-    """Remove each worktree of ``repos`` that exists. The branches stay."""
+def remove_all(root: str, repos: Sequence[str], job_id: str) -> list[tuple[Path, GitError]]:
+    """Remove each worktree of ``repos`` that exists and return each one git refused to remove, with its error.
+    The branches stay."""
+    left = []
     for repo, path in _paths(root, repos, job_id).items():
         if path.is_dir():
-            git.remove(repo, path)
+            try:
+                git.remove(repo, path)
+            except GitError as e:
+                left.append((path, e))
+    return left
 
 
 def _paths(root: str, repos: Sequence[str], job_id: str) -> dict[str, Path]:

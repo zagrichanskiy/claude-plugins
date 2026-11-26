@@ -15,7 +15,7 @@ from .clock import Clock
 from .config import DEFAULTS
 from .errors import ClaudeError, ClaudeOutcomeUnknown, StoreError
 from .errors import SlotError
-from .events import Claim, SessionEnded, SessionsRemoved, SessionStarted, SessionStopped
+from .events import Claim, SessionEnded, SessionsRemoved, SessionStarted, SessionStopped, WorktreeOpened
 from .job import JobRecord
 from .kinds import KINDS, End, SessionKind, StartContext, settings_arguments
 from .sessions import listed_live
@@ -141,15 +141,22 @@ class SessionRunner:
         raise SlotError(f"no free slot: open jobs hold all {self.slots_count} slots under {root}")
 
     def _open_slot(self, record: JobRecord, workspace: Path, path: Path) -> None:
-        """Ready ``path``, copy the local branches of the ``after`` predecessor's slot into it, then check out the
-        job's branch, or the branch of its predecessor when it names none.
+        """Stop the sessions of the jobs that held ``path`` before, ready it, copy the local branches of the ``after``
+        predecessor's slot into it, then check out the job's branch, or the branch of its predecessor when it names
+        none.
 
         ``prune`` keeps the predecessor's record while this job is open, so its slot is known here."""
+        holders = [other for other in self.store.snapshot().records
+                   if other.id != record.id and other.slot == str(path) and other.session_names]
+        if holders:
+            listed = self.claude.sessions()
+            for name in dict.fromkeys(name for other in holders for name in other.session_names):
+                self._stop_session(name, listed.get(name))
         slot.ready(workspace, path)
         before = self.store.load(record.handoff.after) if record.handoff.after is not None else None
         after = None
         if before is not None and before.slot is not None:
-            slot.copy_branches(workspace, Path(before.slot), path, record.handoff.repos)
+            slot.copy_branches(workspace, Path(before.slot), path, record.handoff.repos, before.handoff.branch)
             if before.handoff.branch is not None:
                 after = Path(before.slot), before.handoff.branch
         branch = record.handoff.branch or (after[1] if after is not None else None)
@@ -163,7 +170,10 @@ class SessionRunner:
                 return None
             other = self.store.load(record.handoff.after)
             return other.worktree_root or self.worktree_root, other.id
-        return worktree.open_all(self._root(record), record.handoff.repos, record.id, predecessor)
+        root = self._root(record)
+        if record.worktree_root is None:
+            self.store.append_event(record.id, WorktreeOpened(root))
+        return worktree.open_all(root, record.handoff.repos, record.id, predecessor)
 
     def _root(self, record: JobRecord) -> str:
         return record.worktree_root or os.path.expanduser(self.worktree_root)

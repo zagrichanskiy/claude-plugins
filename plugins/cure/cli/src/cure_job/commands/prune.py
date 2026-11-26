@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from ..errors import GitError
 from ..providers.jobs import JobsProvider
@@ -17,8 +18,9 @@ class PruneCommand(Command):
                    "its sessions are removed, and a failed job after prune.failed-days of config.json, each with its "
                    "worktrees; the branches stay. "
                    "Keep a job that an open job names as after. Remove half-created job directories "
-                   "after one day. Print each removed directory path, then each removed id. A job whose worktree "
-                   "removal fails stays, and the exit is 1. While config.json "
+                   "after one day. Print each removed directory path, then each removed id. A worktree git refuses "
+                   "to remove stays on disk for the user and is reported once; its job is removed. A job whose "
+                   "worktrees cannot be found stays, and the exit is 1. While config.json "
                    "has an error, remove half-created directories only and exit 1")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
@@ -38,6 +40,9 @@ class PruneCommand(Command):
             print(f"job {job_id}: {error}; job kept", file=sys.stderr)
             failed.append(job_id)
 
-        for job_id in jobs.prune(report):
+        def warn(job_id: str, path: Path, error: GitError) -> None:
+            print(f"job {job_id}: worktree {path} left for the user to remove: {error}", file=sys.stderr)
+
+        for job_id in jobs.prune(report, warn):
             self.cli.out(job_id)
         return 1 if failed else 0

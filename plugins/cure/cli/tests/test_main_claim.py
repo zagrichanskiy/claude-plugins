@@ -15,6 +15,7 @@ import subprocess
 import pytest
 
 from cure_job.goal import PLUGIN_ROOT
+from cure_job.kinds import CURE_JOB
 from tests.test_cli import Harness
 from tests.test_config import configure
 
@@ -128,15 +129,6 @@ def test_a_write_under_the_worktree_root_is_never_denied_inside_the_main_workspa
     assert hook("s1", "Edit", main_ws, file_path=str(main_ws / "f")) == "deny"
 
 
-@pytest.mark.parametrize("command", [
-    "git symbolic-ref HEAD", "git reflog", "git remote -v", "git remote get-url origin", "git tag -l",
-    "git worktree list", "git fetch", "repo status", "repo info", "repo list", "repo manifest", "repo diff",
-    "repo branches",
-])
-def test_these_read_commands_in_the_main_workspace_need_no_claim(h, main_ws, command):
-    assert hook("s1", "Bash", main_ws / "sources" / "app", command=command) == "allow"
-
-
 @pytest.mark.parametrize("command", ["repo sync", "repo start x --all", "repo forall -c 'git checkout x'"])
 def test_these_repo_commands_in_the_main_workspace_need_the_claim(h, main_ws, command):
     assert hook("s1", "Bash", main_ws, command=command) == "deny"
@@ -165,14 +157,113 @@ def test_the_session_end_hook_releases_the_claim_of_its_session(h, main_ws):
     assert h.run("main-claim", "s2") == 0
 
 
-def test_a_fetch_that_updates_a_local_branch_needs_the_claim(h, main_ws):
-    cwd = main_ws / "sources" / "app"
-    assert hook("s1", "Bash", cwd, command="git fetch origin main:main") == "deny"
+def denied_then_allowed_with_claim(h, cwd, command):
+    assert hook("s1", "Bash", cwd, command=command) == "deny"
     assert h.run("main-claim", "s1") == 0
-    assert hook("s1", "Bash", cwd, command="git fetch origin main:main") == "allow"
+    assert hook("s1", "Bash", cwd, command=command) == "allow"
 
 
-@pytest.mark.parametrize("command, decision", [("git fetch", "allow"), ("git fetch origin", "allow"),
-                                               ("git tag", "allow"), ("git tag v1", "deny")])
-def test_fetch_without_a_refspec_and_bare_tag_listing_need_no_claim(h, main_ws, command, decision):
-    assert hook("s1", "Bash", main_ws / "sources" / "app", command=command) == decision
+def test_a_fetch_that_updates_a_local_branch_needs_the_claim(h, main_ws):
+    denied_then_allowed_with_claim(h, main_ws / "sources" / "app", "git fetch origin main:main")
+
+
+READS = ["git status", "git log --oneline", "git diff HEAD", "git show HEAD", "git branch", "git branch -a",
+         "git branch -r", "git branch -v", "git branch --show-current", "git rev-parse HEAD", "git ls-files",
+         "git grep x", "git blame f.c", "git remote -v", "ls -la", "cat f.c", "head -n 3 f.c", "tail f.c",
+         "grep -rn x .", "rg x", "find . -name '*.c'", "wc -l f.c", "stat f.c", "file f.c"]
+
+
+@pytest.mark.parametrize("command", READS)
+def test_an_allowlisted_read_in_the_main_workspace_needs_no_claim(h, main_ws, command):
+    assert hook("s1", "Bash", main_ws / "sources" / "app", command=command) == "allow"
+
+
+@pytest.mark.parametrize("metacharacter", [";", "&", "|", "<", ">", "$(", "`", "\\\n", "\n"])
+def test_a_shell_metacharacter_turns_an_allowed_read_into_a_write(h, main_ws, metacharacter):
+    denied_then_allowed_with_claim(h, main_ws / "sources" / "app", f"ls a{metacharacter}b")
+
+
+@pytest.mark.parametrize("command", [
+    "git commit -m m", "git --git-dir APP/.git commit -m m", "git -C APP commit -m m", "env git commit -m m",
+    "sudo git commit -m m", "bash -c 'git commit -m m'", "sh -c 'git commit -m m'", "bash <<EOF\ngit commit\nEOF",
+    "git fetch", "git fetch --tags", "git fetch --depth 1 git@host:team/x.git", "git fetch origin tag v1",
+    "git remote add o url", "find . -exec rm {} +", "find . -delete", "git tag v1", "git reflog", "repo status",
+    "repo sync", "bitbake core-image", "touch f", "/usr/bin/make", "env git status", "bash -c 'git status'"])
+def test_a_command_outside_the_read_allowlist_needs_the_claim(h, main_ws, command):
+    app = main_ws / "sources" / "app"
+    denied_then_allowed_with_claim(h, app, command.replace("APP", str(app)))
+
+
+@pytest.mark.parametrize("command", [
+    "git branch newname", "git branch -D x", "git branch -m a b", "git diff --output=f", "git log --output f",
+    "git grep -O vim x", "git grep --open-files-in-pager=vim x", "rg --pre cat x", "rg --pre=cat x", "ls $HOME",
+    "cat ${X}"])
+def test_an_allowlisted_command_with_a_writing_or_executing_option_or_a_dollar_needs_the_claim(h, main_ws, command):
+    denied_then_allowed_with_claim(h, main_ws / "sources" / "app", command)
+
+
+@pytest.mark.parametrize("where, command", [("main", "./build.sh"), ("outside", "SCRIPT"), ("outside", "sh SCRIPT"),
+                                             ("main", "sh SCRIPT")])
+def test_a_command_that_runs_a_script_in_the_main_workspace_needs_the_claim(h, main_ws, tmp_path, where, command):
+    script = main_ws / "build.sh"
+    script.write_text("#!/bin/sh\nbitbake core-image\n", encoding="utf-8")
+    script.chmod(0o755)
+    (tmp_path / "outside").mkdir()
+    denied_then_allowed_with_claim(h, main_ws if where == "main" else tmp_path / "outside",
+                                   command.replace("SCRIPT", str(script)))
+
+
+@pytest.mark.parametrize("subcommand", ["main-claim", "main-release"])
+def test_the_claim_commands_are_allowed_without_the_claim_unless_chained(h, main_ws, subcommand):
+    command = f"{PLUGIN_ROOT / CURE_JOB} {subcommand} s1"
+    assert hook("s1", "Bash", main_ws / "sources" / "app", command=command) == "allow"
+    denied_then_allowed_with_claim(h, main_ws / "sources" / "app", f"{command} ; touch f")
+
+
+@pytest.mark.parametrize("word", ["LONG", "LOCKED"])
+def test_a_path_word_that_cannot_be_inspected_still_gets_a_decision(h, main_ws, tmp_path, word):
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    (locked / "x").write_text("", encoding="utf-8")
+    locked.chmod(0)
+    try:
+        word = word.replace("LONG", str(tmp_path / ("a" * 300))).replace("LOCKED", str(locked / "x"))
+        assert hook("s1", "Bash", tmp_path, command=f"touch {word} {main_ws}/f") == "deny"
+    finally:
+        locked.chmod(0o700)
+
+
+@pytest.mark.parametrize("command", [
+    "file -C -m m/x", "file --compile -m m/x", "rg --hostname-bin=./build.sh --hyperlink-format=default x",
+    "git diff '--output=f'", "git diff --out\\put=f", "git diff --outp=f", "find . -fprint f",
+    "git -c x=y status", "git --no-pager log"])
+def test_an_option_that_writes_or_executes_is_denied_however_it_is_spelled(h, main_ws, command):
+    denied_then_allowed_with_claim(h, main_ws / "sources" / "app", command)
+
+
+def test_a_git_directory_option_with_an_attached_value_is_a_path_under_the_root(h, main_ws, tmp_path):
+    (tmp_path / "outside").mkdir()
+    denied_then_allowed_with_claim(h, tmp_path / "outside", f"git -C{main_ws}/sources/app commit -m m")
+
+
+@pytest.mark.parametrize("command, decision", [
+    ("cat APP/f.c", "allow"), ("git -C APP commit -m m", "deny"), ("touch APP/f", "deny"), ("rm -rf APP/x", "deny"),
+    ("env -C APP git commit -m m", "deny"), ("sudo --chdir=APP git commit -m m", "deny"),
+    ("cat OUT/f.c", "allow"), ("touch OUT/f", "allow"), ("git commit -m m", "allow"), ("echo hello", "allow")])
+def test_only_a_command_with_an_argument_under_the_root_is_held_to_the_rule(h, main_ws, tmp_path, command, decision):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    command = command.replace("APP", str(main_ws / "sources/app")).replace("OUT", str(outside))
+    assert hook("s1", "Bash", outside, command=command) == decision
+
+
+def test_a_script_run_in_a_slot_or_worktree_needs_no_claim(h, main_ws, tmp_path):
+    inside = main_ws / "worktrees"
+    configure(h, {"slots": {"root": str(tmp_path / "slots")}, "worktree": {"root": str(inside)}})
+    for base in (tmp_path / "slots" / "1", inside / "job"):
+        (base / ".repo").mkdir(parents=True)
+        script = base / "build.sh"
+        script.write_text("#!/bin/sh\nbitbake x\n", encoding="utf-8")
+        script.chmod(0o755)
+        assert hook("s1", "Bash", base, command="./build.sh") == "allow"
+

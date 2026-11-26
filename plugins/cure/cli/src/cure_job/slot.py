@@ -23,6 +23,9 @@ NEEDED_BYTES = 100 * 2**30
 #: Files the manifest does not create and sessions read. A slot links to the launch workspace's copy.
 _LINKS = ("CLAUDE.md", ".claude", "sources/CLAUDE.md", "sources/CLAUDE.local.md")
 
+#: The file of a slot that names the workspace its build configuration and links come from.
+_SOURCE = ".repo/cure-workspace"
+
 #: The ``repo forall`` script of :func:`prepare`. A remote that cannot be read keeps every branch.
 _PREPARE = ('git reset -q --hard && git clean -fdq && git checkout -q --detach "$REPO_LREV" || exit 1; '
             'remote=$(git ls-remote -q --heads "${REPO_REMOTE:-origin}" | cut -f2); '
@@ -35,16 +38,23 @@ _PREPARE = ('git reset -q --hard && git clean -fdq && git checkout -q --detach "
 def find_workspace(path: str | Path) -> Path | None:
     """The nearest ancestor of ``path``, ``path`` included, that holds a ``.repo`` directory."""
     start = Path(os.path.abspath(path))
-    return next((directory for directory in (start, *start.parents) if (directory / ".repo").is_dir()), None)
+    return next((directory for directory in (start, *start.parents) if os.path.isdir(directory / ".repo")), None)
 
 
 def ready(workspace: Path, slot: Path) -> None:
-    """:func:`create` a missing ``slot``. Point an existing one at the launch manifest again and :func:`prepare` it."""
+    """:func:`create` a missing ``slot``. Point an existing one at the launch manifest again and :func:`prepare` it.
+    An existing slot made from another workspace gets the build configuration and links of ``workspace``."""
     if not slot.is_dir():
         create(workspace, slot)
         return
     _init(workspace, slot)
     prepare(slot)
+    source = slot / _SOURCE
+    try:
+        if not source.is_file() or source.read_text(encoding="utf-8") != str(workspace):
+            _configure(workspace, slot)
+    except OSError as e:
+        raise SlotError(f"cannot point the slot {slot} at {workspace}: {e}") from e
 
 
 def create(workspace: Path, slot: Path) -> None:
@@ -59,12 +69,7 @@ def create(workspace: Path, slot: Path) -> None:
     try:
         _init(workspace, slot)
         _checked(slot, "repo", "sync", "-c")
-        for build in sorted(path.name for path in workspace.iterdir() if (path / "conf" / "bblayers.conf").is_file()):
-            _copy_conf(workspace / build / "conf", slot / build / "conf", workspace, slot)
-        for name in _LINKS:
-            if (workspace / name).exists() and not os.path.lexists(slot / name):
-                (slot / name).parent.mkdir(parents=True, exist_ok=True)
-                (slot / name).symlink_to(workspace / name)
+        _configure(workspace, slot)
     except OSError as e:
         shutil.rmtree(slot, ignore_errors=True)
         raise SlotError(f"cannot create the slot {slot}: {e}") from e
@@ -81,13 +86,16 @@ def prepare(slot: Path) -> None:
     _checked(slot, "repo", "sync", "-c")
 
 
-def copy_branches(workspace: Path, source: Path, slot: Path, repos: Sequence[str]) -> None:
+def copy_branches(workspace: Path, source: Path, slot: Path, repos: Sequence[str], branch: str | None) -> None:
     """Make every local branch of the slot ``source`` a local branch of ``slot``, in the project that holds each
-    of ``repos``. A branch ``slot`` already has is only fast-forwarded; any other update is refused."""
+    of ``repos``. A branch ``slot`` already has is only fast-forwarded; any other update is refused, except for
+    ``branch``: ``slot`` takes it from ``source`` and keeps its own as ``<branch>-backup-<short sha>``."""
     for project in _projects(workspace, slot, repos):
         if os.path.realpath(source / project) != os.path.realpath(slot / project):
             # git refuses to fetch into the branch checked out.
             _checked(slot / project, "git", "switch", "-q", "--detach")
+            if branch is not None:
+                _back_up_diverged(slot / project, source / project, branch)
             _checked(slot / project, "git", "fetch", "-q", str(source / project), "refs/heads/*:refs/heads/*")
 
 
@@ -95,14 +103,14 @@ def start_branches(workspace: Path, slot: Path, repos: Sequence[str], branch: st
                    after: tuple[Path, str] | None) -> None:
     """Check out ``branch`` in the project of ``slot`` that holds each of ``repos``.
 
-    A new branch starts at the tip of the branch ``after[1]`` in the slot ``after[0]``, else on a remote. Without
-    ``after`` it starts at ``branch`` in the launch workspace, else on a remote, else at the manifest revision.
+    A new branch starts at the tip of the branch ``after[1]`` in the slot ``after[0]`` with ``after``, else at
+    ``branch`` in the launch workspace; else on a remote, else at the manifest revision.
     A branch that already exists at that start is checked out as it is."""
     for project in _projects(workspace, slot, repos):
         if after is not None:
             start = _fetched(slot / project, [str(after[0] / project)], after[1])
         else:
-            start = _fetched(slot / project, [str(workspace / project)], branch, "HEAD")
+            start = _fetched(slot / project, [str(workspace / project)], branch)
         existing = _run(slot / project, "git", "rev-parse", "-q", "--verify", f"refs/heads/{branch}").stdout.strip()
         if not existing:
             _checked(slot / project, "git", "switch", "-q", "-c", branch, start)
@@ -137,6 +145,23 @@ def _manifest_file(workspace: Path) -> str:
     return includes[0].get("name")
 
 
+def _configure(workspace: Path, slot: Path) -> None:
+    """Replace the ``conf/`` of each build directory of ``slot`` that ``workspace`` has with a copy of the one of
+    ``workspace``, and link ``slot`` to its session files."""
+    (slot / _SOURCE).unlink(missing_ok=True)
+    for build in sorted(path.name for path in workspace.iterdir() if (path / "conf" / "bblayers.conf").is_file()):
+        if os.path.lexists(slot / build / "conf"):
+            shutil.rmtree(slot / build / "conf")
+        _copy_conf(workspace / build / "conf", slot / build / "conf", workspace, slot)
+    for name in _LINKS:
+        if (slot / name).is_symlink():
+            (slot / name).unlink()
+        if (workspace / name).exists() and not os.path.lexists(slot / name):
+            (slot / name).parent.mkdir(parents=True, exist_ok=True)
+            (slot / name).symlink_to(workspace / name)
+    (slot / _SOURCE).write_text(str(workspace), encoding="utf-8")
+
+
 def _copy_conf(source: Path, target: Path, workspace: Path, slot: Path) -> None:
     root = re.compile(re.escape(os.fsencode(workspace)) + rb"(?![\w.+-])")
     replacement = os.fsencode(slot)
@@ -161,14 +186,32 @@ def _projects(workspace: Path, slot: Path, repos: Sequence[str]) -> list[str]:
     return found
 
 
-def _fetched(project: Path, sources: Sequence[str], branch: str, fallback: str | None = None) -> str:
-    """The commit of ``branch`` fetched from the first of ``sources``, then the remotes of ``project``, that has it."""
-    for source in [*sources, *_checked(project, "git", "remote").split()]:
-        if _run(project, "git", "fetch", "-q", source, f"refs/heads/{branch}").returncode == 0:
+def _fetched(project: Path, sources: Sequence[str], branch: str) -> str:
+    """The commit of ``branch`` fetched from the first of ``sources``, then the remotes of ``project``, that has it.
+    Without one, the commit ``project`` has checked out. A source that cannot be read is an error."""
+    ref = f"refs/heads/{branch}"
+    for source in sources:
+        if _checked(project, "git", "ls-remote", "--heads", source, ref):
+            _checked(project, "git", "fetch", "-q", source, ref)
             return _checked(project, "git", "rev-parse", "FETCH_HEAD")
-    if fallback is None:
-        raise SlotError(f"{project}: branch {branch} is in none of {', '.join(sources)} and on no remote")
-    return _checked(project, "git", "rev-parse", fallback)
+    for remote in _checked(project, "git", "remote").split():
+        if _run(project, "git", "fetch", "-q", remote, ref).returncode == 0:
+            return _checked(project, "git", "rev-parse", "FETCH_HEAD")
+    return _checked(project, "git", "rev-parse", "HEAD")
+
+
+def _back_up_diverged(project: Path, source: Path, branch: str) -> None:
+    """Rename ``branch`` of ``project`` to ``<branch>-backup-<short sha>`` unless the same branch of ``source``
+    contains its tip."""
+    ref = f"refs/heads/{branch}"
+    if not _run(project, "git", "rev-parse", "-q", "--verify", ref).stdout.strip():
+        return
+    if _run(project, "git", "fetch", "-q", str(source), ref).returncode != 0:
+        return
+    if _run(project, "git", "merge-base", "--is-ancestor", ref, "FETCH_HEAD").returncode == 0:
+        return
+    short = _checked(project, "git", "rev-parse", "--short", ref)
+    _checked(project, "git", "branch", "-q", "-m", branch, f"{branch}-backup-{short}")
 
 
 def _existing(path: Path) -> Path:
