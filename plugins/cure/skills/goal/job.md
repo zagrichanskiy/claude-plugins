@@ -73,10 +73,9 @@ When the job's row in `cure-job list --json` has `after`, read
 |---|---|
 | Goal | `<job>/goal.md`. The `.notes/` exclusion is skipped for it. |
 | Ledger | `.notes/ledger-<slug>.md` in the worktree or slot copy of the handoff's first repository |
-| Backlog | `.notes/<slug>-backlog.md` in the same directory |
 
-A Solo goal has no ledger and no backlog. Apply the `.notes/` exclusion for the ledger and the
-backlog, as the `note` skill describes. The goal never deletes the job directory.
+A Solo goal has no ledger. Apply the `.notes/` exclusion for the ledger, as the `note` skill
+describes. The goal never deletes the job directory.
 
 ## Questions
 
@@ -142,7 +141,7 @@ with the `notify:` line `finish` printed; (3) the final message. The `finish` co
 and the `SendMessage` or its error are in the transcript before the final message. The final message
 restates each done-when item with its evidence (after a split, an item a moved work item owns has the branch of its part as its evidence, as `size-check.md` states). An item is unproven only when its proof is
 unavailable (a device, a login, a manual check), never when its check ran and failed; give a reason
-for each. Keep the goal file, the retrospective and the backlog; list the retrospective with
+for each. Keep the goal file and the retrospective; list the retrospective with
 `--retro`. Never touch the job directory.
 
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or

@@ -115,6 +115,10 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   fixes and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before
   the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no
   round N+1 starts. A work item with a fresh-reader check adds its passes to each round (`fresh-reader.md`).
+  Every `NITPICK` and `enhancement` is fixed with the round's fixes. Those of the last round are
+  fixed in one fix pass that `qa` and lint verify, with no further round. An item outside the
+  ticket's files that would take the change past `<lines>` is a question to the user, asked as
+  "Asking" states (`needs-input:` in a job, `AskUserQuestion` in a direct run), never a written note.
 - Prose review: each round also dispatches the prose reviewer that the goal's Tools section names,
   on the prose of the diff: added or changed code comments, documents, the commit message and the PR
   text. Before round 1 the orchestrator drafts the commit message and the PR text under `.notes/` and

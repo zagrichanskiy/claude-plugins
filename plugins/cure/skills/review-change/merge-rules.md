@@ -43,16 +43,17 @@ a tag and does not gate the round.
   checked, it is a question.
 - Carry the `enhancement` tag from the agent that raised it. Never assign it to a finding the agent
   tagged with a severity: that call belongs to the agent that read the source.
-- Route every `NITPICK` and every `enhancement` to `.notes/<slug>-backlog.md`, not the report body.
-  `MUST-FIX` and `SHOULD-CONSIDER` stay in the section. State the tag next to each finding, in the
-  report and in the backlog.
+- List every `NITPICK` and every `enhancement` in the report, apart from the severity sections. The
+  caller's fix step fixes them with each round's fixes; those of the last round go in one fix pass
+  that the tests and lint verify. `MUST-FIX` and `SHOULD-CONSIDER` stay in their section. State the
+  tag next to each finding.
 
 ## Content rules
 
 - **Same depth in every section.** A design finding carries its proposed types, declarations and
   diagram as fully as a correctness finding carries its failing scenario and code excerpt. Never
-  compress one altitude to make room for another; if the report is too long, cut nitpicks in every
-  section.
+  compress one altitude to make room for another; if the report is too long, shorten each nitpick to
+  one line and never drop one.
 - **Carry the assessments through.** The designer's structure and pattern assessments, and the
   architect's component and boundary assessment and pattern assessment, go into their sections
   verbatim or as tables.
@@ -91,5 +92,4 @@ The brief to a delegated `general-purpose` agent lists:
 - the report paths of the agents that hold `Write`, and the `ui-reviewer` and `ux-reviewer` reports
   in full;
 - the skip lines recorded in step 3a;
-- the earlier reports found in step 1;
-- the backlog path `.notes/<slug>-backlog.md`.
+- the earlier reports found in step 1.

@@ -34,7 +34,8 @@ A Solo goal differs from the template:
 - Work: the read-first line, item 1, the task, and a clean-up item only when the task creates a
   working file. The clean-up item reads "Delete `<each working file>`. Keep the goal file." Its
   done-when item carries at least one path. With no working file, write neither.
-- No retrospective item, no ledger, no backlog. The stats row work item and done-when item stay.
+- No retrospective item, no ledger. The stats row work item and done-when item stay, and so does
+  the no-backlog done-when item.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
 - Rules: the lines "Tier: Solo.", Stops, Permission mode (only when the user chose one) and Waiting.
 - No `## Tools` section.
@@ -56,21 +57,23 @@ A Solo goal differs from the template:
   `MUST-FIX` or `SHOULD-CONSIDER` open after a PR's round N takes the failure exit; no round N+1
   starts. Rounds 2..N re-check only the previous round's fixes and raise no new topic. The
   orchestrator commits each round's fixes with explicit paths, new files included, before the
-  re-check. Once the PR exists, a fix is squashed into the job's latest commit. One doc-only edit
-  pass is allowed after the last review round. It changes no file that the build, the tests, or a
-  loaded skill or agent reads.
+  re-check. Once the PR exists, a fix is squashed into the job's latest commit.
 - Consultation: `designer` answers class-level questions, `architect` component-level ones. Record
   the answer before the implementer starts. A class flagged in 2 consecutive review rounds gets a
   `designer` consult before an implementer touches it again; round-1 triage and the PR's first
   review round count as consecutive. After each consult, compare its line estimate plus the lines
   already changed with `<lines>`, as `rules.md` "Light and Full" states. The orchestrator never
   writes the class-level decision.
-- Review loop: done when no `MUST-FIX` or `SHOULD-CONSIDER` is open. `NITPICK` and
-  `enhancement`-tagged findings go to the backlog, not into another round. The backlog never holds a
-  `MUST-FIX` or `SHOULD-CONSIDER`, except a fresh-reader finding that `fresh-reader.md` sends there. A `SHOULD-CONSIDER` that needs only an owner decision on behaviour a fix introduced is
-  asked before its round closes. The `review-change` skill defines the triage words. The ledger holds
-  every finding with its status, every assumption and every question with its answer. State a token
-  budget per agent per round.
+- Review loop: done when no `MUST-FIX` or `SHOULD-CONSIDER` is open. The caller's fix step fixes
+  every `NITPICK` and `enhancement`-tagged finding with each round's fixes and writes no backlog
+  file. Those of the last round are fixed in the single pass after the last round, which the tests
+  and lint verify, with no further review round. An item outside the ticket's files that would take
+  the change past `<lines>` is a question to the user, never a written note, asked as `rules.md`
+  "Asking" states (`needs-input:` in a job, `AskUserQuestion` in a direct run). A `SHOULD-CONSIDER`
+  that needs only an owner decision on behaviour a fix introduced is asked before its round
+  closes. The `review-change` skill defines the triage words. The ledger holds every finding with
+  its status, every assumption and every question with its answer. State a token budget per agent
+  per round.
 - Verification: `qa` runs the suite after each fix. Its pass count is a done-when item, and its brief
   gives the expected value of each check. In Full, a live-verification gate runs before merge: the
   `verifier` agent's output is a done-when item. A green suite alone does not clear it. A manual

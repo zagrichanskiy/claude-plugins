@@ -12,5 +12,6 @@ cannot explain. Each such element counts as a `SHOULD-CONSIDER` finding.
 - The orchestrator sorts the findings by line. A finding of the previous round and a finding on a
   changed line belong to the round.
 - For any other finding, read the element in the round-1 version
-  (`git show <commit round 1 read>:<doc>`). An element already present and unexplained there goes to
-  the backlog. Any other finding belongs to the round.
+  (`git show <commit round 1 read>:<doc>`). An element already unexplained at the commit round 1
+  read does not hold the round open and is fixed by one fix pass after the last round. Any
+  other finding belongs to the round.
