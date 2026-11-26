@@ -13,8 +13,8 @@ class ResumeCommand(LaunchCommand):
     help = "continue the session of a needs-input job"
     description = ("Stop the session of a needs-input job's latest run, resume it in the background with the "
                    "goal file as its next run, and print the session name. A session that no longer exists "
-                   "exits 1 and starts nothing; use cure-job launch then")
+                   "exits 1 and starts nothing; use cure-job launch then. The job's own session is refused")
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
-        self.cli.out(jobs.resume(args.id, claude_args(args)))
+        self.cli.out(jobs.resume(args.id, claude_args(args), self.cli.caller_job()))
         return 0

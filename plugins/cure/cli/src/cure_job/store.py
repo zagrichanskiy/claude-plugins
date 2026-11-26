@@ -90,7 +90,8 @@ class JobStore:
         return self.job_dir(job_id) / f"{stem}-{n}.md"
 
     def create(self, base_id: str, render: Callable[[str], str]) -> str:
-        """Reserve the first free id from ``base_id`` on, write ``render(id)`` as its handoff."""
+        """Reserve the first free id from ``base_id`` on that ends in no run marker, write ``render(id)``
+        as its handoff."""
         self._make_jobs()
         job_id = self._reserve(base_id)
         reserved = self.job_dir(job_id)
@@ -318,6 +319,8 @@ class JobStore:
     def _reserve(self, base_id: str) -> str:
         candidates = [base_id] + [ids.with_suffix(base_id, n) for n in range(2, ids.MAX_SUFFIX + 1)]
         for candidate in candidates:
+            if ids.ends_in_run_marker(candidate):
+                continue
             path = self.job_dir(candidate)
             try:
                 with _store_errors(path):

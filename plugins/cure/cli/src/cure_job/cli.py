@@ -42,7 +42,7 @@ from .commands.stop import StopCommand
 from .errors import CureJobError
 from .goal import PLUGIN_ROOT
 from .help import HelpFormatter, style
-from .kinds import KINDS, SessionKind
+from .kinds import JOB_ID_VARIABLE, KINDS, SessionKind
 from .providers.jobs import JobsProvider
 from .store import JobStore
 
@@ -78,6 +78,10 @@ class Cli:
         """The address of the calling session, ``uds:<socket path>``, or ``None`` outside a session."""
         socket = os.environ.get(MESSAGING_SOCKET_ENV)
         return f"uds:{socket}" if socket else None
+
+    def caller_job(self) -> str | None:
+        """The job id of the calling session, or ``None`` outside a job session."""
+        return os.environ.get(JOB_ID_VARIABLE) or None
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = style(argparse.ArgumentParser(

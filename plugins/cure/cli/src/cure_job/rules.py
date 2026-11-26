@@ -75,6 +75,10 @@ class Check:
     names: Sequence[str] = ()
     #: The summary lines an ``end`` reports.
     summary: Sequence[str] = ()
+    #: A ``start`` was given an input.
+    has_input: bool = False
+    #: The job id of the calling session, from its ``CURE_JOB_ID``; ``None`` outside a job session.
+    caller_job: str | None = None
 
 
 Guard = Callable[[Check], CureJobError | None]
@@ -256,6 +260,12 @@ def _session_open(facts: Check) -> CureJobError | None:
     return None
 
 
+def _takes_input(facts: Check) -> CureJobError | None:
+    if facts.has_input and facts.kind.input is None:
+        return CureJobError(f"a {facts.kind.name} session takes no input")
+    return None
+
+
 def _summary_lines(facts: Check) -> CureJobError | None:
     expected = facts.kind.summary_lines
     if len(facts.summary) != expected:
@@ -271,6 +281,14 @@ def _resume_needs_input(facts: Check) -> CureJobError | None:
     if state is not State.NEEDS_INPUT:
         return JobStateError(f"job {facts.record.id} is {state.value}; {facts.operation} needs "
                              f"{State.NEEDS_INPUT.value}")
+    return None
+
+
+def _not_own_session(facts: Check) -> CureJobError | None:
+    """Only the user's answer resumes a needs-input job, so its own session does not."""
+    if facts.caller_job == facts.record.id:
+        return JobStateError(f"job {facts.record.id}: its own session cannot {facts.operation} it; "
+                             "the user's answer resumes it through the dispatcher")
     return None
 
 
@@ -406,9 +424,9 @@ _GENERIC_START: tuple[Guard, ...] = (_goal_settled, _no_other_live_session)
 _START_NEEDS = frozenset({Fact.KIND, Fact.KINDS, Fact.SESSIONS})
 
 RULES: Mapping[Op, Rule] = {
-    Op.START: Rule(Reads.LISTING, (_kind_start_guards, *_GENERIC_START), _START_NEEDS),
-    Op.CONTINUE: Rule(Reads.LISTING, (_resume_needs_input, _kept_session_listed, goal_exists, not_blocked,
-                                      no_invalid_job, *_GENERIC_START), _START_NEEDS),
+    Op.START: Rule(Reads.LISTING, (_kind_start_guards, *_GENERIC_START, _takes_input), _START_NEEDS),
+    Op.CONTINUE: Rule(Reads.LISTING, (_not_own_session, _resume_needs_input, _kept_session_listed, goal_exists,
+                                      not_blocked, no_invalid_job, *_GENERIC_START), _START_NEEDS),
     Op.CLOSE: Rule(Reads.LISTING, (_no_live_session, _open)),
     Op.STOP: Rule(Reads.LISTING, (_has_session,)),
     Op.REMOVE_SESSIONS: Rule(Reads.LISTING, (_done_or_abandoned,)),
