@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 
+from ..clock import format_local
 from ..events import WORK
 from ..job import JobRecord
 from ..providers.jobs import JobsProvider
@@ -54,12 +55,13 @@ def invalid_row(job: InvalidJob) -> dict:
             "origin": None, "resources": [], "goal": None, "approved": None, "problem": job.problem,
             "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
             "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
-            "workspace": None, "phase": None, "sessions": {}, "question": None}
+            "workspace": None, "phase": None, "sessions": {}, "question": None, "asked-at": None}
 
 
 def job_row(view: JobView) -> dict:
     record = view.record
     work = view.sessions.get(WORK)
+    pending = record.pending_ask
     return {
         "id": record.id,
         "state": view.state.value,
@@ -84,7 +86,8 @@ def job_row(view: JobView) -> dict:
         "workspace": record.handoff.launch_dir,
         "phase": view.phase.value,
         "sessions": {kind: session_row(record, session) for kind, session in view.sessions.items()},
-        "question": list(record.question) if record.question is not None else None,
+        "question": list(pending.question) if pending is not None else None,
+        "asked-at": format_local(pending.at) if pending is not None else None,
     }
 
 

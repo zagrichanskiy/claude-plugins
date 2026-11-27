@@ -1,9 +1,9 @@
-"""The eighteen job operations.
+"""The twenty job operations.
 
-Every operation except ``new``, ``approve``, ``finish``, ``end``, ``reported``, ``release``, ``ask`` and ``answered``
-reads one snapshot of the state root, derives the job states from it and makes its writes. ``approve``, ``finish``,
-``end``, ``reported``, ``release``, ``ask`` and ``answered`` read only their own job; ``ask`` also reads the session
-list.
+Every operation except ``new``, ``approve``, ``finish``, ``end``, ``reported``, ``release``, ``ask``, ``answered``,
+``await_answer`` and ``requested`` reads one snapshot of the state root, derives the job states from it and makes its
+writes. ``approve``, ``finish``, ``end``, ``reported``, ``release``, ``ask``, ``answered``, ``await_answer`` and
+``requested`` read only their own job; ``ask`` also reads the session list.
 ``claim`` runs its check and its write under :meth:`JobStore.locked` and reads
 no session list. No other operation holds the lock, so their check and write
 are not atomic across processes.
@@ -29,7 +29,7 @@ from ..clock import Clock, format_local
 from ..config import Config
 from ..errors import (ClaudeError, CureJobError, GitError, HandoffError, JobStateError, ResourceHeld, StoreError,
                       UnknownJob)
-from ..events import Answered, Approved, Asked, Claim, Closed, Origin, Release, Reported
+from ..events import Answered, Approved, Asked, Claim, Closed, Origin, Release, Reported, Requested
 from ..goal import PLUGIN_ROOT, tier
 from ..handoff import parse_submitted, stamp
 from ..job_id import make_id, slug_of
@@ -54,6 +54,8 @@ class Listing(NamedTuple):
 #: cap. A waiting claim polls the store this often.
 CLAIM_WAIT_MAX_SECONDS = 540
 CLAIM_POLL_SECONDS = 10.0
+#: ``await-answer`` reads the job this often.
+ANSWER_POLL_SECONDS = 10.0
 
 
 class JobsProvider:
@@ -305,6 +307,25 @@ class JobsProvider:
         if record.question is None:
             return
         self.store.append_event(job_id, Answered(record.run, tuple(answer), self.clock()))
+
+    def await_answer(self, job_id: str, caller_job: str | None) -> None:
+        """Return once the pending question of the job's run is answered. Reads only this job, every
+        :data:`ANSWER_POLL_SECONDS`.
+
+        Refused unless ``caller_job`` is the job and its run asked a question; refused as soon as the run has a
+        result or the job is abandoned.
+        """
+        while True:
+            record = self.store.load(job_id)
+            check(Op.AWAIT_ANSWER, Check(record, "await-answer", caller_job=caller_job))
+            if record.question is None:
+                return
+            self.sleep(ANSWER_POLL_SECONDS)
+
+    def requested(self, job_id: str, action: str) -> None:
+        """Record that the dispatcher sent ``action`` of the job's latest run to the origin. Reads only this job."""
+        record = self.store.load(job_id)
+        self.store.append_event(job_id, Requested(record.run, action, self.clock(), record.request_goal(action)))
 
     def finish(self, job_id: str, report: Report) -> Path:
         """Write ``report`` as the ``result.md`` of a launched job, then append its job record to ``ledger.jsonl``,

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from .. import job_id
 from ..errors import CureJobError
 from ..frontmatter import is_writable
 from ..providers.jobs import JobsProvider
+from ..sessions import origin_pid
 from .base import Command, notify_line, read_stdin
 
 _STDIN = "-"
@@ -30,7 +32,11 @@ class NewCommand(Command):
         self._parser = parser
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
-        job_id = jobs.new(self._read(args.file), args.slug, self.cli.origin(), args.ticket_summary)
+        origin = self.cli.origin()
+        job_id = jobs.new(self._read(args.file), args.slug, origin, args.ticket_summary)
+        if origin is not None and origin_pid(origin) is None:
+            print(f"warning: origin {origin} is not a <pid>.sock socket; no session can be found as the job's owner, "
+                  "so the dispatcher takes its questions and report", file=sys.stderr)
         self.cli.out(job_id)
         self.cli.out(notify_line(job_id))
         return 0

@@ -25,6 +25,7 @@ from .clock import Clock, local_now
 from .commands.answered import AnsweredCommand
 from .commands.approve import ApproveCommand
 from .commands.ask import AskCommand
+from .commands.await_answer import AwaitAnswerCommand
 from .commands.claim import ClaimCommand
 from .commands.close import CloseCommand
 from .commands.config import ConfigCommand
@@ -39,6 +40,7 @@ from .commands.prune import PruneCommand
 from .commands.release import ReleaseCommand
 from .commands.remove_sessions import RemoveSessionsCommand
 from .commands.reported import ReportedCommand
+from .commands.requested import RequestedCommand
 from .commands.resume import ResumeCommand
 from .commands.start import StartCommand
 from .commands.stats import StatsCommand
@@ -78,8 +80,8 @@ class Cli:
                           LaunchCommand(self), ResumeCommand(self), StartCommand(self), ClaimCommand(self),
                           ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
                           FinishCommand(self), EndCommand(self), AskCommand(self), AnsweredCommand(self),
-                          ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), StatsCommand(self),
-                          ConfigCommand(self)]
+                          AwaitAnswerCommand(self), ReportedCommand(self), RequestedCommand(self),
+                          RemoveSessionsCommand(self), PruneCommand(self), StatsCommand(self), ConfigCommand(self)]
         self._parser = self._build_parser()
 
     def origin(self) -> str | None:

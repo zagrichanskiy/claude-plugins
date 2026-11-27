@@ -17,7 +17,7 @@ The worker starts in the handoff's first repository. It loads:
 - `~/.claude/settings.json`.
 - The managed settings file. Linux: `/etc/claude-code/managed-settings.json`. macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`.
 - `.claude/settings.json` and `.claude/settings.local.json` of the handoff's first repository.
-- The `--settings` rules that `cure-job launch` adds: `finish <id>`, `claim <id>`, `release <id>`, `config get`, `list`, `finish --help`, each on `<plugin-root>/bin/cure-job`.
+- The `--settings` rules that `cure-job launch` adds: `finish <id>`, `claim <id>`, `release <id>`, `ask <id>`, `await-answer <id>`, `answered <id>`, `config get`, `list`, `finish --help`, each on `<plugin-root>/bin/cure-job`.
 
 An action counts as allowed only when an `allow` rule matches it and no `deny` or `ask` rule matches it. `Bash(<command prefix>:*)` matches a command by prefix. An MCP tool rule is `mcp__<server>__<tool>`.
 
@@ -31,7 +31,7 @@ Failed permission check:
 |---|---|
 | The user adds an allow rule | The check runs again. |
 | Drop the action | Edit `goal.md` through `cure:goal`. The check runs again. |
-| Launch anyway | Auto mode: the run may stop at `needs-input` when the classifier denies the action. Other modes: an unallowed tool opens a permission prompt and the job becomes `blocked` (`tell-blocked`). |
+| Launch anyway | Auto mode: the run asks live and, when the answer is "leave auto mode", stops at `needs-input` carrying it; it may also stop when the classifier denies the action. Other modes: an unallowed tool opens a permission prompt and the job becomes `blocked` (`tell-blocked`). |
 
 Leave auto mode (an agent's "no verdict"):
 
@@ -39,7 +39,7 @@ Leave auto mode (an agent's "no verdict"):
 |---|---|
 | `acceptEdits` (recommended) | File edits pass. Other tools need allow rules. |
 | `default` | Every unapproved tool call stops the job. |
-| Stay in auto mode | The run may stop at `needs-input` again. |
+| Stay in auto mode | The run may ask again. |
 
 Write a mode the user chooses into the goal's Rules "Permission mode" line through `cure:goal` ("Answer and resume" step 1). Every later launch, resume and relaunch passes it.
 

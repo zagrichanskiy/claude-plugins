@@ -69,7 +69,7 @@ A Solo goal differs from the template:
   file. Those of the last round are fixed in the single pass after the last round, which the tests
   and lint verify, with no further review round. An item outside the ticket's files that would take
   the change past `<lines>` is a question to the user, never a written note, asked as `rules.md`
-  "Asking" states (`needs-input:` in a job, `AskUserQuestion` in a direct run). A `SHOULD-CONSIDER`
+  "Asking" states (`cure-job ask` in a job, `AskUserQuestion` in a direct run). A `SHOULD-CONSIDER`
   that needs only an owner decision on behaviour a fix introduced is asked before its round
   closes. The `review-change` skill defines the triage words. The ledger holds every finding with
   its status, every assumption and every question with its answer. State a token budget per agent

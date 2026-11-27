@@ -102,9 +102,9 @@ The line holds for a resume of the kept session and for a new run in a new sessi
 
 When a goal is extended after a `done` run, the new Settled line names the commits (`<base>..HEAD`) as the state. The ledger is deleted. In Light and Full it also names the retrospective when that file still exists. Solo has no retrospective.
 
-At run time the worker takes the `needs-input:` exit for a question only the user can answer.
+At run time the worker asks the owning session live with `cure-job ask` ("Asking" in `rules.md`). It takes the `needs-input:` exit only when `ask` exits non-zero or `SendMessage` fails, which happens when the owning session is unreachable.
 
-A job goal's Waiting line reads: "Waiting: never waits; takes the `needs-input:` exit."
+A job goal's Waiting line reads: "Waiting: asks the owning session with `cure-job ask` and waits with `cure-job await-answer`; takes the `needs-input:` exit only when `ask` or the send fails."
 
 ## Template text
 
@@ -151,7 +151,7 @@ title's outcome is unachievable; and (b) the retrospective's summary, naming the
 transcript; and (c) reported as in N+1 with `--status failed`, unless `finish` failed
 twice as counted in (a); and (d) the final message starts with `failed:`.
 
-Also done when a question only the user can answer is open, with no clean-up: the ledger and the
+Also done when a question is open that the owning session cannot receive (`ask` failed or the send failed), with no clean-up: the ledger and the
 working files stay, the session stays alive, and `finish` runs with `--status needs-input`, one
 `--question` per question and one `--kept` per kept file; the final message starts with
 `needs-input:`. A resumed run reads Settled: when it holds an answer, the questions of the earlier

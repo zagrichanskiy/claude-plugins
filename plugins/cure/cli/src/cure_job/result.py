@@ -5,6 +5,7 @@ import enum
 import os
 import re
 from dataclasses import dataclass
+from typing import Sequence
 
 from .errors import ReportError
 from .frontmatter import FrontmatterError, Value, as_list, is_writable, parse, render
@@ -46,15 +47,15 @@ class ShortHoldTimeout:
     holder: str | None
 
 
-def short_hold_timeout(result: Result) -> ShortHoldTimeout | None:
-    """The timeout when the only question starts with ``short-hold timeout:``.
+def short_hold_timeout(questions: Sequence[str]) -> ShortHoldTimeout | None:
+    """The timeout when the only line of ``questions`` starts with ``short-hold timeout:``.
 
     The expected form is ``short-hold timeout: <resource> held by <holder id>``; without
     ``held by`` the holder is ``None``.
     """
-    if len(result.questions) != 1 or not result.questions[0].startswith(SHORT_HOLD_TIMEOUT):
+    if len(questions) != 1 or not questions[0].startswith(SHORT_HOLD_TIMEOUT):
         return None
-    rest = result.questions[0][len(SHORT_HOLD_TIMEOUT):]
+    rest = questions[0][len(SHORT_HOLD_TIMEOUT):]
     resource, held_by, holder = rest.rpartition(_HELD_BY)
     if not held_by:
         return ShortHoldTimeout(rest.strip(), None)

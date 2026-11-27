@@ -81,7 +81,8 @@ def phase_of(record: JobRecord) -> Phase:
 
 def project(phase: Phase, held: bool, work: Liveness | None, asking: bool = False) -> State:
     """The ``list --json`` state: the work liveness in ``WORKING``, ``held`` before a launch, else the phase.
-    A busy, idle or stalled work session that is ``asking`` waits for the origin's answer."""
+    A busy, idle or stalled work session that is ``asking`` waits for the origin's answer: a waiting run keeps
+    a background ``await-answer`` process, so it may be listed busy."""
     if phase is Phase.WORKING:
         if work is None or work is Liveness.ENDED:
             raise AssertionError(f"a working job has work liveness {work}")
