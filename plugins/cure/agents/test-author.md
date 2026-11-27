@@ -74,7 +74,7 @@ lines of the lint and test output into the report.
 
 ## Rules
 
-- Write test files to disk. Do not commit, branch or push.
+- Write test files to disk. Do not commit, branch or push. Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
 - Never install a package, dependency or tool.
 - Do not modify the code under test to make a test pass. If the code must
   change, report that instead.

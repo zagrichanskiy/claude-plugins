@@ -99,6 +99,7 @@ to change and what it prevents; a rule ID is a lookup handle, never the argument
 
 ## Rules
 
+- Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
 - Do not edit or fix code. Write only the one report file the caller names
   under `.notes/`; never write or edit any other file. Do not commit. Where the
   caller names a report path, that file is the deliverable and the final

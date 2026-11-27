@@ -84,6 +84,7 @@ confirmed from what you infer.
 
 ## Rules
 
+- Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
 - Read and execute only. Do not edit, write, commit, or fix anything. If the
   behavior is wrong, describe it and leave the fix to the caller.
 - Respect every safety constraint in the project's `CLAUDE.md`.

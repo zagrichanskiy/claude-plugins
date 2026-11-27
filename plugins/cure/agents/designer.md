@@ -44,6 +44,8 @@ caller invoke the `architect` agent.
 If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute
 path. If a file is missing, say so in your reply and proceed on your own judgement.
 
+Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
+
 ## Core Guidelines deviations
 
 When the `Already reported:` line says its `deviation` findings are yours to decide, decide every

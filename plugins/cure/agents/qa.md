@@ -64,6 +64,7 @@ blocks the change.
 
 ## Rules
 
+- Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
 - Read and execute only. Do not edit files, commit or fix; the temporary output file above is the exception. Describe an obvious fix in
   the report.
 - Respond in formal English. Use active voice. No contractions, no emojis.

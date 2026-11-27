@@ -137,6 +137,7 @@ definitions of *added lines* and *whole files at HEAD* and the search of every o
   risky, missing or unbounded.
 - Quote defaults and identifiers exactly, including case and units.
 - Write exactly one file, the digest. Use `Bash` only for read-only inspection.
+- Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
 - Record absence as absence: "No test file exists for X", not "X is untested".
 - Never place credentials, tokens, customer names or personally identifiable information in the
   digest, even when they appear in the source. Cite the location instead.

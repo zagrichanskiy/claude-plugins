@@ -68,7 +68,7 @@ report the defect.
 
 ## Rules
 
-- Write to disk. Do not commit, branch or push.
+- Write to disk. Do not commit, branch or push. Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
 - Never place passwords, tokens, keys, customer names, or other credentials or
   personally identifiable information in code, configuration or a fixture.
 - A comment states only what the code cannot say. It never restates the next
