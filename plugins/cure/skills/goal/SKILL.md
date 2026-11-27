@@ -82,8 +82,9 @@ context compaction and before an exit.
 
 1. Fact check: `<base>` equals `origin/<base>` (for a base taken from a predecessor or marked
    "Base: the PR branch of split part 1", the check of `rules.md`); <ticket, branch, named files>;
-   <each tool Done-when runs>; <each Settled fact marked verify>. Print `date --iso-8601=seconds`
-   as `<start>`.
+   <each tool Done-when runs>; <each Settled fact, with the command of `rules.md`
+   and its output in the ledger (Solo: the transcript)>; <each done-when check run on the base, which must fail there>.
+   Print `date --iso-8601=seconds` as `<start>`.
 2. <One step, its agent, its files.>
 K-1. (Light and Full, when Settled has an estimate) <the size-check item text of `sizing.md`>
 K.   <The push and the pull request, when the job pushes. K is the item before the retrospective.>

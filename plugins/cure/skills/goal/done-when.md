@@ -14,6 +14,8 @@ addr show usb0 reports 192.168.140.1/24` passes.
   sets them up, or work item 1 checks them. Work item 1 checks every executable a done-when command
   starts with, except one that a work item builds or installs, one check each (`gh auth status`,
   `claude --version`, `python3 --version`).
+- Work item 1 runs each done-when check on the base, where it must fail. The goal marks a check of a
+  state the base already meets on the item itself, for example "holds on the base".
 - An item that measures replies to a fixed prompt set never asks about state the run changes, such as
   the branch's commits. It states samples per prompt and the pass threshold, for example 3 runs, all
   pass.
@@ -61,9 +63,6 @@ exists only in a shipped file.
 ## Settled
 
 - A Settled statement is a decision or fact the goal rests on.
-- A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1 verifies
-  it against the device, code or document the note cites, not against the note. A mismatch in ticket,
-  branch or base commit is recorded and corrected.
 - An analysis goal that reads a design document names the document's branch or commit under Settled
   when the checkout that holds it is not on its default branch.
 - A work item that runs a fresh-reader check over a document set cites `fresh-reader.md`.

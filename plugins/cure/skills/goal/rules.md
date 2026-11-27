@@ -5,9 +5,24 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 
 ## All tiers
 
-- Work item 1: run `git fetch`, then the fact check the item names. A false Settled statement, a
-  failed fetch or a failed tool check is a failure cause. Base moved: base the work on
-  `origin/<base>`. Other mismatch: record it, use the corrected value.
+- Work item 1: run `git fetch`, then the fact check the item names. A failed fetch or a failed tool
+  check is a failure cause. Base moved: base the work on `origin/<base>`. Other mismatch in ticket,
+  branch or base commit that Settled does not state: record it, use the corrected value.
+- Work item 1 checks every Settled fact (a decision is not checked) against the branch the work
+  runs on (the job worktree or slot when the job has one, else the launch checkout). It records each
+  command and its output in the ledger (Solo: the transcript):
+  - a fact copied from a note: check it against the source the note cites, not the note;
+  - paths and symbols: `git ls-tree <base> <path>` or `git show <base>:<path>`;
+  - refs: `git rev-parse --verify <ref>`; checkout branches:
+    `git -C <checkout the statement names> branch --show-current`;
+  - PR state and base: `gh pr view`;
+  - device facts: `MACHINE` from `/etc/build` and the value read on the device;
+  - the test command runs once on the base.
+- Work item 1 runs each done-when check on the base. It must fail there. A check marked "holds on the
+  base" in the goal keeps the mark on its ledger line (Solo: the transcript). An unmarked check that
+  passes on the base is a question before any change.
+- A Settled fact found false is a question before any change: the `needs-input:` exit in a job,
+  otherwise as "Asking" states.
 - Base from a predecessor job, or Settled "Base: the PR branch of split part 1": compare `<base>`
   with the local branch, not `origin/<base>`, because the predecessor commits locally and pushes
   nothing. In a workspace slot, `cure-job launch` copies the predecessor's local branches into the
