@@ -7,8 +7,8 @@ from functools import cached_property
 from pathlib import Path
 
 from . import resource
-from .events import (WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved, SessionStarted,
-                     WorktreeOpened, CheckoutStarted)
+from .events import (WORK, Answered, Approved, Asked, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved,
+                     SessionStarted, WorktreeOpened, CheckoutStarted)
 from .handoff import Handoff
 from .result import Result
 from .sessions import JobSession, fold
@@ -81,6 +81,31 @@ class JobRecord:
     def reported(self) -> bool:
         """The origin session was told of the latest run's result."""
         return self.run > 0 and any(isinstance(event, Reported) and event.run == self.run for event in self.events)
+
+    @property
+    def asked(self) -> bool:
+        """The session of the latest run asked a question."""
+        return self.run > 0 and any(isinstance(event, Asked) and event.run == self.run for event in self.events)
+
+    @property
+    def pending_ask(self) -> Asked | None:
+        """The latest ``asked`` event of the latest run that no ``answered`` event followed, while the run has no
+        result and the job is not abandoned."""
+        if self.result is not None or self.closed is not None:
+            return None
+        pending = None
+        for event in self.events:
+            if isinstance(event, Asked) and event.run == self.run:
+                pending = event
+            elif isinstance(event, Answered) and event.run == self.run:
+                pending = None
+        return pending
+
+    @property
+    def question(self) -> tuple[str, ...] | None:
+        """The lines of the :attr:`pending_ask` question."""
+        pending = self.pending_ask
+        return pending.question if pending is not None else None
 
     @property
     def sessions_removed(self) -> bool:

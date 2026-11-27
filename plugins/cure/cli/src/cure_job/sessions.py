@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from .claude import Session, SessionStatus
 from .events import WORK, Event, SessionEnded, SessionStarted, SessionStopped
@@ -63,6 +64,22 @@ def fold(events: Sequence[Event], has_result: bool) -> tuple[JobSession, ...]:
 def listed_live(listed: Session | None) -> bool:
     """The listing has a live entry for the session."""
     return listed is not None and listed.status is not SessionStatus.STOPPED
+
+
+#: Claude Code names a session's messaging socket ``<pid>.sock`` after the pid of the session.
+_PID_SOCKET = re.compile(r"uds:.*/(\d+)\.sock")
+
+
+def origin_pid(origin: str | None) -> int | None:
+    """The pid that names the socket of ``origin``, or ``None`` for an address of another form."""
+    match = _PID_SOCKET.fullmatch(origin) if origin is not None else None
+    return int(match.group(1)) if match is not None else None
+
+
+def origin_reachable(origin: str | None, sessions: Mapping[str, Session]) -> bool:
+    """A live listed session has the pid that names the socket of ``origin``."""
+    pid = origin_pid(origin)
+    return pid is not None and any(listed_live(session) and pid in session.pids for session in sessions.values())
 
 
 def liveness(session: JobSession, listed: Session | None, now: datetime, grace: timedelta) -> Liveness:

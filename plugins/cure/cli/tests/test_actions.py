@@ -96,7 +96,8 @@ def test_timeout_as_only_question_gets_ask_timeout_with_resource_and_holder():
     record = make_record(A, events=(launched(A), Reported(1, NOW)),
                          result=Result(ResultStatus.NEEDS_INPUT, (), None, (), (TIMEOUT,)))
     view = derive([record], {}, NOW, frozenset())[0]
-    assert actions(view, {}) == [Action("ask-timeout", {"resource": "device:bench", "holder": B})]
+    assert actions(view, {}) == [Action("ask-timeout",
+                                        {"resource": "device:bench", "holder": B, "route": "dispatcher"})]
 
 
 def _timeout_actions(questions):
@@ -111,7 +112,8 @@ def _timeout_actions(questions):
     ("short-hold timeout: device:bench repo:x held by " + A + " " + B, "device:bench repo:x", A + " " + B),
 ])
 def test_timeout_question_without_a_single_holder_still_gets_ask_timeout(question, resource, holder):
-    assert _timeout_actions((question,)) == [Action("ask-timeout", {"resource": resource, "holder": holder})]
+    assert _timeout_actions((question,)) == [Action("ask-timeout", {"resource": resource, "holder": holder,
+                                                                        "route": "dispatcher"})]
 
 
 @pytest.mark.parametrize("questions", [

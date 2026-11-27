@@ -105,6 +105,9 @@ def settings_arguments(kind: SessionKind, ctx: StartContext) -> list[str]:
     if kind.deny:
         permissions["deny"] = [rule.format(**fields) for rule in kind.deny]
     settings = {"permissions": permissions, "env": {JOB_ID_VARIABLE: job_id}}
+    if kind.name == events.WORK:
+        # The origin's answer to ``cure-job ask`` arrives as a message from another session.
+        settings["crossSessionInbound"] = "accept"
     return ["--settings", json.dumps(settings, separators=(",", ":"))]
 
 
@@ -130,7 +133,8 @@ WORK = SessionKind(
     name=events.WORK,
     agent=_work_agent,
     allow=("Bash({cure_job} finish {job_id} *)", "Bash({cure_job} claim {job_id} *)",
-           "Bash({cure_job} release {job_id} *)", "Bash({cure_job} config get *)", "Bash({cure_job} list *)",
+           "Bash({cure_job} release {job_id} *)", "Bash({cure_job} ask {job_id} *)",
+           "Bash({cure_job} answered {job_id} *)", "Bash({cure_job} config get *)", "Bash({cure_job} list *)",
            "Bash({cure_job} finish --help)"),
     start_states=frozenset({State.APPROVED, State.LOST, State.NEEDS_INPUT}),
     start_guards=(approved_first, after_satisfied, state_in_start_states, kept_session_not_live, goal_exists,

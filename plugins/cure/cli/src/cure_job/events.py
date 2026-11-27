@@ -78,6 +78,22 @@ class Reported:
 
 
 @dataclass(frozen=True)
+class Asked:
+    """``cure-job ask``: the session of run ``run`` asked the origin session ``question``."""
+    run: int
+    question: tuple[str, ...]
+    at: datetime
+
+
+@dataclass(frozen=True)
+class Answered:
+    """``cure-job answered``: the session of run ``run`` got ``answer`` to its latest question."""
+    run: int
+    answer: tuple[str, ...]
+    at: datetime
+
+
+@dataclass(frozen=True)
 class SessionStopped:
     """``cure-job stop`` ran for session ``n`` of kind ``kind``. The launch grace no longer applies to it."""
     kind: str
@@ -118,8 +134,8 @@ class CheckoutStarted:
     commit: str
 
 
-Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, SessionStopped, SessionEnded,
-              SessionsRemoved, WorktreeOpened, CheckoutStarted]
+Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, Asked, Answered, SessionStopped,
+              SessionEnded, SessionsRemoved, WorktreeOpened, CheckoutStarted]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
@@ -128,6 +144,8 @@ _APPROVED = "approved"
 _CLOSED = "closed"
 _ORIGIN = "origin"
 _REPORTED = "reported"
+_ASKED = "asked"
+_ANSWERED = "answered"
 _STOPPED = "stopped"
 _SESSIONS_REMOVED = "sessions-removed"
 _WORKTREE_OPENED = "worktree-opened"
@@ -164,6 +182,10 @@ def encode(event: Event) -> str:
         fields = {"event": _ORIGIN, "address": event.address, "at": format_local(event.at)}
     elif isinstance(event, Reported):
         fields = {"event": _REPORTED, "run": event.run, "at": format_local(event.at)}
+    elif isinstance(event, Asked):
+        fields = {"event": _ASKED, "run": event.run, "question": list(event.question), "at": format_local(event.at)}
+    elif isinstance(event, Answered):
+        fields = {"event": _ANSWERED, "run": event.run, "answer": list(event.answer), "at": format_local(event.at)}
     elif isinstance(event, SessionsRemoved):
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     elif isinstance(event, WorktreeOpened):
@@ -189,6 +211,10 @@ def decode(line: str) -> Event | None:
                               worktree_root=_worktree_root(fields))
     if kind == _REPORTED:
         return Reported(_int(fields, "run"), parse_local(_text(fields, "at")))
+    if kind == _ASKED:
+        return Asked(_int(fields, "run"), _texts(fields, "question"), parse_local(_text(fields, "at")))
+    if kind == _ANSWERED:
+        return Answered(_int(fields, "run"), _texts(fields, "answer"), parse_local(_text(fields, "at")))
     if kind == _STOPPED:
         return SessionStopped(WORK, _int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _SESSIONS_REMOVED:

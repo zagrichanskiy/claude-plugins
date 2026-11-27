@@ -21,13 +21,13 @@ GOAL_DIGEST = digest(b"goal")
 
 def settings_args(job_id: str, plugin_root: Path = PLUGIN_ROOT) -> tuple[str, ...]:
     """The ``--settings`` pair ``launch`` and ``resume`` add: allow rules for the worker's job and the read commands,
-    and ``CURE_JOB_ID``."""
+    ``CURE_JOB_ID`` and the acceptance of messages from other sessions."""
     cure_job = f"{plugin_root}/bin/cure-job"
-    allow = [f"Bash({cure_job} {command} {job_id} *)" for command in ("finish", "claim", "release")]
+    allow = [f"Bash({cure_job} {command} {job_id} *)" for command in ("finish", "claim", "release", "ask", "answered")]
     allow += [f"Bash({cure_job} {command} *)" for command in ("config get", "list")]
     allow.append(f"Bash({cure_job} finish --help)")
-    return ("--settings", json.dumps({"permissions": {"allow": allow}, "env": {"CURE_JOB_ID": job_id}},
-                                     separators=(",", ":")))
+    return ("--settings", json.dumps({"permissions": {"allow": allow}, "env": {"CURE_JOB_ID": job_id},
+                                      "crossSessionInbound": "accept"}, separators=(",", ":")))
 
 
 def listed(statuses: dict[str, SessionStatus]) -> dict[str, Session]:

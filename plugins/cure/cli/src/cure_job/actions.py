@@ -41,17 +41,22 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
         return [Action("repair", {"problem": row["problem"]})]
     record, state = view.record, view.state
     settled = goal_settled(record, kinds)
+    # Who takes a message to the job's owner: the origin session itself, or the dispatcher in its place.
+    route = {"route": "origin" if view.origin_reachable else "dispatcher"}
     found = []
     if state in (State.DONE, State.FAILED, State.NEEDS_INPUT) and not record.reported:
-        found.append(Action("report"))
+        found.append(Action("report", route))
     if state in (State.DONE, State.ABANDONED) and not record.sessions_removed:
         found.append(Action("remove-sessions"))
     if state is State.NEEDS_INPUT:
         timeout = short_hold_timeout(record.result) if record.result else None
         if timeout:
-            found.append(Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder}))
+            found.append(Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder, **route}))
         else:
-            found.append(Action("ask-input"))
+            found.append(Action("ask-input", route))
+    elif state is State.AWAITING_ANSWER:
+        if not view.origin_reachable:
+            found.append(Action("ask-input", {**route, "question": list(record.question)}))
     elif state is State.STALLED:
         found.append(Action("confirm-stalled", {"stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]}))
     elif state is State.LOST:
@@ -65,7 +70,7 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
             found.append(Action("draft"))
     elif state is State.AWAITING_APPROVAL or (state is State.HELD and not record.approved):
         if settled and (view.after is None or view.after.state is not PredecessorGone.INVALID):
-            found.append(Action("ask-approval"))
+            found.append(Action("ask-approval", route))
     elif state is State.APPROVED:
         if settled:
             found.append(Action("launch"))

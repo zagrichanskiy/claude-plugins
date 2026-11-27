@@ -50,9 +50,9 @@ class Command:
 DISPATCHER = "dispatcher"
 
 
-def notify_line(job_id: str) -> str:
-    """The line that names the message to send once the job changed."""
-    return f'notify: SendMessage {DISPATCHER} "job {job_id}"'
+def notify_line(job_id: str, recipient: str = DISPATCHER) -> str:
+    """The line that names the message to send to ``recipient`` once the job changed."""
+    return f'notify: SendMessage {recipient} "job {job_id}"'
 
 
 def read_stdin() -> str:
@@ -63,6 +63,13 @@ def read_stdin() -> str:
     finally:
         # Without detach, the collected wrapper would close sys.stdin.buffer.
         text.detach()
+
+
+def line_arg(text: str) -> str:
+    text = text.strip()
+    if "\n" in text:
+        raise argparse.ArgumentTypeError("a line holds no line break")
+    return text
 
 
 def job_id_arg(text: str) -> str:

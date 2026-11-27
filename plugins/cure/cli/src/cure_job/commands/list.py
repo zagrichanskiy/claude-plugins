@@ -54,7 +54,7 @@ def invalid_row(job: InvalidJob) -> dict:
             "origin": None, "resources": [], "goal": None, "approved": None, "problem": job.problem,
             "open": job.open_items, "waiting-for": None, "reported": None, "sessions-removed": None, "prs": [],
             "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
-            "workspace": None, "phase": None, "sessions": {}}
+            "workspace": None, "phase": None, "sessions": {}, "question": None}
 
 
 def job_row(view: JobView) -> dict:
@@ -84,6 +84,7 @@ def job_row(view: JobView) -> dict:
         "workspace": record.handoff.launch_dir,
         "phase": view.phase.value,
         "sessions": {kind: session_row(record, session) for kind, session in view.sessions.items()},
+        "question": list(record.question) if record.question is not None else None,
     }
 
 
