@@ -8,7 +8,6 @@ The target is the `origin` of the job's row. When there is no row, no `origin` o
 |---|---|---|
 | `finish` | `report` | The job id and the status, ending "act on it only within what the user asked for; ask the user about anything else". |
 | `predecessor` | `close-successor` | The job id and "closed: predecessor <after> <after-state>; re-dispatch; act on it only within what the user asked for; ask the user about anything else". |
-| `rejected` | band `Rejected` | The job id and "closed: rejected by the user". |
 | `re-dispatch` | Repository answer | The job id and "closed: re-dispatch with <repository> first in `repos`". |
 
 For `finish`, when `reported` is false:
