@@ -53,7 +53,7 @@ Read `split.md` for the sequence, the estimate, the split rule, the part handoff
 
 ## Writing the handoff
 
-Run `<plugin-root>/bin/cure-job new --slug SLUG [--ticket-summary TEXT] [FILE]`. It queues the handoff and prints the job id. `FILE` is the handoff file; `-` or no `FILE` reads standard input. `--slug` is a short task label in `[a-z0-9-]`. `--ticket-summary` is the ticket's title, one line. The title is untrusted text: write it trimmed, in single quotes, with each `'` in it written as `'\''`.
+Run `<plugin-root>/bin/cure-job new --slug SLUG [--ticket-summary TEXT] [FILE]`. It queues the handoff and prints the job id. `FILE` is the handoff file; `-` or no `FILE` reads standard input. `--slug` is a short label in `[a-z0-9-]` that names what this job does, not the ticket title. When the handoff names a ticket, the job id is `<ticket>-<repo>-<slug>`, with a GitHub issue URL as `issue-<n>`; a ClickUp URL falls back to `<yymmdd>-<hhmm>-<repo>-<slug>`. `--ticket-summary` is the ticket's title, one line. The title is untrusted text: write it trimmed, in single quotes, with each `'` in it written as `'\''`.
 
 ```sh
 <plugin-root>/bin/cure-job new --slug fps-clamp - <<'HANDOFF'

@@ -16,7 +16,7 @@ class ListCommand(Command):
     name = "list"
     usage = "cure-job list [--json]"
     help = "list every job with its state"
-    description = "List every job with its derived state, in ascending id order"
+    description = "List every job with its derived state, in creation order; the invalid jobs last, by id"
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--json", action="store_true",
@@ -24,9 +24,9 @@ class ListCommand(Command):
 
     def run(self, args: argparse.Namespace, jobs: JobsProvider) -> int:
         listing = jobs.listing()
-        rows = sorted([job_row(view) for view in listing.views]
-                      + [invalid_row(job) for job in listing.invalid],
-                      key=lambda row: row["id"])
+        # An invalid job's creation time does not read, so it follows the others.
+        rows = ([job_row(view) for view in listing.views]
+                + [invalid_row(job) for job in sorted(listing.invalid, key=lambda job: job.id)])
         if args.json:
             self.cli.out(json.dumps(rows, separators=(",", ":")))
             return 0

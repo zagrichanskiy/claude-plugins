@@ -67,6 +67,11 @@ Run only enough, with the project's run command, to confirm the new tests collec
 pass. Full-suite runs belong to the `qa` agent. If a new test fails because it
 exposed a real defect in the code under test, report the defect and keep the test.
 
+Run `pre-commit run --files <new and changed files>`, never the `-a`/`--all-files` form: it skips
+untracked files. Never pipe a build or test command; report its own exit code. Wait in the
+foreground or on a PID, never with `pgrep -f`, which matches its own command line. Paste the last
+lines of the lint and test output into the report.
+
 ## Rules
 
 - Write test files to disk. Do not commit, branch or push.

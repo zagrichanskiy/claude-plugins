@@ -6,7 +6,7 @@ import json
 
 from ..actions import actions
 from ..providers.jobs import JobsProvider
-from ..state import lock_rank
+from ..state import invalid_lock_rank, lock_rank
 from .base import Command
 from .list import invalid_row, job_row
 
@@ -28,7 +28,7 @@ class NextCommand(Command):
         listing = jobs.listing()
         # An invalid job's work sessions are unknown, so it ranks as launched: it may hold any resource.
         ranked = sorted([(lock_rank(view.record), view, job_row(view)) for view in listing.views]
-                        + [((False, job.id), None, invalid_row(job)) for job in listing.invalid],
+                        + [(invalid_lock_rank(job.id), None, invalid_row(job)) for job in listing.invalid],
                         key=lambda entry: entry[0])
         elements = []
         for _, view, row in ranked:
