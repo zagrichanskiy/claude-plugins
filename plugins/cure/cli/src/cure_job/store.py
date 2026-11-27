@@ -237,6 +237,13 @@ class JobStore:
         with _store_errors(target):
             ledger.append(target, record)
 
+    def ledgers(self) -> list[str]:
+        """The text of each kept ledger, then of each current one."""
+        kept = self.root / _LEDGERS
+        paths = [kept / name for name in _names(kept) if name.endswith(".jsonl")]
+        paths += [self._jobs / name / _LEDGER for name in _names(self._jobs)]
+        return [text for text in (_read_text(path)[0] for path in paths) if text is not None]
+
     def read_goal(self, job_id: str) -> str:
         target = self.goal_path(job_id)
         text, _ = _read_text(target)
@@ -414,6 +421,17 @@ class JobStore:
 
 def _archived(run: int) -> str:
     return f"result-{run}.md"
+
+
+def _names(directory: Path) -> list[str]:
+    """The entries of ``directory``, ascending; none when it is absent."""
+    try:
+        with _store_errors(directory):
+            return sorted(os.listdir(directory))
+    except StoreError as e:
+        if isinstance(e.__cause__, FileNotFoundError):
+            return []
+        raise
 
 
 def _archived_runs(directory: Path) -> frozenset[int]:

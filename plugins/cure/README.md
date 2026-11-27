@@ -76,6 +76,8 @@ The main workspace is the `repo` tool workspace outside `slots.root`. No job tak
 
 The transcripts are found by the session id `claude agents` lists for each session of the job, under `${CURE_JOB_PROJECTS:-~/.claude/projects}`. A message streamed over several transcript lines counts once, and a sidechain line is skipped. A value that `finish` cannot read is `null`, never 0.
 
+`cure-job stats` reads the last record of each job from the current and the kept ledgers. It prints one line per repository and tier with the job count and the median of each token type, of turns and of changed lines. A job's tokens of one type are its orchestrator's and its subagents' tokens added, and its changed lines are the sum over its repositories. A `null` value is left out of a median, and a column with no value prints `-`, as does a missing tier. `--repo <repo>` prints only that repository.
+
 ## Job band
 
 The hooks module `hooks/register.tsx` draws a band above the prompt. It reads `cure-job list --json` on each draw and calls no tracker.
