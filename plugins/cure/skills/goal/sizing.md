@@ -12,8 +12,15 @@ it takes the failure exit instead of growing.
 - When Settled has an estimate, record the cap in Settled at draft time: read
   `<plugin-root>/bin/cure-job config get split.limit` and write "Split cap: <limit> changed lines".
   The size check reads the cap from there.
-- Estimate tests apart from code. Tests of a state-machine change are estimated at 2x its code.
-  Validator tests are estimated per key. A legacy parser is estimated separately.
+- The estimate rule. The unit is insertions plus deletions.
+  - Estimate tests apart from code, at 2x the code they cover. Validator tests are estimated per key.
+    A legacy parser is estimated separately.
+  - Deleted, moved and regenerated files (such as SVGs) count in full.
+  - List the callers of each changed symbol and the docs that state a changed term. Estimate the lines
+    that change in each, not the file in full.
+  - A `designer` or `architect` consult estimates raw changed lines, without the reserve. The goal
+    takes the larger of its raw estimate and the consult's.
+  - Add a review reserve of 50% on top of that.
 - The test-author brief states a line budget, the test estimate, beside the list of behaviours to
   cover.
 - A goal with a test-author step has a work item between the implementer item and the test-author

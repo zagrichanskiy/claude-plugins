@@ -14,8 +14,8 @@
 ## Estimate
 
 1. From Work and Done when, list every file each step changes: new, edited, deleted, tests, docs. Read each file to be edited.
-2. Per file, estimate added plus deleted lines with a one-phrase basis. Estimate tests apart from code by the rule in the goal skill, section "Sizing a goal".
-3. Sum per repository. The unit is insertions plus deletions of `git diff --shortstat <base>`.
+2. Per file, estimate added plus deleted lines with a one-phrase basis. Apply the estimate rule of `<plugin-root>/skills/goal/sizing.md` "Sizing a goal": only its per-file items: tests at 2x their code; deleted, moved and regenerated files in full; callers and docs of a changed term listed, each estimated by the lines that change in it. The reserve and the consult comparison belong to step 3.
+3. Sum per repository, then add a review reserve of 50%. The unit is insertions plus deletions of `git diff --shortstat <base>`. When the raw estimate of a `designer` or `architect` consult is larger than the raw sum, use it before the reserve.
 4. Run `<plugin-root>/bin/cure-job stats --repo <repository directory name>` (the basename of the first repository) and `grep '| <repo> |' ~/.claude/retros/stats.md` (read-only history). `cure-job stats` counts the lines of a job's repositories together, filed under its first repository: compare the total of a multi-repository estimate, not one repository's sum, against the lines median of each tier shown, and against the `lines` of a row that is a similar goal.
 
 ## Part handoffs

@@ -4,8 +4,8 @@ The main workspace is a ``repo`` tool workspace that is not a slot, that is, who
 The claim is the file ``main-claim`` in the state root, holding the session id. An Edit or a Write of a file in the
 main workspace needs the claim. A Bash command that runs there, or names a path there in any word, needs the claim
 unless it is one simple command of :data:`_READS`, or ``cure-job main-claim`` or ``main-release``, without a
-character of :data:`_METACHARACTERS`. A target under ``slots.root`` or ``worktree.root`` is never in the main
-workspace, even where that root lies inside it.
+character of :data:`_METACHARACTERS`. A target under ``slots.root``, ``worktree.root`` or the worktree root a job
+recorded is never in the main workspace, even where that root lies inside it.
 """
 from __future__ import annotations
 
@@ -77,9 +77,14 @@ def denial(store: JobStore, payload: Mapping[str, object], slots_root: str, work
     """The reason to deny the tool call of the PreToolUse ``payload``, or ``None`` to allow it."""
     session = str(payload.get("session_id") or "")
     job_roots = [os.path.realpath(os.path.expanduser(root)) for root in (slots_root, worktree_root)]
+    recorded: list[str] | None = None
     for target in _targets(payload, cure_job):
         workspace = find_workspace(target)
         if workspace is None or any(_under(target, root) for root in job_roots):
+            continue
+        if recorded is None:
+            recorded = _recorded_roots(store)
+        if any(_under(target, root) for root in recorded):
             continue
         try:
             current = holder(store)
@@ -92,6 +97,16 @@ def denial(store: JobStore, payload: Mapping[str, object], slots_root: str, work
         return (f"{target} is in the main workspace {workspace}; a write there needs the claim {MAIN}. {held}"
                 f"Take the claim with: {cure_job} {MAIN}-claim {session}")
     return None
+
+
+def _recorded_roots(store: JobStore) -> list[str]:
+    """The worktree root each job recorded at its launch, which a later change of ``worktree.root`` leaves in use.
+    A store that does not read exempts no root, so the write needs the claim."""
+    try:
+        records = store.load_all()
+    except StoreError:
+        return []
+    return [os.path.realpath(record.worktree_root) for record in records if record.worktree_root is not None]
 
 
 def _targets(payload: Mapping[str, object], cure_job: Path) -> list[str]:

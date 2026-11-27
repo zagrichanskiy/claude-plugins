@@ -173,7 +173,7 @@ def test_launch_starts_the_session_in_the_first_repo_worktree_with_the_goal_prom
     job_id = new_job(jobs, clock, approved=True)
     session = jobs.launch(job_id)
     assert session == job_id
-    worktree = str(tmp_path / "home" / "work" / "yocto" / "worktrees" / "video-core" / job_id)
+    worktree = str(tmp_path / "home" / "dev" / "worktrees" / "video-core" / job_id)
     assert claude.started == [(job_id, worktree, f"/goal @{store.goal_path(job_id)}", settings_args(job_id))]
 
 

@@ -123,9 +123,11 @@ order. Solo writes none. Read `${CLAUDE_PLUGIN_ROOT}/skills/goal/sizing.md` "The
 
 ## Sizing a goal
 
-Bound a goal by deliverables: one reviewable concern, one PR. Estimate test lines apart from code:
-tests of a state-machine change at 2x its code, validator tests per key, a legacy parser separately.
-The rest is in `sizing.md` "Sizing a goal".
+Bound a goal by deliverables: one reviewable concern, one PR. The estimate counts insertions plus
+deletions; tests at 2x their code; deleted, moved and regenerated files in full; the lines that
+change in each caller and doc of a changed term; plus a 50% review reserve. A larger raw estimate
+from a `designer` or `architect` consult replaces the goal's raw estimate before the reserve. The
+full rule is in `sizing.md` "Sizing a goal".
 
 ## Running it
 
