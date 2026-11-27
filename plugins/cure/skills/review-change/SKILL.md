@@ -66,6 +66,8 @@ Target: <the boundary from step 1>
 Digest: <path> — read it first; it is a map, not evidence. Cite the source for every finding.
 Report path: .notes/<slug>-<agent>-r<N>-report.md — write your report there yourself; do not return it in full to the caller.
 Token budget: <the figure from step 1>
+Settled: <the caller's Settled decisions, as decided; do not raise them. Omit when the caller states none>
+Round: <the caller's Round line, word for word. Omit when the caller's brief has none>
 Task: REVIEW. Decide for yourself which files to open.
 ```
 
@@ -104,7 +106,11 @@ on a usage or rate limit with `SendMessage` once the limit resets; do not dispat
   and update `.notes/<slug>-ledger.md` with the round's finding ids and status.
 - A fix that changes a rule beyond its finding needs a test in the same round. The fix brief tells
   the implementer to return such a change as a question, and states each finding's cause scope:
-  local to the cited line, or also present elsewhere.
+  local to the cited line, or also present elsewhere. It carries the finding and its scenario, not
+  the reviewer's text, and a grep of the changed fact's key terms over the document set and its
+  siblings. The fixer changes only the words the finding names, and their copies among the grep hits,
+  and checks the result against the code. A grep hit that states the same fact is a copy, edited
+  within an "also present elsewhere" cause scope; the fixer reports any other hit.
 - Sweep the digest once the report is delivered, per the `note` skill. Persist a report the author
   works from over several sessions where the project keeps documents, and hand back the path.
 

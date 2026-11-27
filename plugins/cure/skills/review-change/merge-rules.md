@@ -81,6 +81,9 @@ a tag and does not gate the round.
   *not raised*. Re-check every must-fix that was not raised against the source yourself before you
   drop it. If it still holds, keep it in its altitude's section, marked as carried by the merging
   session.
+- **Drop new non-defects in re-check rounds.** Only when the caller's brief carries a `Round:` line:
+  drop a new finding (neither a finding of the previous round nor on a line that round's fixes
+  changed) that is not a behaviour defect. It is not carried and not backlogged.
 
 ## Delegating the merge
 

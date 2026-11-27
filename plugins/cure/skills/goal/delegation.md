@@ -54,9 +54,10 @@ A Solo goal differs from the template:
   component, each with at most N review rounds (N = `reviews.Full`). The cap counts per PR. A round
   that ended on a failed test or check counts apart from a round spent on review findings. A
   `MUST-FIX` or `SHOULD-CONSIDER` open after a PR's round N takes the failure exit; no round N+1
-  starts. Rounds 2..N re-check only the previous round's fixes and raise no new topic. The
-  orchestrator commits each round's fixes with explicit paths, new files included, before the
-  re-check. Once the PR exists, a fix is squashed into the job's latest commit.
+  starts. Rounds 2..N re-check only the previous round's fixes and findings and raise no new topic
+  except a behaviour defect, which the job fixes. The orchestrator commits each round's fixes with
+  explicit paths, new files included, before the re-check. Once the PR exists, a fix is squashed into
+  the job's latest commit.
 - Consultation: `designer` answers class-level questions, `architect` component-level ones. Record
   the answer before the implementer starts. A class flagged in 2 consecutive review rounds gets a
   `designer` consult before an implementer touches it again; round-1 triage and the PR's first
