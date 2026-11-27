@@ -3,7 +3,8 @@
 ``JobStore`` is the state-root seam: production code builds it on
 ``~/.claude/cure`` and a test builds it on a temporary directory. The layout is
 ``<root>/jobs/<id>/`` with ``handoff.md``, ``goal.md``, ``dispatch.jsonl``,
-``result.md`` and ``result-<run>.md``. The root and ``jobs/`` are private to
+``result.md``, ``result-<run>.md`` and ``ledger.jsonl``, and ``<root>/ledgers/<id>.jsonl``, the ledger
+kept for a removed job. The root, ``jobs/`` and ``ledgers/`` are private to
 the user (0700), and every file the store writes is 0600.
 """
 from __future__ import annotations
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Callable, Iterator, NamedTuple, Sequence
 
 from . import job_id as ids
+from . import ledger
 from .errors import HandoffError, StoreError, UnknownJob
 from .events import Event, decode, encode
 from .goal import digest, open_items
@@ -33,6 +35,8 @@ _HANDOFF = "handoff.md"
 _GOAL = "goal.md"
 _EVENTS = "dispatch.jsonl"
 _RESULT = "result.md"
+_LEDGER = "ledger.jsonl"
+_LEDGERS = "ledgers"
 _ENCODING = "utf-8"
 _NEW_PREFIX = ".new-"
 _ARCHIVED = re.compile(r"result-([1-9][0-9]*)\.md")
@@ -85,6 +89,14 @@ class JobStore:
 
     def result_path(self, job_id: str) -> Path:
         return self.job_dir(job_id) / _RESULT
+
+    def ledger_path(self, job_id: str) -> Path:
+        return self.job_dir(job_id) / _LEDGER
+
+    def kept_ledger_path(self, job_id: str) -> Path:
+        if not ids.is_valid(job_id):
+            raise ValueError(f"invalid job id {job_id!r}")
+        return self.root / _LEDGERS / f"{job_id}.jsonl"
 
     def input_path(self, job_id: str, stem: str, n: int) -> Path:
         return self.job_dir(job_id) / f"{stem}-{n}.md"
@@ -213,6 +225,18 @@ class JobStore:
                 os.unlink(temp)
         return True
 
+    def read_handoff(self, job_id: str) -> str:
+        target = self.job_dir(job_id) / _HANDOFF
+        text, _ = _read_text(target)
+        if text is None:
+            raise UnknownJob(f"unknown job {job_id}: {target} does not exist")
+        return text
+
+    def append_ledger(self, job_id: str, record: dict) -> None:
+        target = self.ledger_path(job_id)
+        with _store_errors(target):
+            ledger.append(target, record)
+
     def read_goal(self, job_id: str) -> str:
         target = self.goal_path(job_id)
         text, _ = _read_text(target)
@@ -263,7 +287,19 @@ class JobStore:
             os.rename(directory / _archived(run), directory / _RESULT)
 
     def remove(self, job_id: str) -> None:
+        """Remove the job directory after appending its ``ledger.jsonl``, when it has one, to the kept ledger,
+        unless the kept ledger already ends with it."""
         directory = self.job_dir(job_id)
+        text, _ = _read_text(self.ledger_path(job_id))
+        target = self.kept_ledger_path(job_id)
+        # A retry after a failed rmtree finds the ledger already kept.
+        kept = _read_text(target)[0] or ""
+        if text and not kept.endswith(text):
+            with _store_errors(target):
+                os.makedirs(target.parent, _DIR_MODE, exist_ok=True)
+                descriptor = os.open(target, os.O_WRONLY | os.O_APPEND | os.O_CREAT, _FILE_MODE)
+                with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+                    sink.write(("\n" if kept and not kept.endswith("\n") else "") + text)
         with _store_errors(directory):
             shutil.rmtree(directory)
 

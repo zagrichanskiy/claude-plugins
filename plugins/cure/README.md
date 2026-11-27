@@ -61,6 +61,21 @@ Slots: a job whose first repository is inside a `repo` tool workspace runs in a 
 
 The main workspace is the `repo` tool workspace outside `slots.root`. No job takes it. An interactive session runs `cure-job main-claim <session id>` before its first write there. An Edit or Write there is a write. A Bash command that runs there or names a path there is a write unless it is one simple command with none of `;`, `&`, `|`, `<`, `>`, `$`, a backtick or a newline, and the command is `git status`, `log`, `diff`, `show`, `branch` with listing options only, `rev-parse`, `ls-files`, `grep` without `-O`, `blame` or `remote -v`, with no option before the subcommand and no `--output`, or `ls`, `cat`, `head`, `tail`, `grep`, `rg` without `--pre` or `--hostname-bin`, `wc`, `stat`, `file` without `-C`, or `find` without an action such as `-exec` or `-delete`. `<plugin>/bin/cure-job main-claim` or `main-release`, run by its full path as such a simple command, is not a write either. A target under `slots.root` or `worktree.root` is never in the main workspace, even when that root lies inside it. One session holds the claim `main` at a time; `main-claim` exits 1 naming the holder and `cure-job main-release <holder>`, which releases the claim of a holder that no longer runs. A `PreToolUse` hook denies a write under the main workspace from a session that does not hold `main`, and its reason gives the `main-claim` command and, while another session holds `main`, that `main-release` command. A `SessionEnd` hook runs `cure-job main-release <session id>`.
 
+## Job ledger
+
+`cure-job finish` appends one job record to `ledger.jsonl` in the job directory, one JSON object per line, after it writes `result.md`. A job that runs again finishes again, and each record holds the totals of every run so far, so the last record of a job holds the job's totals. Only `cure-job` writes a ledger, and nothing truncates or rotates one. When `cure-job prune` removes a job, it first appends the job's ledger to `${CURE_JOB_ROOT:-~/.claude/cure}/ledgers/<id>.jsonl`, unless that file already ends with it.
+
+| Field | Value |
+|---|---|
+| `job`, `date`, `repo`, `slug` | The job id, the time of `finish`, the basename of the first repository, the slug of the id |
+| `tier`, `outcome` | The goal's Rules tier and the `finish` status |
+| `est_lines` | N of the handoff's Settled line `Estimate: ~N changed lines` |
+| `lines` | For the first handoff repository in each git toplevel, the insertions plus deletions of the job's commits since the commit its worktree or slot checkout started at; `null` when no start commit is recorded |
+| `turns` | The orchestrator's assistant messages |
+| `orchestrator_tokens`, `subagent_tokens` | `input`, `output`, `cache_creation` and `cache_read` tokens, summed over the job's session transcripts and, separately, over their subagent transcripts |
+
+The transcripts are found by the session id `claude agents` lists for each session of the job, under `${CURE_JOB_PROJECTS:-~/.claude/projects}`. A message streamed over several transcript lines counts once, and a sidechain line is skipped. A value that `finish` cannot read is `null`, never 0.
+
 ## Job band
 
 The hooks module `hooks/register.tsx` draws a band above the prompt. It reads `cure-job list --json` on each draw and calls no tracker.

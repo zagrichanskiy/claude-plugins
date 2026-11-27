@@ -12,6 +12,7 @@ A slot is held through the claim ``slot:<path>``. A launch with no free slot exi
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import stat
@@ -24,6 +25,7 @@ import pytest
 from cure_job import slot
 from cure_job.claude import SessionStatus
 from cure_job.config import DEFAULTS
+from cure_job.result import Report, ResultStatus
 from tests.test_approve import DONE_RESULT, NEEDS_INPUT_RESULT, rows
 from tests.test_cli import Harness
 from tests.test_config import configure
@@ -349,6 +351,21 @@ def test_a_reused_slot_is_clean_after_the_next_launch_and_keeps_local_commits(wo
     assert not (project / "untracked.txt").exists()
     assert git(project, "rev-parse", "local-only") == kept
     assert git(project, "rev-parse", "HEAD") == git(project, "rev-parse", "origin/main")
+
+
+def test_a_slot_job_counts_its_lines_from_the_commit_its_slot_started_at(h, workspace, slots):
+    main_project = workspace / PROJECT
+    git(main_project, "switch", "-qc", "feat-a")
+    (main_project / "ahead.txt").write_text("1\n2\n3\n4\n5\n", encoding="utf-8")
+    git(main_project, "add", "."); git(main_project, "commit", "-qm", "ahead")
+    git(main_project, "switch", "-q", "main")
+    job_id = start(h, workspace, "a", branch="feat-a")
+    project = session_cwd(h)
+    (project / "f.txt").write_text("a\nb\n", encoding="utf-8")
+    git(project, "add", "."); git(project, "commit", "-qm", "work")
+    h.cli.jobs.finish(job_id, Report(ResultStatus.DONE))
+    [record] = (h.root / "jobs" / job_id / "ledger.jsonl").read_text(encoding="utf-8").splitlines()
+    assert json.loads(record)["lines"] == {str(workspace / PROJECT): 2}
 
 
 def test_a_slot_job_does_not_record_a_worktree_root(h, workspace, slots):

@@ -22,15 +22,16 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Mapping, NamedTuple, NoReturn, Sequence
 
-from .. import worktree
+from .. import ledger, slot, worktree
 from ..claude import Claude, Session
-from ..clock import Clock
+from ..clock import Clock, format_local
 from ..config import Config
-from ..errors import GitError, HandoffError, JobStateError, ResourceHeld, StoreError, UnknownJob
+from ..errors import (ClaudeError, CureJobError, GitError, HandoffError, JobStateError, ResourceHeld, StoreError,
+                      UnknownJob)
 from ..events import Approved, Claim, Closed, Origin, Release, Reported
-from ..goal import PLUGIN_ROOT
+from ..goal import PLUGIN_ROOT, tier
 from ..handoff import parse_submitted, stamp
-from ..job_id import make_id
+from ..job_id import make_id, slugify
 from ..result import Report, render_result
 from ..job import JobRecord
 from ..events import WORK
@@ -56,8 +57,11 @@ CLAIM_POLL_SECONDS = 10.0
 class JobsProvider:
     def __init__(self, store: JobStore, claude: Claude, clock: Clock, plugin_root: Path = PLUGIN_ROOT,
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic,
-                 config: Config = Config(), kinds: Mapping[str, SessionKind] = KINDS):
+                 config: Config = Config(), kinds: Mapping[str, SessionKind] = KINDS,
+                 projects_root: Path | None = None):
         self.store = store
+        # The Claude Code projects directory that holds the session transcripts; without it no tokens are read.
+        self.projects_root = projects_root
         self.kinds = kinds
         self.config = config
         self.claude = claude
@@ -264,16 +268,78 @@ class JobsProvider:
         self.store.append_event(job_id, Reported(record.run, self.clock()))
 
     def finish(self, job_id: str, report: Report) -> Path:
-        """Write ``report`` as the ``result.md`` of a launched job and return its path.
+        """Write ``report`` as the ``result.md`` of a launched job, then append its job record to ``ledger.jsonl``,
+        and return the ``result.md`` path.
 
-        Reads only this job: no session list, no other job's files, no clock.
+        Reads this job, the session list once for the transcripts of its sessions, and no other job's files.
         """
         record = self.store.load(job_id)
         path = self.store.result_path(job_id)
         check(Op.END, Check(record, "finish", kind=WORK_KIND))
         if not self.store.write_result(job_id, render_result(report)):
             raise JobStateError(f"job {job_id} already has {path}")
+        try:
+            self.store.append_ledger(job_id, self._job_record(record, report))
+        except StoreError as e:
+            raise StoreError(f"job {job_id}: {path} is written; its ledger record is not: {e}") from e
         return path
+
+    def _job_record(self, record: JobRecord, report: Report) -> dict:
+        """The ledger record of ``record``. A value that does not read is ``None``."""
+        try:
+            handoff_text = self.store.read_handoff(record.id)
+        except CureJobError:
+            handoff_text = None
+        try:
+            goal_text = self.store.read_goal(record.id)
+        except CureJobError:
+            goal_text = None
+        repo = os.path.basename(record.handoff.launch_dir)
+        prefix = f"{record.id[:11]}-{slugify(repo)}-"
+        orchestrator, subagents = [], []
+        for uuid in self._session_uuids(record):
+            main, found = ledger.locate(self.projects_root, uuid)
+            orchestrator.extend([main] if main is not None else [])
+            subagents.extend(found)
+        return ledger.job_record(
+            job_id=record.id, date=format_local(self.clock()), repo=repo,
+            slug=record.id.removeprefix(prefix) if record.id.startswith(prefix) else None,
+            tier=tier(goal_text) if goal_text is not None else None, outcome=report.status.value,
+            est_lines=ledger.est_lines(handoff_text) if handoff_text is not None else None,
+            lines=self._changed_lines(record), orchestrator=ledger.read_usage(orchestrator),
+            subagents=ledger.read_usage(subagents))
+
+    def _session_uuids(self, record: JobRecord) -> list[str]:
+        if self.projects_root is None:
+            return []
+        try:
+            listed = self.claude.sessions()
+        except ClaudeError:
+            return []
+        return [listed[name].uuid for name in record.session_names if name in listed and listed[name].uuid]
+
+    def _changed_lines(self, record: JobRecord) -> dict[str, int | None] | None:
+        """The changed lines of the checkout of the first repository in each git toplevel since its start commit."""
+        repos = record.handoff.repos
+        try:
+            if record.slot is None:
+                checkouts = worktree.paths(record.worktree_root or self.config["worktree.root"], repos, record.id)
+            else:
+                workspace = slot.find_workspace(repos[0])
+                if workspace is None:
+                    return None
+                checkouts = {repo: Path(record.slot) / os.path.relpath(repo, workspace)
+                             for repo in worktree.firsts(repos).values()}
+        except GitError:
+            return None
+        lines: dict[str, int | None] = {}
+        for repo, checkout in checkouts.items():
+            start = record.start_commits.get(repo)
+            try:
+                lines[repo] = worktree.git.changed_lines(checkout, start) if start is not None else None
+            except GitError:
+                lines[repo] = None
+        return lines
 
     def prune_half_created(self) -> list[Path]:
         """Remove the directories an interrupted ``new`` left, after one day. Return their paths."""

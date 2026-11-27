@@ -15,7 +15,8 @@ from .clock import Clock
 from .config import DEFAULTS
 from .errors import ClaudeError, ClaudeOutcomeUnknown, StoreError
 from .errors import SlotError
-from .events import Claim, SessionEnded, SessionsRemoved, SessionStarted, SessionStopped, WorktreeOpened
+from .events import (Claim, SessionEnded, SessionsRemoved, SessionStarted, SessionStopped, WorktreeOpened,
+                     CheckoutStarted)
 from .job import JobRecord
 from .kinds import KINDS, End, SessionKind, StartContext, settings_arguments
 from .sessions import listed_live
@@ -162,6 +163,9 @@ class SessionRunner:
         branch = record.handoff.branch or (after[1] if after is not None else None)
         if branch is not None:
             slot.start_branches(workspace, path, record.handoff.repos, branch, after)
+        for repo in worktree.firsts(record.handoff.repos).values():
+            commit = worktree.git.head(path / os.path.relpath(os.path.abspath(repo), workspace))
+            self.store.append_event(record.id, CheckoutStarted(repo, commit))
 
     def _worktree(self, record: JobRecord) -> Path:
         """The directory of the first repository in its worktree, after creating the missing worktrees."""
@@ -173,7 +177,8 @@ class SessionRunner:
         root = self._root(record)
         if record.worktree_root is None:
             self.store.append_event(record.id, WorktreeOpened(root))
-        return worktree.open_all(root, record.handoff.repos, record.id, predecessor)
+        return worktree.open_all(root, record.handoff.repos, record.id, predecessor,
+                                 lambda repo, commit: self.store.append_event(record.id, CheckoutStarted(repo, commit)))
 
     def _root(self, record: JobRecord) -> str:
         return record.worktree_root or os.path.expanduser(self.worktree_root)

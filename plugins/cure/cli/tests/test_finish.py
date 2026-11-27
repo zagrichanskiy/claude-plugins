@@ -99,13 +99,13 @@ def test_finish_writes_a_result_that_parses_back_and_derives_the_state(jobs, sto
     assert state_of(jobs, job_id) == state
 
 
-def test_finish_makes_no_sessions_call(store, clock):
+def test_finish_makes_one_sessions_call_for_the_transcripts(store, clock, tmp_path):
     claude = FakeClaude()
-    jobs = JobsProvider(store, claude, clock)
+    jobs = JobsProvider(store, claude, clock, projects_root=tmp_path / "projects")
     job_id = make_job(jobs, store, clock)
     calls = claude.sessions_calls
     jobs.finish(job_id, Report(ResultStatus.DONE))
-    assert claude.sessions_calls == calls
+    assert claude.sessions_calls == calls + 1
 
 
 # --- Report refusals --------------------------------------------------------------------------------
