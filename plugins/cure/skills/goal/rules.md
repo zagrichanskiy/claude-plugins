@@ -76,7 +76,8 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   recommendation, for a reader who has not followed the run.
 - Read with `gh issue view --json <fields>` or `gh pr view --json <fields>`. Edit with `gh api`, for
   example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -F body=@<file>`; in Light and Full
-  `delivery` runs it with the `pr-edit` brief. `gh issue view` and
+  `delivery` runs it with the `pr-edit` brief. Only a pull request is edited this way. An issue,
+  its body included, is written by `tracker` (`field` brief). `gh issue view` and
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - A command for the user to run with `!` is a script file, run as `! python3 <absolute path>`. Job
@@ -90,10 +91,24 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 
 - The main session orchestrates: it dispatches agents, keeps the ledger, checks completeness. It reads
   no source and edits no code.
-- The orchestrator dispatches `delivery` for every git and GitHub write: branch creation, commit,
+- The orchestrator dispatches `delivery` for every git write and pull request: branch creation, commit,
   amend, push and PR, with explicit paths. It keeps read-only git (for example `status`, `diff`,
   `log`, `show`, `rev-parse`, `merge-base`, `ls-tree`, `fetch`) and `gh` reads. It never asks
   `implementer`, `test-author` or `skill-author` to write to git.
+- The orchestrator dispatches `tracker` for every tracker read, write and transition, on GitHub
+  issues too, and for each tracker step of the PR skill. No other agent of a job has a tracker tool.
+- Ticket status, each step a `tracker` `transition` brief carrying the generic status name. A run
+  whose goal names no ticket skips these steps.
+  - Before the first change: In progress, assigned to the tracker's signed-in user.
+  - After the `tracker` `field` write that links the PRs, or, when that write is not run, after the
+    run's push with every PR linked, in every run: In review, assignee unchanged.
+  - When a run starts on a branch that already has an open PR of its ticket: In progress, assigned
+    to the signed-in user.
+  - A transition whose status `tracker` reports as `skipped: no status named` is recorded in the
+    ledger and the run continues.
+  - A ticket already in the target status, or already assigned to that user, is left as it is.
+  - A failed transition, or a question from one, does not fail the job and goes to no question
+    round. The ledger and the final message name it.
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round. Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit

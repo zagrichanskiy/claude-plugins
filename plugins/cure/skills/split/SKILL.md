@@ -39,7 +39,7 @@ Every exit leaves `<branch>` checked out. Stage with explicit paths; never `git 
 
 ## Preflight
 
-Under `pr`, dispatch `tracker` with the brief `check` and `delivery` with the brief `preflight`. The tracker comes from the ticket form, else from `<plugin-root>/bin/cure-job config get split.tracker` (default `github`). `check` reports `github: ok | no-auth | issues-disabled`, `jira: mcp | command | none` and `clickup: mcp | none`. `none`, `no-auth` or `issues-disabled` for the chosen tracker stops the skill.
+Under `pr`, dispatch `tracker` with the brief `check` and `delivery` with the brief `preflight`. The tracker comes from the ticket form, else from `<plugin-root>/bin/cure-job config get split.tracker` (default `github`). `check` reports `github: ok | no-auth | issues-disabled` and, for another tracker, `<tracker>: mcp | command | none` (`command` only for Jira). `none`, `no-auth` or `issues-disabled` for the chosen tracker stops the skill.
 
 Stop with nothing changed, naming the check, when a check fails, when `git branch --show-current` is not `<branch>`, or when `git status --porcelain` lists a staged entry or a path in `git diff --name-only --no-renames <base-commit> <branch>` or in the files of any item. Never log in and never read or store a token.
 
@@ -80,7 +80,7 @@ A failed command ends the rollback. The report names the command, the checked-ou
 
 ## Tickets
 
-Only under `delivery: pr`, in step 5, after every scratch part passes. Read `<plugin-root>/skills/split/build-publish.md` section "Tickets". `tracker` creates one ticket per stacked part, part 2 first. Part 1 keeps `<orig>`. The branch name of a stacked part is `<tid>_<slug>`; `<tid>` is `issue-<N>` for a GitHub `#N`, the key for Jira, the custom id for ClickUp.
+Only under `delivery: pr`, in step 5, after every scratch part passes. Read `<plugin-root>/skills/split/build-publish.md` section "Tickets". `tracker` `split-create` creates one ticket per stacked part, part 2 first. Part 1 keeps `<orig>`. The branch name of a stacked part is `<tid>_<slug>`; `<tid>` is `issue-<N>` for a GitHub `#N`, the key for Jira, the custom id for ClickUp.
 
 ## Publish
 
@@ -92,6 +92,7 @@ Read `<plugin-root>/skills/split/build-publish.md` section "Publish" before step
 - per part its branch, items and changed lines, with the estimate and the cap
 - under `pr` the pull request URLs in chain order
 - `<orig>` with the link and rewrite results and the saved-body path
+- the skipped tracker steps not run, and the result of each field write
 - manual steps (field and link copy and rewrite for Jira without MCP tools, each companion pull request outside `repos`)
 - each sibling PR with its part or the reason it stays
 - the tree hash of the old tip and of the last part, locally and on `origin`
