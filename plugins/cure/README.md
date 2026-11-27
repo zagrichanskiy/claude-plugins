@@ -9,7 +9,7 @@ Config file: `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}
 Question policies: `${XDG_CONFIG_HOME:-~/.config}/cure/question-policies.md`, beside `config.json`. The dispatcher reads it before each question round and appends a policy when the user calls a question not needed. The CLI does not read it.
 
 - The defaults live only in the key table of `config.py`.
-- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `band`, `dashboard`, `worktree`, `slots`; `launch-grace-seconds` is top-level).
+- `skills/dispatch/config.example.json` is generated from that table, holds the defaults, is never read at runtime, and lists every key nested by group (`handoff`, `dispatcher`, `split`, `reviews`, `short-hold`, `prune`, `worktree`, `slots`; `launch-grace-seconds` is top-level).
 - Lookup names stay dotted: `cure-job config get handoff.delivery`.
 
 | Command | Effect |
@@ -35,7 +35,6 @@ Old layouts:
 
 - A flat dotted key is the error `config.json: handoff.delivery: flat key; write it as {"handoff": {"delivery": ...}}`.
 - `base` in the `handoff` group is the error `config.json: handoff: "base" is removed; a job's base is the base stated in the handoff, else resolved by cure:goal`.
-- `jira-url` in the `band` group is the error `config.json: band: "jira-url" is removed; write it as "tracker-url": "<jira-url>/browse/<key>"`. The dispatcher's rewrite writes that `band.tracker-url`.
 - The dispatcher rewrites a file with only these problems to the nested layout.
 - `config init` drops a `base` row of `defaults.md` with the note `defaults.md: handoff: "base" is removed; row dropped; ...`.
 
@@ -77,51 +76,3 @@ The main workspace is the `repo` tool workspace outside `slots.root`. No job tak
 The transcripts are found by the session id `claude agents` lists for each session of the job, under `${CURE_JOB_PROJECTS:-~/.claude/projects}`. A message streamed over several transcript lines counts once, and a sidechain line is skipped. A value that `finish` cannot read is `null`, never 0.
 
 `cure-job stats` reads the last record of each job from the current and the kept ledgers. It prints one line per repository and tier with the job count and the median of each token type, of turns and of changed lines. A job's tokens of one type are its orchestrator's and its subagents' tokens added, and its changed lines are the sum over its repositories. A `null` value is left out of a median, and a column with no value prints `-`, as does a missing tier. `--repo <repo>` prints only that repository.
-
-## Job band
-
-The hooks module `hooks/register.tsx` draws a band above the prompt. It reads `cure-job list --json` on each draw and calls no tracker.
-
-| Session | Band |
-|---|---|
-| Job session (`CURE_JOB_ID` set by `cure-job launch` and `resume`) | The job's ticket as a link, its summary, its PR links, its branch and the session's working directory. No buttons. |
-| Dispatcher (main agent `cure:dispatcher`) | One entry per `awaiting-approval` job: the ticket link, summary, PR links, the handoff branch and the workspace, with Approve (`cure-job approve <id> --by user`) and Reject (`cure-job close <id>`). Nothing when no job awaits approval. |
-| Any other session | Nothing. |
-
-Ticket links:
-
-- A tracker key (`ABC-12`, a Jira key or a ClickUp custom id) links to `band.tracker-url` with `<key>` replaced by the key. `band.tracker-url` defaults to `https://ienso-team.atlassian.net/browse/<key>`; for ClickUp it is `https://app.clickup.com/t/<workspace-id>/<key>`.
-- `owner/repo#N` links to that GitHub issue. `#N` links to an issue of the workspace's GitHub `origin`, else shows as text.
-- An http(s) URL links to itself.
-
-A job session without a handoff `branch` shows `git branch --show-current` of its working directory.
-
-## Work dashboard
-
-The same module opens a pane titled Work in an interactive session that is neither a job session nor the dispatcher. It shows the user's open tracker tasks, their open GitHub pull requests and the cure jobs. The data is fetched once at session start and then every `dashboard.refresh-seconds`, without a model call. The pane is placed at once from 144 terminal columns; narrower, it waits until the terminal widens. Closing the pane stops the refresh; `/cure-work` reopens it and restarts the refresh, and in a job session or the dispatcher it answers that the pane is not available there.
-
-| Source | Fetched with |
-|---|---|
-| Pull requests | One `gh api graphql` search for open PRs authored by `@me` and one for those whose review is requested from `@me`, narrowed to the `dashboard.github-owners` entries when the list is set; each returns the head branch, review decision and last commit's check state |
-| Jobs | `cure-job list --json`, narrowed to `dashboard.job-states` and, under `dashboard.job-scope` `workspace`, to the jobs whose `workspace` is the session's project root (where it started, or where `/cd`, a host directory change or a worktree move took it; a shell `cd` does not move it) |
-| Tasks, `split.tracker` `github` | `gh search issues --assignee @me --state open`, once per `dashboard.github-owners` entry with `--owner`, once without when the list is empty |
-| Tasks, any other `split.tracker` | One call of the MCP tool `dashboard.tasks-mcp-tool` on server `dashboard.tasks-mcp-server` with `dashboard.tasks-mcp-args`; the list at `dashboard.tasks-field-items` in its reply gives one task per item. While the server, the tool or `dashboard.tasks-field-key` is empty, the pane says tasks are unavailable |
-
-Each task is one group with the PRs and jobs that belong to it. A PR belongs to a task by its head branch: `ABC-12_…` to the tracker key `ABC-12`, `issue-5-…` or `issue-5_…` to issue 5 of the PR's repository. A job belongs to a task by its `ticket`: a tracker key, an issue reference, or a URL equal to the task's `dashboard.tasks-field-url` value. A PR or job that matches no task is listed under Unlinked.
-
-A source whose refresh fails keeps its last data and the pane shows how old the data is and the error. When a PR search returns some PRs together with an error, the pane shows those PRs and the line `PRs incomplete: <reason>`. A source with no data yet shows why it is unavailable; PRs and jobs still show without tasks.
-
-| Key | Default | Value |
-|---|---|---|
-| `dashboard.refresh-seconds` | `120` | Seconds between refreshes, 30 to 3600; read at session start and by `/cure-work` |
-| `dashboard.github-owners` | `[]` | GitHub owners whose issues count as tasks and whose PRs are shown; empty means every owner |
-| `dashboard.tasks-mcp-server` | `""` | MCP server whose tool lists the tasks when `split.tracker` is not `github`, named as `/mcp` lists it |
-| `dashboard.tasks-mcp-tool` | `""` | Name of that tool |
-| `dashboard.tasks-mcp-args` | `{}` | JSON object passed to the tool as its arguments |
-| `dashboard.tasks-field-items` | `""` | Dotted path to the task list in the tool's reply; empty means the reply is the list |
-| `dashboard.tasks-field-key` | `""` | Dotted path, within one item, to the task key; an item without a key is skipped |
-| `dashboard.tasks-field-title` | `""` | Dotted path to the task title; empty shows no title |
-| `dashboard.tasks-field-status` | `""` | Dotted path to the task status; empty shows no status |
-| `dashboard.tasks-field-url` | `""` | Dotted path to the task URL, by which a job whose `ticket` is that URL joins the task |
-| `dashboard.job-states` | `["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"]` | Job states the pane lists, each a state `cure-job list` reports (`invalid` included) |
-| `dashboard.job-scope` | `"workspace"` | `workspace` lists the jobs started in the session's project root; `all` lists every job |

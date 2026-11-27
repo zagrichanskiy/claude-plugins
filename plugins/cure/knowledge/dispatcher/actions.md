@@ -24,9 +24,9 @@ Condition: `config.json` has an error. The element is last in the array, `id` is
 
 Show each line of `errors` to the user. Ask nothing. Each line is `config.json: <key>: <problem>`, or `config.json: <problem>` for a whole-file error (for example `config.json found at the old location <path>; run cure-job config init`).
 
-When every line is a flat-key problem (`config.json: handoff.delivery: flat key; write it as {"handoff": {"delivery": ...}}`) or a removed-key problem (`config.json: <group>: "<name>" is removed; <reason>`):
+When every line is a flat-key problem (`config.json: handoff.delivery: flat key; write it as {"handoff": {"delivery": ...}}`) or a removed-key problem (`config.json: <group>: "<name>" is removed; <reason>`, or `config.json: <group>: group is removed; <reason>` for a whole group):
 
-1. Rewrite `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` to the nested layout of `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json`. Move each flat dotted key into its group, drop each removed key, keep every other value. A removed `band.jira-url` becomes `band.tracker-url` with the value `<jira-url>/browse/<key>`.
+1. Rewrite `${CURE_JOB_CONFIG:-${XDG_CONFIG_HOME:-~/.config}/cure/config.json}` to the nested layout of `${CLAUDE_PLUGIN_ROOT}/skills/dispatch/config.example.json`. Move each flat dotted key into its group, drop each removed key and group, keep every other value.
 2. Run `cure-job config check`. On exit 0, tell the user which keys moved or were dropped. On exit 1, show its stderr.
 
 When any line is another problem, do not edit the file; suggest `cure-job config check` after the user fixes it. An unknown-key line ends with `unknown to cure <version>; restart the dispatcher after an update`; do not edit the file for it.

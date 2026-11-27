@@ -43,19 +43,6 @@ DEFAULTS: dict[str, object] = {
     "short-hold.wait-seconds": 540,
     "short-hold.wait-total-minutes": 120,
     "prune.failed-days": 30,
-    "band.tracker-url": "https://ienso-team.atlassian.net/browse/<key>",
-    "dashboard.refresh-seconds": 120,
-    "dashboard.github-owners": [],
-    "dashboard.tasks-mcp-server": "",
-    "dashboard.tasks-mcp-tool": "",
-    "dashboard.tasks-mcp-args": {},
-    "dashboard.tasks-field-items": "",
-    "dashboard.tasks-field-key": "",
-    "dashboard.tasks-field-title": "",
-    "dashboard.tasks-field-status": "",
-    "dashboard.tasks-field-url": "",
-    "dashboard.job-states": ["launched", "running", "blocked", "stalled", "lost", "needs-input", "failed"],
-    "dashboard.job-scope": "workspace",
     "launch-grace-seconds": 60,
     "worktree.root": "~/work/yocto/worktrees",
     "slots.count": 5,
@@ -65,12 +52,13 @@ DEFAULTS: dict[str, object] = {
 
 GROUPS = tuple(dict.fromkeys(key.split(".")[0] for key in DEFAULTS if "." in key))
 
-#: Removed keys by (group, name), and why.
+#: Removed keys by (group, name), and why; a name of ``None`` removes the whole group.
 REMOVED = {
+    ("band", None): "the job band was removed",
+    ("dashboard", None): "the Work pane was removed",
     ("handoff", "base"): "a job's base is the base stated in the handoff, else resolved by cure:goal",
     ("prune", "done-days"): "a done job is pruned once its finish is reported and its sessions are removed",
     ("prune", "abandoned-days"): "an abandoned job is pruned once its sessions are removed",
-    ("band", "jira-url"): 'write it as "tracker-url": "<jira-url>/browse/<key>"',
 }
 
 
@@ -194,6 +182,8 @@ def _check(key: str, value: object, values: dict[str, object], problems: list[Pr
 def removed(key: str) -> Problem | None:
     """The problem for a removed dotted ``key``, reported under its group; ``None`` when ``key`` is not removed."""
     group, _, name = key.partition(".")
+    if reason := REMOVED.get((group, None)):
+        return Problem(group, f"group is removed; {reason}")
     reason = REMOVED.get((group, name))
     return Problem(group, f'"{name}" is removed; {reason}') if reason else None
 
@@ -254,50 +244,6 @@ def _text(value: object) -> str | None:
     return None if isinstance(value, str) else f"expected a string, got {json.dumps(value)}"
 
 
-def _https_url(value: object) -> str | None:
-    if not isinstance(value, str) or not re.fullmatch(r"https://[^\s/]+(/\S*)?", value):
-        return f"expected an https URL, got {json.dumps(value)}"
-    return None
-
-
-def _key_url(value: object) -> str | None:
-    if problem := _https_url(value):
-        return problem
-    return None if "<key>" in value else f"expected a URL with <key>, got {json.dumps(value)}"
-
-
-def _names(value: object) -> str | None:
-    if (not isinstance(value, list) or any(not isinstance(item, str) or not re.fullmatch(r"\S+", item) for item in value)
-            or len(set(value)) != len(value)):
-        return f"expected a list of distinct names without spaces, got {json.dumps(value)}"
-    return None
-
-
-def _optional_name(value: object) -> str | None:
-    if not isinstance(value, str) or not re.fullmatch(r"\S*", value):
-        return f"expected a name without spaces or \"\", got {json.dumps(value)}"
-    return None
-
-
-def _object(value: object) -> str | None:
-    return None if isinstance(value, dict) else f"expected a JSON object, got {json.dumps(value)}"
-
-
-def _job_states(value: object) -> str | None:
-    from .commands.list import INVALID  # both import this module
-    from .state import State
-
-    states = [state.value for state in State] + [INVALID]
-    if (not isinstance(value, list) or any(item not in states for item in value)
-            or len(set(value)) != len(value)):
-        return f"expected a list of distinct job states from {', '.join(states)}, got {json.dumps(value)}"
-    return None
-
-
-def _job_scope(value: object) -> str | None:
-    return None if value in ("workspace", "all") else f"expected \"workspace\" or \"all\", got {json.dumps(value)}"
-
-
 def _tiers(value: object) -> str | None:
     if (not isinstance(value, list) or any(tier not in TIERS for tier in value)
             or len(set(value)) != len(value)):
@@ -336,19 +282,6 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "short-hold.wait-seconds": _int_range(10, 540),
     "short-hold.wait-total-minutes": _int_range(10, 1440),
     "prune.failed-days": _int_range(1, 365),
-    "band.tracker-url": _key_url,
-    "dashboard.refresh-seconds": _int_range(30, 3600),
-    "dashboard.github-owners": _names,
-    "dashboard.tasks-mcp-server": _text,
-    "dashboard.tasks-mcp-tool": _optional_name,
-    "dashboard.tasks-mcp-args": _object,
-    "dashboard.tasks-field-items": _optional_name,
-    "dashboard.tasks-field-key": _optional_name,
-    "dashboard.tasks-field-title": _optional_name,
-    "dashboard.tasks-field-status": _optional_name,
-    "dashboard.tasks-field-url": _optional_name,
-    "dashboard.job-states": _job_states,
-    "dashboard.job-scope": _job_scope,
     "launch-grace-seconds": _int_range(10, 600),
     "worktree.root": _directory,
     "slots.count": _int_range(1, 20),
