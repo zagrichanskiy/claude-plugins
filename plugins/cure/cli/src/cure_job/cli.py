@@ -3,9 +3,10 @@
 :class:`Cli` owns the output sink and the :class:`~cure_job.providers.jobs.JobsProvider`,
 assembles the root parser by asking each command to register itself, and drives
 dispatch. :func:`main` is the composition root and reads the root, the
-``config.json`` path and the binary from the environment: a test builds a
-:class:`Cli` with its own root, its own ``config.json`` path and its own
-``claude``, and can reach neither ``~/.claude``, ``~/.config`` nor the real
+``config.json`` path, the binary and the transcripts directory from the
+environment: a test builds a :class:`Cli` with its own root, its own
+``config.json`` path and its own ``claude``, and without a transcripts
+directory, and can reach neither ``~/.claude``, ``~/.config`` nor the real
 binary. :meth:`Cli.origin` reads the messaging socket of the calling session.
 """
 from __future__ import annotations
@@ -50,8 +51,10 @@ from .store import JobStore
 ROOT_ENV = "CURE_JOB_ROOT"
 CLAUDE_ENV = "CURE_JOB_CLAUDE"
 CONFIG_ENV = "CURE_JOB_CONFIG"
+PROJECTS_ENV = "CURE_JOB_PROJECTS"
 DEFAULT_ROOT = "~/.claude/cure"
 DEFAULT_CLAUDE = "claude"
+DEFAULT_PROJECTS = "~/.claude/projects"
 MESSAGING_SOCKET_ENV = "CLAUDE_CODE_MESSAGING_SOCKET"
 
 #: Flush every line so a caller that reads a pipe sees the output at once.
@@ -62,12 +65,13 @@ class Cli:
     def __init__(self, *, root: Path, config_path: Path, claude: Claude, clock: Clock = local_now,
                  out: Callable[[str], None] = _flush_print, plugin_root: Path = PLUGIN_ROOT,
                  sleep: Callable[[float], None] = time.sleep, monotonic: Callable[[], float] = time.monotonic,
-                 kinds: Mapping[str, SessionKind] = KINDS):
+                 kinds: Mapping[str, SessionKind] = KINDS, projects_root: Path | None = None):
         self.out = out
         self.config_path = config_path
         self.version = config.plugin_version(plugin_root)
         self.config = config.load(config_path, root, self.version)
-        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config, kinds)
+        self.jobs = JobsProvider(JobStore(root), claude, clock, plugin_root, sleep, monotonic, self.config, kinds,
+                                projects_root)
         self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
                           LaunchCommand(self), ResumeCommand(self), StartCommand(self), ClaimCommand(self),
                           ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
@@ -130,7 +134,8 @@ def main(argv: list[str] | None = None) -> int:
     if os.sep in binary:
         binary = os.path.abspath(binary)
     try:
-        cli = Cli(root=root, config_path=config_path, claude=ClaudeCli(binary))
+        projects_root = Path(os.path.expanduser(os.environ.get(PROJECTS_ENV) or DEFAULT_PROJECTS))
+        cli = Cli(root=root, config_path=config_path, claude=ClaudeCli(binary), projects_root=projects_root)
     except CureJobError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

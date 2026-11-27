@@ -111,8 +111,15 @@ class WorktreeOpened:
     root: str
 
 
+@dataclass(frozen=True)
+class CheckoutStarted:
+    """The first launch started the worktree or slot checkout of the handoff repository ``repo`` at ``commit``."""
+    repo: str
+    commit: str
+
+
 Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, SessionStopped, SessionEnded,
-              SessionsRemoved, WorktreeOpened]
+              SessionsRemoved, WorktreeOpened, CheckoutStarted]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
@@ -124,6 +131,7 @@ _REPORTED = "reported"
 _STOPPED = "stopped"
 _SESSIONS_REMOVED = "sessions-removed"
 _WORKTREE_OPENED = "worktree-opened"
+_CHECKOUT_STARTED = "checkout-started"
 #: The tags of a session of a kind other than work. A work session keeps ``launched`` and ``stopped``,
 #: which an older version reads.
 _SESSION_STARTED = "session-started"
@@ -160,6 +168,8 @@ def encode(event: Event) -> str:
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     elif isinstance(event, WorktreeOpened):
         fields = {"event": _WORKTREE_OPENED, "root": event.root}
+    elif isinstance(event, CheckoutStarted):
+        fields = {"event": _CHECKOUT_STARTED, "repo": event.repo, "commit": event.commit}
     else:
         fields = {"event": _CLOSED, "reason": event.reason}
     if isinstance(event, SessionStarted) and event.worktree_root is not None:
@@ -185,6 +195,8 @@ def decode(line: str) -> Event | None:
         return SessionsRemoved(parse_local(_text(fields, "at")))
     if kind == _WORKTREE_OPENED:
         return WorktreeOpened(_text(fields, "root"))
+    if kind == _CHECKOUT_STARTED:
+        return CheckoutStarted(_text(fields, "repo"), _text(fields, "commit"))
     if kind == _CLAIM:
         return Claim(_text(fields, "resource"), None if "run" not in fields else _int(fields, "run"))
     if kind == _RELEASE:

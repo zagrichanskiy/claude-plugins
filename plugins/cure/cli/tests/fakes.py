@@ -90,13 +90,21 @@ class FakeClock:
 
 
 class FakeGit:
-    """``worktree.Git`` without git: a repository path is its own toplevel, a worktree is an empty directory."""
+    """``worktree.Git`` without git: a repository path is its own toplevel, a worktree is an empty directory
+    at a fixed commit."""
 
     def toplevel(self, repo: str) -> str:
         return repo
 
-    def add(self, repo: str, path: Path, base: Path | None) -> None:
+    def add(self, repo: str, path: Path, base: Path | None) -> str:
         path.mkdir(parents=True)
+        return self.head(path)
+
+    def head(self, checkout: Path) -> str:
+        return "0" * 40
+
+    def changed_lines(self, checkout: Path, base: str) -> int:
+        return 0
 
     def remove(self, repo: str, path: Path) -> None:
         pass

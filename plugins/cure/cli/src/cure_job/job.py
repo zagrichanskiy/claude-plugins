@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import resource
 from .events import (WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved, SessionStarted,
-                     WorktreeOpened)
+                     WorktreeOpened, CheckoutStarted)
 from .handoff import Handoff
 from .result import Result
 from .sessions import JobSession, fold
@@ -104,6 +104,12 @@ class JobRecord:
         roots = (event.worktree_root if isinstance(event, SessionStarted) else event.root
                  for event in self.events if isinstance(event, (SessionStarted, WorktreeOpened)))
         return next((root for root in roots if root is not None), None)
+
+    @property
+    def start_commits(self) -> dict[str, str]:
+        """The commit each handoff repository's checkout started at. A later start, such as a slot launch
+        retried after upstream moved, replaces an earlier one."""
+        return {event.repo: event.commit for event in self.events if isinstance(event, CheckoutStarted)}
 
     @property
     def slot(self) -> str | None:
