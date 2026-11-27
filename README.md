@@ -95,8 +95,8 @@ the project's conventions, test command and run command from the repo.
 | `implementer` | Writes and edits production code for one work item and saves it to disk. Learns the project's language, layout and conventions from the repo, and implements what the item states and nothing beside it. Does not commit. |
 | `test-author` | Writes unit tests for a change, module, or coverage gap and saves them to disk. Matches the project's existing test conventions rather than imposing a framework. Does not commit. |
 | `qa` | Runs the test suite, or a named subset, and reports pass/fail with failure detail. It reports only; it never fixes what it finds. |
-| `tracker` | Creates a ticket for split-off work, copies the original's fields and links, links the tickets and rewrites the original. Uses Jira MCP tools when it has them, else `split.jira-command`. Returns ids and manual steps. |
-| `delivery` | Runs every git and GitHub write of a job and the git work of `cure:split`: branches, commits, amends, rebases, pushes and pull requests; for `cure:split` builds and measures the part branches, bumps versions, checks trees, pushes and opens pull requests, through the repository's PR skill when it names one. Returns short reports. |
+| `tracker` | Runs every tracker read, comment, transition, field write and ticket creation of a job. For split-off work it creates a ticket, copies the original's fields and links, links the tickets and rewrites the original; for `cure:split` it uses the tracker MCP tools, else `split.jira-command`. Returns ids and manual steps. |
+| `delivery` | Runs every git write and pull request of a job and the git work of `cure:split`: branches, commits, amends, rebases, pushes and pull requests; for `cure:split` builds and measures the part branches, bumps versions, checks trees, pushes and opens pull requests, through the repository's PR skill when it names one. Returns short reports. |
 | `reviewer` | Reviews the working diff, or named files, for correctness bugs and design problems, and reports ranked findings with a concrete failing scenario for each. Loads a C++ or Python pitfall supplement only for the change's language. Writes only the report file the caller names; never edits code. |
 | `verifier` | Drives the change end-to-end in the real application to confirm the behaviour works, rather than that the suite passes. Never edits. |
 | `skill-author` | Creates and updates Claude Code skills from a description or source material, including the skills in this repository. |
@@ -235,7 +235,7 @@ Every agent states its own `model` and `effort`, by role:
 | Mechanical | `collector`, `verifier` | `sonnet` | `medium` |
 | Rule check | `cg-interfaces`, `cg-classes`, `cg-resources`, `cg-statements`, `cg-generic`, `cg-concurrency`, `cg-philosophy` | `sonnet` | `medium` |
 | Mechanical | `qa` | `sonnet` | `low` |
-| Mechanical | `tracker` | `sonnet` | `low` |
+| Mechanical | `tracker` | `haiku` | `low` |
 | Mechanical | `delivery` | `haiku` | `low` |
 
 ## Adding a plugin

@@ -76,7 +76,8 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   recommendation, for a reader who has not followed the run.
 - Read with `gh issue view --json <fields>` or `gh pr view --json <fields>`. Edit with `gh api`, for
   example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -F body=@<file>`; in Light and Full
-  `delivery` runs it with the `pr-edit` brief. `gh issue view` and
+  `delivery` runs it with the `pr-edit` brief. Only a pull request is edited this way. An issue,
+  its body included, is written by `tracker` (`field` brief). `gh issue view` and
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - A command for the user to run with `!` is a script file, run as `! python3 <absolute path>`. Job
@@ -90,10 +91,12 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 
 - The main session orchestrates: it dispatches agents, keeps the ledger, checks completeness. It reads
   no source and edits no code.
-- The orchestrator dispatches `delivery` for every git and GitHub write: branch creation, commit,
+- The orchestrator dispatches `delivery` for every git write and pull request: branch creation, commit,
   amend, push and PR, with explicit paths. It keeps read-only git (for example `status`, `diff`,
   `log`, `show`, `rev-parse`, `merge-base`, `ls-tree`, `fetch`) and `gh` reads. It never asks
   `implementer`, `test-author` or `skill-author` to write to git.
+- The orchestrator dispatches `tracker` for every tracker read, write and transition, on GitHub
+  issues too, and for each tracker step of the PR skill. No other agent of a job has a tracker tool.
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round. Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit
