@@ -146,7 +146,7 @@ for each. Keep the goal file and the retrospective; list the retrospective with
 
 Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a measured failure, or
 <review cause>, or the diff passes <lines> lines (per repository, in <repo>: insertions plus deletions of `git diff --shortstat <base commit>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`); the base commit is the one work item 1 recorded), or a consult's line estimate for a repository's files plus the lines already changed in it passes <lines> lines, or `git fetch` or
-a tool check failed, or `finish` exited non-zero twice (not counting an exit 1 that names `--pr` or `--retro`), or a Settled statement is false or the
+a tool check failed, or `finish` exited non-zero twice (not counting an exit 1 that names `--pr` or `--retro`), or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
 transcript; and (c) reported as in N+1 with `--status failed`, unless `finish` failed
 twice as counted in (a); and (d) the final message starts with `failed:`.
