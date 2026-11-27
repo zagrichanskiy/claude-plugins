@@ -6,10 +6,10 @@ view alone, so that it is tested without sessions.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from .config import DEFAULTS, Config
-from .events import WORK
+from .events import REQUESTABLE, WORK
 from .job import JobRecord
 from .kinds import KINDS, Recovery, SessionKind
 from .result import short_hold_timeout
@@ -49,14 +49,10 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
     if state in (State.DONE, State.ABANDONED) and not record.sessions_removed:
         found.append(Action("remove-sessions"))
     if state is State.NEEDS_INPUT:
-        timeout = short_hold_timeout(record.result) if record.result else None
-        if timeout:
-            found.append(Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder, **route}))
-        else:
-            found.append(Action("ask-input", route))
+        found.append(_ask(record.result.questions if record.result else (), route, {}))
     elif state is State.AWAITING_ANSWER:
         if not view.origin_reachable:
-            found.append(Action("ask-input", {**route, "question": list(record.question)}))
+            found.append(_ask(record.question, route, {"question": list(record.question)}))
     elif state is State.STALLED:
         found.append(Action("confirm-stalled", {"stalled-confirm-seconds": config["dispatcher.stalled-confirm-seconds"]}))
     elif state is State.LOST:
@@ -79,7 +75,17 @@ def actions(view: JobView | None, row: Mapping[str, object], config: Config = Co
         # A kind this version does not know gets no action.
         if name != WORK and kind is not None:
             found.extend(_session_actions(record, kind, session, config))
-    return found
+    # The origin was sent a requested action once; a dispatcher-route action is always asked.
+    return [action for action in found if not (action.name in REQUESTABLE and action.args.get("route") == "origin"
+                                               and record.requested(action.name))]
+
+
+def _ask(questions: Sequence[str], route: Mapping[str, object], input_args: Mapping[str, object]) -> Action:
+    """``ask-timeout`` when ``questions`` is a short-hold timeout, else ``ask-input`` with ``input_args``."""
+    timeout = short_hold_timeout(questions)
+    if timeout:
+        return Action("ask-timeout", {"resource": timeout.resource, "holder": timeout.holder, **route})
+    return Action("ask-input", {**route, **input_args})
 
 
 def _session_actions(record: JobRecord, kind: SessionKind, view: SessionView, config: Config) -> list[Action]:

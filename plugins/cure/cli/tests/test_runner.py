@@ -21,14 +21,15 @@ JOB = "261013-1000-video-core-a"
 PLUGIN = Path("/plugins/cure")
 NEEDS_INPUT = "---\nstatus: needs-input\nquestion: which?\n---\n"
 
-#: ``WorkerSettings(Path("/plugins/cure"), JOB).arguments()[1]`` as commit c0eee6f prints it, with the ``ask`` and
-#: ``answered`` rules and ``crossSessionInbound``.
+#: ``WorkerSettings(Path("/plugins/cure"), JOB).arguments()[1]`` as commit c0eee6f prints it, with the ``ask``,
+#: ``answered`` and ``await-answer`` rules and ``crossSessionInbound``.
 MAIN_WORK_SETTINGS = (
     '{"permissions":{"allow":["Bash(/plugins/cure/bin/cure-job finish 261013-1000-video-core-a *)",'
     '"Bash(/plugins/cure/bin/cure-job claim 261013-1000-video-core-a *)",'
     '"Bash(/plugins/cure/bin/cure-job release 261013-1000-video-core-a *)",'
     '"Bash(/plugins/cure/bin/cure-job ask 261013-1000-video-core-a *)",'
     '"Bash(/plugins/cure/bin/cure-job answered 261013-1000-video-core-a *)",'
+    '"Bash(/plugins/cure/bin/cure-job await-answer 261013-1000-video-core-a)",'
     '"Bash(/plugins/cure/bin/cure-job config get *)","Bash(/plugins/cure/bin/cure-job list *)",'
     '"Bash(/plugins/cure/bin/cure-job finish --help)"]},"env":{"CURE_JOB_ID":"261013-1000-video-core-a"},'
     '"crossSessionInbound":"accept"}'

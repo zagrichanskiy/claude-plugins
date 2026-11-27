@@ -8,6 +8,7 @@ from datetime import timedelta
 import pytest
 
 from cure_job.claude import SessionStatus
+from cure_job.clock import format_local
 from cure_job.errors import ClaudeError, ClaudeOutcomeUnknown
 from cure_job.cli import Cli
 from cure_job.events import SessionStarted
@@ -43,8 +44,16 @@ class PidClaude(FakeClaude):
 def h(root):
     harness = Harness(root)
     harness.claude = PidClaude()
+    harness.sleeps = []
+    harness.on_sleep = lambda: None
+
+    def sleep(seconds):
+        harness.sleeps.append(seconds)
+        assert len(harness.sleeps) < 50, "await-answer polled without end"
+        harness.on_sleep()
+
     harness.cli = Cli(root=root, config_path=root / "config.json", claude=harness.claude, clock=harness.clock,
-                      out=harness.lines.append)
+                      out=harness.lines.append, sleep=sleep)
     return harness
 
 
@@ -59,9 +68,9 @@ def row(h, job_id):
     return {r["id"]: r for r in json.loads(h.lines[0])}[job_id]
 
 
-def ask(h, job_id):
+def ask(h, job_id, *questions):
     argv = ["ask", job_id]
-    for question in QUESTION:
+    for question in questions or QUESTION:
         argv += ["--question", question]
     return h.run(*argv)
 
@@ -288,6 +297,141 @@ def write_result(h, job_id, text):
     (h.root / "jobs" / job_id / "result.md").write_text(text, encoding="utf-8")
 
 
+def awaiting_answer_job(h, tmp_path, monkeypatch, *question, owner_gone=True):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert ask(h, job_id, *question) == 0
+    if owner_gone:
+        h.claude.statuses[OWNER_SESSION] = SessionStatus.STOPPED
+    h.claude.statuses[work_session(h, job_id)] = SessionStatus.IDLE
+    h.clock.advance(LAUNCH_GRACE + timedelta(minutes=1))
+    return job_id
+
+
+# --- await-answer ------------------------------------------------------------------------------------------
+
+def test_await_answer_exits_zero_at_once_when_the_question_is_already_answered(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert ask(h, job_id) == 0
+    assert h.run("answered", job_id, "--answer", "main") == 0
+    assert h.run("await-answer", job_id) == 0
+
+
+def test_await_answer_polls_until_the_answer_is_recorded(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert ask(h, job_id) == 0
+    h.on_sleep = lambda: len(h.sleeps) == 3 and h.run("answered", job_id, "--answer", "main")
+    assert h.run("await-answer", job_id) == 0
+    assert len(h.sleeps) == 3
+
+
+def test_await_answer_exits_one_when_the_run_gets_a_result(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert ask(h, job_id) == 0
+    h.on_sleep = lambda: write_result(h, job_id, "---\nstatus: done\n---\n")
+    assert h.run("await-answer", job_id) == 1
+
+
+def test_await_answer_exits_one_when_the_job_is_abandoned(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert ask(h, job_id) == 0
+    h.claude.statuses[work_session(h, job_id)] = SessionStatus.STOPPED
+    h.clock.advance(LAUNCH_GRACE + timedelta(minutes=1))
+    assert h.run("close", job_id) == 0
+    assert h.run("await-answer", job_id) == 1
+
+
+def test_await_answer_exits_one_when_no_question_was_asked_in_the_run(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert h.run("await-answer", job_id) == 1
+    assert h.sleeps == []
+
+
+def test_await_answer_exits_one_when_the_caller_is_not_the_job(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    assert ask(h, job_id) == 0
+    monkeypatch.setenv("CURE_JOB_ID", "261013-1000-video-core-other")
+    assert h.run("await-answer", job_id) == 1
+
+
+# --- requested ---------------------------------------------------------------------------------------------
+
+def actions_of(h):
+    return [name for item in _next(h) for name in item["actions"]]
+
+
+def test_requested_appends_a_requested_event_for_the_run(h, tmp_path):
+    job_id = h.new(tmp_path)
+    assert h.run("origin", job_id, ORIGIN) == 0
+    (h.root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+    assert h.run("requested", job_id, "--action", "ask-approval") == 0
+    [event] = events(h, job_id, "requested")
+    assert (event["run"], event["action"], event["at"]) == (0, "ask-approval", format_local(h.clock.now))
+
+
+def test_requested_rejects_an_action_that_is_not_a_route_action(h, tmp_path):
+    job_id = h.new(tmp_path)
+    with pytest.raises(SystemExit) as caught:
+        h.run("requested", job_id, "--action", "report")
+    assert caught.value.code == 2
+
+
+def test_next_omits_a_requested_ask_approval_of_a_reachable_owner_until_the_goal_changes(h, tmp_path):
+    job_id = h.new(tmp_path)
+    assert h.run("origin", job_id, ORIGIN) == 0
+    goal = h.root / "jobs" / job_id / "goal.md"
+    goal.write_text("goal", encoding="utf-8")
+    reachable_owner(h)
+    assert actions_of(h) == ["ask-approval"]
+    assert h.run("requested", job_id, "--action", "ask-approval") == 0
+    assert actions_of(h) == []
+    goal.write_text("goal, revised", encoding="utf-8")
+    assert actions_of(h) == ["ask-approval"]
+
+
+def test_next_omits_a_requested_ask_input_but_keeps_report(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    write_result(h, job_id, "---\nstatus: needs-input\n---\n")
+    assert h.run("requested", job_id, "--action", "ask-input") == 0
+    assert actions_of(h) == ["report"]
+
+
+def test_next_omits_a_requested_ask_timeout(h, tmp_path, monkeypatch):
+    job_id = asking_job(h, tmp_path, monkeypatch)
+    write_result(h, job_id, "---\nstatus: needs-input\nquestion:\n  - 'short-hold timeout: gpu held by x'\n---\n")
+    assert "ask-timeout" in actions_of(h)
+    assert h.run("requested", job_id, "--action", "ask-timeout") == 0
+    assert "ask-timeout" not in actions_of(h)
+
+
+def test_next_never_suppresses_a_dispatcher_route_action(h, tmp_path):
+    job_id = h.new(tmp_path)
+    assert h.run("origin", job_id, ORIGIN) == 0
+    (h.root / "jobs" / job_id / "goal.md").write_text("goal", encoding="utf-8")
+    reachable_owner(h)
+    assert h.run("requested", job_id, "--action", "ask-approval") == 0
+    h.claude.statuses[OWNER_SESSION] = SessionStatus.STOPPED
+    assert routes(h) == {"ask-approval": "dispatcher"}
+
+
+# --- short-hold timeout of an awaiting-answer job ----------------------------------------------------------
+
+def test_an_awaiting_answer_job_asking_a_short_hold_timeout_gets_ask_timeout_for_the_dispatcher(h, tmp_path,
+                                                                                               monkeypatch):
+    awaiting_answer_job(h, tmp_path, monkeypatch, "short-hold timeout: gpu held by 261013-1000-video-core-b")
+    [item] = _next(h)
+    assert item["actions"] == ["ask-timeout"]
+    assert item["args"][0]["route"] == "dispatcher"
+
+
+def test_a_multi_line_question_led_by_a_short_hold_timeout_gets_ask_input_with_every_line(h, tmp_path,
+                                                                                          monkeypatch):
+    question = ["short-hold timeout: gpu held by 261013-1000-video-core-b", "Which board?"]
+    awaiting_answer_job(h, tmp_path, monkeypatch, *question)
+    [item] = _next(h)
+    assert item["actions"] == ["ask-input"]
+    assert item["args"][0]["question"] == question
+
+
 # --- a session list that cannot be read --------------------------------------------------------------------
 
 BROKEN = [ClaudeError("claude agents: exit 1"), ClaudeOutcomeUnknown("claude agents: no exit within 60 seconds")]
@@ -313,13 +457,14 @@ def test_a_failing_session_list_routes_the_report_of_a_done_job_to_the_dispatche
     assert row(h, job_id)["state"] == "done"
 
 
-# --- the question of a list row ----------------------------------------------------------------------------
+# --- the question and asked_at of a list row ---------------------------------------------------------------
 
-def test_a_working_job_row_carries_the_question(h, tmp_path, monkeypatch):
+def test_a_working_job_row_carries_the_question_and_when_it_was_asked(h, tmp_path, monkeypatch):
     job_id = asking_job(h, tmp_path, monkeypatch)
-    assert row(h, job_id)["question"] is None
+    assert row(h, job_id)["asked-at"] is None
     assert ask(h, job_id) == 0
-    assert row(h, job_id)["question"] == QUESTION
+    found = row(h, job_id)
+    assert (found["question"], found["asked-at"]) == (QUESTION, format_local(h.clock.now))
 
 
 def test_a_needs_input_job_that_asked_and_got_no_answer_has_a_null_question(h, tmp_path, monkeypatch):
@@ -330,7 +475,20 @@ def test_a_needs_input_job_that_asked_and_got_no_answer_has_a_null_question(h, t
     assert (found["phase"], found["question"]) == ("needs-input", None)
 
 
-# --- an origin reached by pid -----------------------------------------------------------------------------
+# --- an origin that cannot be reached by pid ---------------------------------------------------------------
+
+def test_new_warns_once_about_an_origin_that_is_not_a_pid_socket(h, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("CLAUDE_CODE_MESSAGING_SOCKET", "/run/session.sock")
+    h.new(tmp_path)
+    err = capsys.readouterr().err.splitlines()
+    assert len(err) == 1 and "origin" in err[0]
+
+
+def test_new_does_not_warn_about_a_pid_socket_origin(h, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("CLAUDE_CODE_MESSAGING_SOCKET", f"/run/cure/{ORIGIN_PID}.sock")
+    h.new(tmp_path)
+    assert capsys.readouterr().err == ""
+
 
 def test_an_owner_is_reachable_by_a_pid_of_any_of_its_live_entries(h, tmp_path):
     job_id = h.new(tmp_path)

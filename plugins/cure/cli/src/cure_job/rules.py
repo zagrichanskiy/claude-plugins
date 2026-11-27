@@ -38,6 +38,7 @@ class Op(enum.Enum):
     REPORTED = "reported"
     ASK = "ask"
     ANSWERED = "answered"
+    AWAIT_ANSWER = "await-answer"
 
 
 class Reads(enum.Enum):
@@ -471,4 +472,5 @@ RULES: Mapping[Op, Rule] = {
     Op.ASK: Rule(Reads.RECORD, (_caller_is_job, _ask_launched, _ask_not_abandoned, _ask_no_result, _ask_has_origin,
                                 _origin_reachable), frozenset({Fact.SESSIONS})),
     Op.ANSWERED: Rule(Reads.RECORD, (_caller_is_job, _asked)),
+    Op.AWAIT_ANSWER: Rule(Reads.RECORD, (_caller_is_job, _ask_not_abandoned, _ask_no_result, _asked)),
 }

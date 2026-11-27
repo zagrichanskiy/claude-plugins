@@ -7,8 +7,8 @@ from functools import cached_property
 from pathlib import Path
 
 from . import resource
-from .events import (WORK, Answered, Approved, Asked, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved,
-                     SessionStarted, WorktreeOpened, CheckoutStarted)
+from .events import (ASK_APPROVAL, WORK, Answered, Approved, Asked, Claim, Closed, Event, Origin, Release, Reported,
+                     Requested, SessionsRemoved, SessionStarted, WorktreeOpened, CheckoutStarted)
 from .handoff import Handoff
 from .result import Result
 from .sessions import JobSession, fold
@@ -106,6 +106,17 @@ class JobRecord:
         """The lines of the :attr:`pending_ask` question."""
         pending = self.pending_ask
         return pending.question if pending is not None else None
+
+    def request_goal(self, action: str) -> str | None:
+        """The goal digest a request of ``action`` is keyed on beside the run: that of the goal ``ask-approval`` asks
+        to approve, so that a changed goal is asked again."""
+        return self.goal_digest if action == ASK_APPROVAL else None
+
+    def requested(self, action: str) -> bool:
+        """The dispatcher sent ``action`` of the latest run to the origin, for the current :meth:`request_goal`."""
+        goal = self.request_goal(action)
+        return any(isinstance(event, Requested) and (event.run, event.action, event.goal) == (self.run, action, goal)
+                   for event in self.events)
 
     @property
     def sessions_removed(self) -> bool:

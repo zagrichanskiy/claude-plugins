@@ -12,6 +12,10 @@ from .clock import format_local, parse_local
 #: The kind of the session a ``launch`` or ``resume`` starts.
 WORK = "work"
 
+#: The ``next`` actions the dispatcher sends to a reachable origin and records with ``cure-job requested``.
+ASK_APPROVAL = "ask-approval"
+REQUESTABLE = (ASK_APPROVAL, "ask-input", "ask-timeout")
+
 
 @dataclass(frozen=True)
 class SessionStarted:
@@ -94,6 +98,16 @@ class Answered:
 
 
 @dataclass(frozen=True)
+class Requested:
+    """``cure-job requested``: the dispatcher sent ``action`` of run ``run`` to the origin session. ``goal`` is the
+    digest of the goal an ``ask-approval`` asked for, else ``None``."""
+    run: int
+    action: str
+    at: datetime
+    goal: str | None = None
+
+
+@dataclass(frozen=True)
 class SessionStopped:
     """``cure-job stop`` ran for session ``n`` of kind ``kind``. The launch grace no longer applies to it."""
     kind: str
@@ -134,8 +148,8 @@ class CheckoutStarted:
     commit: str
 
 
-Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, Asked, Answered, SessionStopped,
-              SessionEnded, SessionsRemoved, WorktreeOpened, CheckoutStarted]
+Event = Union[SessionStarted, Claim, Release, Approved, Closed, Origin, Reported, Asked, Answered, Requested,
+              SessionStopped, SessionEnded, SessionsRemoved, WorktreeOpened, CheckoutStarted]
 
 _LAUNCHED = "launched"
 _CLAIM = "claim"
@@ -146,6 +160,7 @@ _ORIGIN = "origin"
 _REPORTED = "reported"
 _ASKED = "asked"
 _ANSWERED = "answered"
+_REQUESTED = "requested"
 _STOPPED = "stopped"
 _SESSIONS_REMOVED = "sessions-removed"
 _WORKTREE_OPENED = "worktree-opened"
@@ -186,6 +201,10 @@ def encode(event: Event) -> str:
         fields = {"event": _ASKED, "run": event.run, "question": list(event.question), "at": format_local(event.at)}
     elif isinstance(event, Answered):
         fields = {"event": _ANSWERED, "run": event.run, "answer": list(event.answer), "at": format_local(event.at)}
+    elif isinstance(event, Requested):
+        fields = {"event": _REQUESTED, "run": event.run, "action": event.action, "at": format_local(event.at)}
+        if event.goal is not None:
+            fields["goal"] = event.goal
     elif isinstance(event, SessionsRemoved):
         fields = {"event": _SESSIONS_REMOVED, "at": format_local(event.at)}
     elif isinstance(event, WorktreeOpened):
@@ -215,6 +234,9 @@ def decode(line: str) -> Event | None:
         return Asked(_int(fields, "run"), _texts(fields, "question"), parse_local(_text(fields, "at")))
     if kind == _ANSWERED:
         return Answered(_int(fields, "run"), _texts(fields, "answer"), parse_local(_text(fields, "at")))
+    if kind == _REQUESTED:
+        return Requested(_int(fields, "run"), _text(fields, "action"), parse_local(_text(fields, "at")),
+                         _text(fields, "goal") if "goal" in fields else None)
     if kind == _STOPPED:
         return SessionStopped(WORK, _int(fields, "run"), parse_local(_text(fields, "at")))
     if kind == _SESSIONS_REMOVED:
