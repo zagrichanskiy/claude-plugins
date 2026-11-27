@@ -21,10 +21,10 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   `git -C <repo> rev-parse <branch>` (else `origin/<branch>`). Otherwise it is
   `git -C <repo> rev-parse <base>`, or `origin/<base>` when the base moved and the work is based on
   it. Repositories of one job can have different bases. The size check, the changed-line cap in the
-  failure exit, the stats row's `lines` and `cure:split` read this value.
+  failure exit and `cure:split` read this value.
 - Item 1 also records, per repository and where the base commit is recorded, a dirty-tree baseline:
   branch, HEAD, `git diff --shortstat` and the paths of `git -C <repo> status --porcelain`. The
-  changed-line cap and the stats row's `lines` exclude those paths.
+  changed-line cap excludes those paths.
 - A goal that pushes: item 1 runs `git -C <repo> log --oneline origin/<branch>..<branch>` when both
   refs exist, else skips the check. Commits of predecessor jobs on the chain are excluded. Each
   remaining commit is recorded where the base commit is. Whether to push it is a question at item 1,
@@ -66,21 +66,6 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 - A tool call or an agent that gets an auto-mode "no verdict": ask the user to leave auto mode for the
   goal. The question starts with the fixed prefix `auto-mode no verdict:`. Never route the work
   through a copy, a patch or a shell write.
-- Last step of every tier, Solo included: append one row to `~/.claude/retros/stats.md` with this
-  command and its values filled in. A failed goal appends a row. A `needs-input` exit does not.
-  Unknown value is `-`; approximate value is `~45`. `|` and `'` are stripped from every value (the
-  command quotes each value in single quotes). `outcome` is `met` or `failed`.
-
-  ```sh
-  mkdir -p ~/.claude/retros
-  (set -C; printf '%s\n' '| date | repo | slug | tier | outcome | est_lines | lines | turns | agent_tokens | rounds | title |' '|---|---|---|---|---|---|---|---|---|---|---|' > ~/.claude/retros/stats.md) 2>/dev/null
-  grep -qF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md || printf '%s\n' '| <date> | <repo> | <slug> | <tier> | <outcome> | <est_lines> | <lines> | <turns> | <agent_tokens> | <rounds> | <title> |' >> ~/.claude/retros/stats.md
-  ```
-
-- The row's `lines` is the changed-line cap count of the failure exit (untracked files included),
-  largest repository. `agent_tokens` is the sum of the subagent token reports. `rounds` is the review
-  rounds.
-- Done when: `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
 
 ## Light and Full
 
@@ -135,11 +120,12 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 - Fresh-reader check: a work item that names it follows `<plugin-root>/skills/goal/fresh-reader.md`.
   Read it again after a compaction before the item ends.
 - When a failure cause holds: stop, write the retrospective with the cause and what is left, print its
-  summary, append the `stats.md` row with outcome `failed`, keep the ledger, take the failure exit.
+  summary, keep the ledger, take the failure exit.
 - The retrospective is `~/.claude/retros/<date>-<repo>-<slug>.md` with these sections, in this order,
   and no others: Outcome (`met`, or `failed: <cause>, what is left`); "Where it went wrong" (one row
-  per event, `W1…Wn`, each with its evidence); Proposed changes. No measurements: the `stats.md` row
-  holds them. Proposed changes table header: `| Target | Change | Evidence (Wn) | Expected effect |`.
+  per event, `W1…Wn`, each with its evidence); Proposed changes. No measurements: `cure-job finish`
+  records a job's measurements (`cure-job stats`); a direct run records none. Proposed changes table
+  header: `| Target | Change | Evidence (Wn) | Expected effect |`.
   A proposal with no `Wn` evidence is not made. Target forms: `<plugin>:<path>` (a file in a plugin,
   for example `cure:skills/goal/rules.md`), `repo:<path>` (a file in the goal's own repository),
   `user:CLAUDE.md` (the user's global instructions).
@@ -150,5 +136,4 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   retrospective, and runs the done-when checks.
 - Questions are the session's own (asked or exited per mode). Assumptions are recorded in the final
   message.
-- When a failure cause holds: stop, keep the working files, append the `stats.md` row with outcome
-  `failed`, take the failure exit.
+- When a failure cause holds: stop, keep the working files, take the failure exit.

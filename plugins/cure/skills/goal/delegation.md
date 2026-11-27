@@ -34,8 +34,7 @@ A Solo goal differs from the template:
 - Work: the read-first line, item 1, the task, and a clean-up item only when the task creates a
   working file. The clean-up item reads "Delete `<each working file>`. Keep the goal file." Its
   done-when item carries at least one path. With no working file, write neither.
-- No retrospective item, no ledger. The stats row work item and done-when item stay, and so does
-  the no-backlog done-when item.
+- No retrospective item, no ledger. The no-backlog done-when item stays.
 - Exits: drop `<rounds>`, `<review cause>` and the retrospective clause from the failure exit.
 - Rules: the lines "Tier: Solo.", Stops, Permission mode (only when the user chose one) and Waiting.
 - No `## Tools` section.
@@ -78,8 +77,7 @@ A Solo goal differs from the template:
   gives the expected value of each check. In Full, a live-verification gate runs before merge: the
   `verifier` agent's output is a done-when item. A green suite alone does not clear it. A manual
   check goes into the PR checklist, never into the done-when list.
-- Retrospective: a work item and a done-when item before the stats row item.
-- Stats row: the second-last work item and the done-when item before the clean-up item, in every tier.
+- Retrospective: the second-last work item and the done-when item before the clean-up item.
 - Implementer brief: when the repository ships a versioned plugin or package, the brief says to bump
   the version once per branch, not per commit, and points to the repository's version rule when its
   `CLAUDE.md` has one.

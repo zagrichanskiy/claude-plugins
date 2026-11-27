@@ -87,18 +87,15 @@ context compaction and before an exit.
 2. <One step, its agent, its files.>
 K-1. (Light and Full, when Settled has an estimate) <the size-check item text of `sizing.md`>
 K.   <The push and the pull request, when the job pushes. K is the item before the retrospective.>
-N-2. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
+N-1. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print
      its summary.
-N-1. Append the `stats.md` row with the command of `rules.md`. `<date> | <repo> | <slug>` is filled
-     in here.
 N. Delete `<ledger path>` and `<each working file>`. Keep the goal file and the retrospective.
    The failure path skips this item.
 
 ## Done when
 
 1. <Measured by a command this session runs.>
-N-2. (Light and Full) The retrospective has "Outcome", "Where it went wrong" and "Proposed changes" sections; its summary is printed.
-N-1. `grep -cF '| <date> | <repo> | <slug> |' ~/.claude/retros/stats.md` prints `1`.
+N-1. (Light and Full) The retrospective has "Outcome", "Where it went wrong" and "Proposed changes" sections; its summary is printed.
 N. `ls <ledger path> <working files>` reports "No such file" for each.
 N+1. `ls -l --time-style=full-iso <repo>/.notes/*backlog*.md` shows no file with an mtime after
      `<start>`. It is the last item; number it after the last item the tier keeps.
