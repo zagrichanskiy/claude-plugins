@@ -94,7 +94,8 @@ on a usage or rate limit with `SendMessage` once the limit resets; do not dispat
 
 - State plainly, before the summary counts, whether the round passes the severity floor: it passes
   when no `MUST-FIX` or `SHOULD-CONSIDER` finding is open in any section. `NITPICK`s and
-  `enhancement`s sit in `.notes/<slug>-backlog.md` and do not hold the round open.
+  `enhancement`s do not hold the round open. The caller's fix step fixes them with each round's
+  fixes; those of the last round go in one fix pass that the tests and lint verify.
 - Report each agent's reading footer and per-leg token usage (for a resumed agent, the difference
   from its previous report, never the cumulative figure), and the number of agents dispatched. Compare
   the per-leg figure with the budget. Flag any agent at or over budget.

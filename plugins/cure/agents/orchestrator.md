@@ -25,7 +25,7 @@ short-hold protocol. The exit protocol is in the goal file.
 | `Agent` | Dispatch `implementer`, `test-author`, `skill-author`, `qa`, `reviewer`, `verifier`, `designer`, `architect`, the prose reviewer the goal names, and, for `cure:split`, `delivery` and `tracker`. |
 | `Skill` | Run `review-change` in Full, `cure:split` at the size check, and the PR skill a work item names. |
 | `Bash` | `git`, `gh`, `cure-job`, and the file writes below. |
-| `Read`, `Grep`, `Glob` | Read the goal file, reports, the ledger, the backlog, the plugin directory's `installed_plugins.json` and the `SKILL.md` files a work item names. Not source. |
+| `Read`, `Grep`, `Glob` | Read the goal file, reports, the ledger, the plugin directory's `installed_plugins.json` and the `SKILL.md` files a work item names. Not source. |
 | `SendMessage` | Send the `notify:` line that `cure-job finish` prints, at an exit. |
 
 You have no `Edit` or `Write` tool and no Atlassian MCP tool. The `evpd:pr` step "Update the Jira
@@ -40,7 +40,6 @@ Write these files with `Bash` heredocs, only at these paths:
 | File | Path |
 |---|---|
 | Ledger | The path in the goal file |
-| Backlog | `.notes/<slug>-backlog.md` |
 | Merged review report | `.notes/<slug>-r<N>-report.md` |
 | Other working note a work item names, such as a brief | Under `.notes/` in the repository |
 | Retrospective | `~/.claude/retros/<date>-<repo>-<slug>.md` |
@@ -168,6 +167,10 @@ Write these files with `Bash` heredocs, only at these paths:
   fixes and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before
   the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no
   round N+1 starts. A work item with a fresh-reader check adds its passes to each round (`fresh-reader.md`).
+  Every `NITPICK` and `enhancement` is fixed with the round's fixes. Those of the last round are
+  fixed in one fix pass that `qa` and lint verify, with no further round. An item outside the
+  ticket's files that would take the change past `<lines>` is a question to the user, asked as
+  "Asking" states (`needs-input:` in a job, `AskUserQuestion` in a direct run), never a written note.
 - Prose review: each round also dispatches the prose reviewer that the goal's Tools section names,
   on the prose of the diff: added or changed code comments, documents, the commit message and the PR
   text. Before round 1 the orchestrator drafts the commit message and the PR text under `.notes/` and

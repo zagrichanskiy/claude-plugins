@@ -25,6 +25,9 @@ addr show usb0 reports 192.168.140.1/24` passes.
 - A command that can run over 120 s states its Bash timeout in its work item (the default is
   120000 ms).
 - An item that claims a reboot proves it with `/proc/uptime` after the cycle below 120 s.
+- Every template, Solo included, has an item that the job created or appended no
+  `.notes/*backlog*.md`: `ls -l --time-style=full-iso <repo>/.notes/*backlog*.md` shows no file
+  with an mtime after `<start>`, the timestamp work item 1 printed.
 - An item about a skill's question round names a non-interactive test path that shows it unattended.
 - A static criterion (an expected value, threshold or prompt set that does not depend on the run's
   output) is written once, in the briefs file, before measurement round 1. Changing it restarts the
@@ -52,7 +55,7 @@ exists only in a shipped file.
   directory, a worktree, a prompt or briefs file, a fixture) as a path in that work item. The same
   path goes in the clean-up item and in its done-when `ls`. The kept files and what the goal builds
   or delivers are excluded.
-- The work item says the goal file, the retrospective and the backlog are kept.
+- The work item says the goal file and the retrospective are kept.
 - Save characters in Context or the work steps.
 
 ## Settled
@@ -61,12 +64,10 @@ exists only in a shipped file.
 - A Settled fact copied from a note (a device or system fact) is marked "verify". Work item 1 verifies
   it against the device, code or document the note cites, not against the note. A mismatch in ticket,
   branch or base commit is recorded and corrected.
-- A backlog-fix goal checks each backlog item against the document at `<base>` and lists the items
-  already fixed under Settled. For a backlog row that defines a term, the goal quotes the definition.
 - An analysis goal that reads a design document names the document's branch or commit under Settled
   when the checkout that holds it is not on its default branch.
 - A work item that runs a fresh-reader check over a document set cites `fresh-reader.md`.
   Its passes share the round limit N with the reviewer pass. Round 1 reads each whole
   document, one pass per document. Rounds 2..N re-check the previous round's findings and the lines
-  changed since. Any other element already unexplained at the commit round 1 read goes to the
-  backlog.
+  changed since. Any other element already unexplained at the commit round 1 read is fixed by one
+  fix pass after the last round.
