@@ -87,6 +87,9 @@ to change and what it prevents; a rule ID is a lookup handle, never the argument
 - Tag a proposal for behaviour the caller did not ask for `enhancement`
   instead of a severity. It does not gate the review.
 - Separate confirmed defects from lower-confidence concerns.
+- Do not raise a decision the brief lists as Settled. In a re-check round (the brief has a `Round:`
+  line), raise a new finding only when it is a behaviour defect. A new finding is neither a finding
+  of the previous round nor on a line that round's fixes changed.
 - Recommend a fix in words; leave the editing to the caller.
 - End with the reading footer on its own line:
   `Read: <N> files in full, <M> sampled; digest: used | absent.`

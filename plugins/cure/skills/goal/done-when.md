@@ -68,5 +68,4 @@ exists only in a shipped file.
 - A work item that runs a fresh-reader check over a document set cites `fresh-reader.md`.
   Its passes share the round limit N with the reviewer pass. Round 1 reads each whole
   document, one pass per document. Rounds 2..N re-check the previous round's findings and the lines
-  changed since. Any other element already unexplained at the commit round 1 read is fixed by one
-  fix pass after the last round.
+  changed since.

@@ -117,14 +117,26 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
 - Review round: one reviewer pass, the same unit for every tier. The goal states N, the round limit
-  (N = `reviews.<tier>`). Round 1 reviews the diff. Rounds 2..N re-check only the previous round's
-  fixes and raise no new topic. The orchestrator commits each round's fixes, and `qa` re-runs, before
-  the next round. A `MUST-FIX` or `SHOULD-CONSIDER` open after round N takes the failure exit; no
-  round N+1 starts. A work item with a fresh-reader check adds its passes to each round (`fresh-reader.md`).
+  (N = `reviews.<tier>`). Round 1 reviews the diff. Rounds 2..N, the fresh reader included, re-check
+  only the previous round's fixes and findings. A new finding is one that is neither a finding of
+  the previous round nor on a line that round's fixes changed. It is raised only when it is a
+  behaviour defect (a bug), and the job fixes it. The orchestrator drops any other new finding of
+  rounds 2..N; there is no backlog. Every reviewer brief of rounds 2..N, the Light reviewer's
+  included, carries the line
+  `Round: re-check; raise a new finding only when it is a behaviour defect`.
+  The orchestrator commits each round's fixes, and `qa` re-runs, before the next round. A `MUST-FIX`
+  or `SHOULD-CONSIDER` open after round N takes the failure exit; no round N+1 starts. A work item
+  with a fresh-reader check adds its passes to each round (`fresh-reader.md`).
   Every `NITPICK` and `enhancement` is fixed with the round's fixes. Those of the last round are
   fixed in one fix pass that `qa` and lint verify, with no further round. An item outside the
   ticket's files that would take the change past `<lines>` is a question to the user, asked as
   "Asking" states (`needs-input:` in a job, `AskUserQuestion` in a direct run), never a written note.
+- Review brief: every review brief except the fresh reader's lists the Settled decisions as decided
+  and tells the reviewer not to raise them.
+- Fix brief: it carries the finding and its scenario, not the reviewer's text, and a grep of the
+  changed fact's key terms over the document set and its siblings. The fixer changes only the words
+  the finding names and their copies among the grep hits (a hit that states the same fact), reports
+  any other hit, and checks the result against the code.
 - Prose review: each round also dispatches the prose reviewer that the goal's Tools section names,
   on the prose of the diff: added or changed code comments, documents, the commit message and the PR
   text. Before round 1 the orchestrator drafts the commit message and the PR text under `.notes/` and

@@ -32,8 +32,9 @@ Before editing a line:
   finding and the PR's first review round count as consecutive. Do not make
   the class-level call yourself. Continue without stopping when the work item
   already carries the designer's decision.
-- Implement what the work item states and nothing beside it. Report an unrelated
-  cleanup; leave it out of the diff.
+- Implement what the work item states and nothing beside it. Under a fix brief, a grep hit
+  that states the same fact counts as stated; report any other hit. Report an unrelated cleanup;
+  leave it out of the diff.
 - Where the item leaves a design choice open and the choices lead to materially
   different code, state the assumption in the report and implement it. Stop with
   nothing written only when any assumption would be unsafe or wasted.
