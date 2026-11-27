@@ -148,7 +148,7 @@ Also done when (a) <turns> turns have passed, or <rounds> rounds ended on a meas
 <review cause>, or the diff passes <lines> lines (per repository, in <repo>: insertions plus deletions of `git diff --shortstat <base commit>`, plus the lines of untracked files (`git ls-files -z --others --exclude-standard | xargs -0 cat | wc -l`); the base commit is the one work item 1 recorded), or a consult's line estimate for a repository's files plus the lines already changed in it passes <lines> lines, or `git fetch` or
 a tool check failed, or `finish` exited non-zero twice (not counting an exit 1 that names `--pr` or `--retro`), or a Settled statement is false or the
 title's outcome is unachievable; and (b) the retrospective's summary, naming the cause, is in the
-transcript and the `stats.md` row is appended with outcome `failed`; and (c) reported as in N+1 with `--status failed`, unless `finish` failed
+transcript; and (c) reported as in N+1 with `--status failed`, unless `finish` failed
 twice as counted in (a); and (d) the final message starts with `failed:`.
 
 Also done when a question only the user can answer is open, with no clean-up: the ledger and the
@@ -166,14 +166,11 @@ Review cause: `delegation.md` "Agent tier", except Full, written whole: "a `MUST
 `SHOULD-CONSIDER` is open after review round <limit>" (limit = `reviews.Full`). When the handoff's
 `delivery` is `commit` (the default), the generated text carries no pull-request wording.
 
-The `lines` value of the `stats.md` row is measured the same way, per repository against its base
-commit, and the row carries the estimate as `est_lines`.
-
 Clean-up work item: write "The failure and `needs-input` exits skip this item." in place of "The
 failure path skips this item."
 
-A Solo exit has (a) without `<rounds>` and `<review cause>`, then "(b) the `stats.md` row is appended
-with outcome `failed`", the report clause as (c) and the final-message clause as (d).
+A Solo exit has (a) without `<rounds>` and `<review cause>`, then the report clause as (b) and the
+final-message clause as (c).
 
 ## Launch line
 

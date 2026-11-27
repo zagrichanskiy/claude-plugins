@@ -23,8 +23,10 @@ it takes the failure exit instead of growing.
   `delivery: pr`, it rewords the ticket to the delivered part and opens a new ticket for the rest.
   With no usable tracker it applies no cut. Each ticket has one PR per repository, and the PR does
   not reference the split.
-- To size a goal from earlier ones, run `grep '| <repo> |' ~/.claude/retros/stats.md`: turns, tokens
-  and lines. Do not read the retrospectives for this.
+- To size a goal from earlier ones, run `<plugin-root>/bin/cure-job stats --repo <repository
+  directory name>` (the basename of the goal's first repository; median turns, tokens and lines per
+  tier) and `grep '| <repo> |' ~/.claude/retros/stats.md` (read-only history). Do not read the
+  retrospectives for this.
 
 ## Size-check item
 
@@ -49,6 +51,7 @@ A Solo goal writes none. The format is the retrospective bullet of `rules.md` "L
   proposals into issues and deletes it.
 - "Where it went wrong" rows (`W1…Wn`) cite the turn, agent, finding id or command: rework, stale
   facts in the goal file, a stop, a permission prompt, a round that found only `NITPICK`.
-- It holds no measurements; the `stats.md` row is their only copy. Assumptions and answered questions
-  stay in the ledger, and the printed summary lists them.
+- It holds no measurements: `cure-job finish` records a job's measurements (`cure-job stats`); a
+  direct run records none. Assumptions and answered questions stay in the ledger, and the printed
+  summary lists them.
 - The session writes proposals only. It never edits a plugin or a skill.

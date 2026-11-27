@@ -41,7 +41,7 @@ addr show usb0 reports 192.168.140.1/24` passes.
 
 End with the exits of the mode file. The failure exit is a conjunction: a failure cause holds, the
 retrospective's summary naming the cause is in the transcript, and the final message starts with
-`failed:`. A Solo goal has no retrospective clause; its failure exit has the `stats.md` clause.
+`failed:`. A Solo goal has no retrospective clause.
 Print the summary; the evaluator reads the transcript only. No exit clause depends on text that
 exists only in a shipped file.
 
