@@ -17,7 +17,7 @@ from . import resource as resource_names
 from .claude import Session
 from .errors import CureJobError, JobStateError, SessionGone, StoreError
 from .job import JobRecord
-from .sessions import listed_live
+from .sessions import listed_live, origin_reachable
 from .state import JobView, State
 from .store import InvalidJob
 
@@ -36,6 +36,8 @@ class Op(enum.Enum):
     REMOVE_SESSIONS = "remove-sessions"
     ORIGIN = "origin"
     REPORTED = "reported"
+    ASK = "ask"
+    ANSWERED = "answered"
 
 
 class Reads(enum.Enum):
@@ -400,6 +402,54 @@ def _reported_has_result(facts: Check) -> CureJobError | None:
     return None
 
 
+def _caller_is_job(facts: Check) -> CureJobError | None:
+    """Only the job's own run session asks its origin and records the answer."""
+    if facts.caller_job != facts.record.id:
+        return JobStateError(f"job {facts.record.id}: {facts.operation} runs only in the job's own session")
+    return None
+
+
+def _ask_launched(facts: Check) -> CureJobError | None:
+    if facts.record.run == 0:
+        return JobStateError(f"job {facts.record.id} has no launched run; ask needs a running run")
+    return None
+
+
+def _ask_not_abandoned(facts: Check) -> CureJobError | None:
+    if facts.record.closed is not None:
+        return JobStateError(f"job {facts.record.id} is abandoned; {facts.operation} needs a running run")
+    return None
+
+
+def _ask_no_result(facts: Check) -> CureJobError | None:
+    record = facts.record
+    if record.result is not None or record.run in record.archived_runs:
+        return JobStateError(f"job {record.id} has a result for run {record.run}; "
+                             f"{facts.operation} needs a running run")
+    return None
+
+
+def _ask_has_origin(facts: Check) -> CureJobError | None:
+    record = facts.record
+    if record.origin is None:
+        return JobStateError(f"job {record.id} has no origin; finish with --status needs-input instead")
+    return None
+
+
+def _origin_reachable(facts: Check) -> CureJobError | None:
+    record = facts.record
+    if not origin_reachable(record.origin, facts.sessions()):
+        return JobStateError(f"job {record.id}: origin {record.origin} is not a live session; "
+                             "finish with --status needs-input instead")
+    return None
+
+
+def _asked(facts: Check) -> CureJobError | None:
+    if not facts.record.asked:
+        return JobStateError(f"job {facts.record.id}: run {facts.record.run} asked no question; nothing answered")
+    return None
+
+
 #: Every row that starts a session ends with these.
 _GENERIC_START: tuple[Guard, ...] = (_goal_settled, _no_other_live_session)
 _START_NEEDS = frozenset({Fact.KIND, Fact.KINDS, Fact.SESSIONS})
@@ -418,4 +468,7 @@ RULES: Mapping[Op, Rule] = {
                                     _no_open_items)),
     Op.END: Rule(Reads.RECORD, (_kind_end_guards, _session_open, _summary_lines), frozenset({Fact.KIND})),
     Op.REPORTED: Rule(Reads.RECORD, (_reported_launched, _reported_has_result)),
+    Op.ASK: Rule(Reads.RECORD, (_caller_is_job, _ask_launched, _ask_not_abandoned, _ask_no_result, _ask_has_origin,
+                                _origin_reachable), frozenset({Fact.SESSIONS})),
+    Op.ANSWERED: Rule(Reads.RECORD, (_caller_is_job, _asked)),
 }

@@ -280,3 +280,28 @@ def test_stop_runs_claude_stop_with_the_id(cli, fake_state):
 def test_stop_of_an_unknown_id_raises_claude_error_with_the_stderr_line(cli, fake_state):
     with pytest.raises(ClaudeError, match="no live session nope"):
         cli.stop("nope")
+
+
+# --- pids -------------------------------------------------------------------------------------------------
+
+def test_pids_hold_the_pid_of_every_live_entry_of_the_name(cli, fake_state):
+    write_agents(fake_state, [
+        {"name": "d", "pid": 7, "status": "idle"},
+        {"name": "d", "pid": 9, "status": "busy"},
+        {"name": "d", "id": "stopped01"},
+    ])
+    assert sorted(cli.sessions()["d"].pids) == [7, 9]
+
+
+@pytest.mark.parametrize("pid", [None, True, "7", 7.5])
+def test_pids_skip_a_pid_that_is_not_an_integer(cli, fake_state, pid):
+    entry = {"name": "d", "status": "busy", "pid": pid}
+    if pid is None:
+        del entry["pid"]
+    write_agents(fake_state, [entry, {"name": "d", "pid": 3, "status": "idle"}])
+    assert cli.sessions()["d"].pids == (3,)
+
+
+def test_a_stopped_entry_has_no_pids(cli, fake_state):
+    write_agents(fake_state, [{"name": "d", "id": "stopped01"}])
+    assert cli.sessions()["d"].pids == ()

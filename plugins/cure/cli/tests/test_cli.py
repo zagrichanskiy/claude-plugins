@@ -179,7 +179,7 @@ def test_list_json_is_one_compact_line_with_kebab_case_keys(h, tmp_path):
         "problem": None, "origin": None, "open": 0,
         "waiting-for": None, "reported": False, "sessions-removed": False,
         "prs": [], "after": None, "after-state": None, "ticket": None, "ticket-summary": None, "branch": None,
-        "workspace": "/work/video-core", "phase": "approved", "sessions": {}}
+        "workspace": "/work/video-core", "phase": "approved", "sessions": {}, "question": None}
     assert data[1]["state"] == "queued"
 
 
@@ -279,7 +279,7 @@ def test_next_json_gives_ask_timeout_the_resource_and_holder(h, tmp_path):
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
     assert item["actions"] == ["ask-timeout"]
-    assert item["args"] == [{"resource": "device:bench", "holder": "other-job"}]
+    assert item["args"] == [{"resource": "device:bench", "holder": "other-job", "route": "dispatcher"}]
 
 
 def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_question(h, tmp_path):
@@ -288,7 +288,7 @@ def test_next_json_gives_ask_timeout_with_null_holder_for_a_prefix_only_timeout_
     assert h.run("reported", job_id) == 0
     [item] = _next(h)
     assert item["actions"] == ["ask-timeout"]
-    assert item["args"] == [{"resource": "", "holder": None}]
+    assert item["args"] == [{"resource": "", "holder": None, "route": "dispatcher"}]
 
 
 def test_next_json_lists_jobs_in_lock_order_with_row_fields_actions_and_args(h, tmp_path):

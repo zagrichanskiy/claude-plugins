@@ -22,7 +22,9 @@ from typing import Callable, Mapping
 from .claude import Claude, ClaudeCli
 from . import config
 from .clock import Clock, local_now
+from .commands.answered import AnsweredCommand
 from .commands.approve import ApproveCommand
+from .commands.ask import AskCommand
 from .commands.claim import ClaimCommand
 from .commands.close import CloseCommand
 from .commands.config import ConfigCommand
@@ -75,7 +77,7 @@ class Cli:
         self._commands = [NewCommand(self), ListCommand(self), NextCommand(self), ApproveCommand(self),
                           LaunchCommand(self), ResumeCommand(self), StartCommand(self), ClaimCommand(self),
                           ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
-                          FinishCommand(self), EndCommand(self),
+                          FinishCommand(self), EndCommand(self), AskCommand(self), AnsweredCommand(self),
                           ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), StatsCommand(self),
                           ConfigCommand(self)]
         self._parser = self._build_parser()

@@ -17,7 +17,7 @@ from .config import DEFAULTS, Config
 from .events import WORK
 from .job import JobRecord
 from .result import ResultStatus
-from .sessions import JobSession, Liveness, liveness
+from .sessions import JobSession, Liveness, liveness, origin_reachable
 
 
 class State(enum.Enum):
@@ -28,6 +28,7 @@ class State(enum.Enum):
     LAUNCHED = "launched"
     RUNNING = "running"
     STALLED = "stalled"
+    AWAITING_ANSWER = "awaiting-answer"
     BLOCKED = "blocked"
     LOST = "lost"
     NEEDS_INPUT = "needs-input"
@@ -78,11 +79,14 @@ def phase_of(record: JobRecord) -> Phase:
     return Phase.APPROVED if record.approved else Phase.AWAITING_APPROVAL
 
 
-def project(phase: Phase, held: bool, work: Liveness | None) -> State:
-    """The ``list --json`` state: the work liveness in ``WORKING``, ``held`` before a launch, else the phase."""
+def project(phase: Phase, held: bool, work: Liveness | None, asking: bool = False) -> State:
+    """The ``list --json`` state: the work liveness in ``WORKING``, ``held`` before a launch, else the phase.
+    A busy, idle or stalled work session that is ``asking`` waits for the origin's answer."""
     if phase is Phase.WORKING:
         if work is None or work is Liveness.ENDED:
             raise AssertionError(f"a working job has work liveness {work}")
+        if asking and work in (Liveness.BUSY, Liveness.IDLE, Liveness.STALLED):
+            return State.AWAITING_ANSWER
         return _WORKING_STATES[work]
     if held and phase in _PRE_LAUNCH:
         return State.HELD
@@ -150,16 +154,37 @@ class JobView:
     held: bool
     after: After | None
     ended_at: datetime | None
+    #: A live listed session has the pid of the origin's socket.
+    origin_reachable: bool = False
 
     @property
     def state(self) -> State:
         work = self.sessions.get(WORK)
-        return project(self.phase, self.held, work.liveness if work is not None else None)
+        return project(self.phase, self.held, work.liveness if work is not None else None,
+                       self.record.question is not None)
 
 
 def needs_sessions(records: Iterable[JobRecord]) -> bool:
-    """True when the view of some record depends on the session list."""
-    return any(record.open_sessions() and not phase_of(record).is_terminal for record in records)
+    """True when the view of some record depends on the session list: the state, or the reachability of an
+    origin that a ``next`` action asks."""
+    return any(_needs_liveness(record) or _asks_origin(record) for record in records)
+
+
+def needs_liveness(records: Iterable[JobRecord]) -> bool:
+    """True when the state of some record depends on the session list."""
+    return any(_needs_liveness(record) for record in records)
+
+
+def _needs_liveness(record: JobRecord) -> bool:
+    return bool(record.open_sessions()) and not phase_of(record).is_terminal
+
+
+def _asks_origin(record: JobRecord) -> bool:
+    if record.origin is None:
+        return False
+    phase = phase_of(record)
+    return (record.question is not None or phase in (Phase.AWAITING_APPROVAL, Phase.NEEDS_INPUT)
+            or (record.result is not None and not record.reported))
 
 
 #: The creation time of a job whose handoff has no readable ``created``: before every other job.
@@ -204,9 +229,10 @@ def derive(records: Sequence[JobRecord], sessions: Mapping[str, Session], now: d
         held = not phase.is_terminal and _waits(record, terminal)
         parts[record.id] = (phase, views, held)
         work = views.get(WORK)
-        states[record.id] = project(phase, held, work.liveness if work is not None else None)
+        states[record.id] = project(phase, held, work.liveness if work is not None else None,
+                                    record.question is not None)
     return [JobView(record, *parts[record.id], _after(record, by_id, states, invalid_ids),
-                    _ended_at(record, states[record.id]))
+                    _ended_at(record, states[record.id]), origin_reachable(record.origin, sessions))
             for record in ordered]
 
 

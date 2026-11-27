@@ -31,13 +31,15 @@ class Session:
     listing ``id`` of every live entry under the name, strongest first; a live
     entry without a string ``id`` contributes ``""``. ``all_ids`` holds the
     listing ``id`` of every entry, live or stopped, in the same way. ``uuid`` is
-    the strongest entry's ``sessionId``, which ``claude --resume`` takes.
+    the strongest entry's ``sessionId``, which ``claude --resume`` takes. ``pids`` holds the
+    integer ``pid`` of every live entry under the name; a stopped entry has none.
     """
     status: SessionStatus
     waiting_for: str | None = None
     ids: tuple[str, ...] = ()
     all_ids: tuple[str, ...] = ()
     uuid: str | None = None
+    pids: tuple[int, ...] = ()
 
 
 #: The key `claude agents --json` puts the status of a live session under, and
@@ -94,8 +96,11 @@ class ClaudeCli:
             waiting_for = strongest.get("waitingFor")
             ids = tuple(_id(entry) for entry_status, entry in listed if entry_status is not SessionStatus.STOPPED)
             uuid = strongest.get("sessionId")
+            pids = tuple(entry["pid"] for entry_status, entry in listed
+                         if entry_status is not SessionStatus.STOPPED and _is_int(entry["pid"]))
             found[name] = Session(status, waiting_for if isinstance(waiting_for, str) else None, ids,
-                                  tuple(_id(entry) for _, entry in listed), uuid if isinstance(uuid, str) else None)
+                                  tuple(_id(entry) for _, entry in listed), uuid if isinstance(uuid, str) else None,
+                                  pids)
         return found
 
     def start(self, name: str, cwd: str, prompt: str, extra_args: Sequence[str] = ()) -> None:
@@ -140,6 +145,11 @@ def _status(entry: dict) -> SessionStatus:
     value = entry.get(STATUS_KEY)
     # A list or an object is not hashable, and is not a known value either.
     return _STATUSES.get(value, SessionStatus.BUSY) if isinstance(value, str) else SessionStatus.BUSY
+
+
+def _is_int(value: object) -> bool:
+    # bool is an int subclass, and `true` is not a pid.
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _id(entry: dict) -> str:

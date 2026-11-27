@@ -1,8 +1,9 @@
-"""The sixteen job operations.
+"""The eighteen job operations.
 
-Every operation except ``new``, ``approve``, ``finish``, ``end``, ``reported`` and ``release``
-reads one snapshot of the state root, derives the job states from it and makes its
-writes. ``approve``, ``finish``, ``end``, ``reported`` and ``release`` read only their own job.
+Every operation except ``new``, ``approve``, ``finish``, ``end``, ``reported``, ``release``, ``ask`` and ``answered``
+reads one snapshot of the state root, derives the job states from it and makes its writes. ``approve``, ``finish``,
+``end``, ``reported``, ``release``, ``ask`` and ``answered`` read only their own job; ``ask`` also reads the session
+list.
 ``claim`` runs its check and its write under :meth:`JobStore.locked` and reads
 no session list. No other operation holds the lock, so their check and write
 are not atomic across processes.
@@ -28,7 +29,7 @@ from ..clock import Clock, format_local
 from ..config import Config
 from ..errors import (ClaudeError, CureJobError, GitError, HandoffError, JobStateError, ResourceHeld, StoreError,
                       UnknownJob)
-from ..events import Approved, Claim, Closed, Origin, Release, Reported
+from ..events import Answered, Approved, Asked, Claim, Closed, Origin, Release, Reported
 from ..goal import PLUGIN_ROOT, tier
 from ..handoff import parse_submitted, stamp
 from ..job_id import make_id, slug_of
@@ -39,7 +40,8 @@ from ..kinds import KINDS, SessionKind
 from ..kinds import WORK as WORK_KIND
 from ..rules import Check, Op, check
 from ..runner import Continuation, SessionRunner, Stopped
-from ..state import HALF_CREATED_AGE, JobView, derive, expired, holders, needs_sessions, retention
+from ..state import (HALF_CREATED_AGE, JobView, derive, expired, holders, needs_liveness, needs_sessions,
+                     retention)
 from ..store import InvalidJob, JobStore, Snapshot
 
 
@@ -103,8 +105,16 @@ class JobsProvider:
         """The views of the readable jobs and the invalid jobs, from one snapshot."""
         snapshot = self.store.snapshot()
         # The session list costs one run of the binary, so it is read only
-        # when the state of some job depends on it.
-        sessions = self.claude.sessions() if needs_sessions(snapshot.records) else {}
+        # when the view of some job depends on it.
+        sessions: Mapping[str, Session] = {}
+        if needs_liveness(snapshot.records):
+            sessions = self.claude.sessions()
+        elif needs_sessions(snapshot.records):
+            try:
+                sessions = self.claude.sessions()
+            except ClaudeError:  # ClaudeOutcomeUnknown included
+                # Only reachability reads the list: every origin reads unreachable, so the dispatcher asks.
+                pass
         return self._listing(snapshot, sessions)
 
     def _listing(self, snapshot: Snapshot, sessions: Mapping[str, Session]) -> Listing:
@@ -274,6 +284,27 @@ class JobsProvider:
         if record.reported:
             return
         self.store.append_event(job_id, Reported(record.run, self.clock()))
+
+    def ask(self, job_id: str, question: Sequence[str], caller_job: str | None) -> str:
+        """Record that the run session of ``job_id`` asks its origin ``question`` and return the origin.
+
+        Reads this job and the session list. Refused unless ``caller_job`` is the job and its origin is a live session.
+        """
+        record = self.store.load(job_id)
+        check(Op.ASK, Check(record, "ask", sessions=functools.cache(self.claude.sessions), caller_job=caller_job))
+        self.store.append_event(job_id, Asked(record.run, tuple(question), self.clock()))
+        return record.origin
+
+    def answered(self, job_id: str, answer: Sequence[str], caller_job: str | None) -> None:
+        """Record ``answer`` to the latest question of the job's run. Reads only this job.
+
+        A question already answered gets no write.
+        """
+        record = self.store.load(job_id)
+        check(Op.ANSWERED, Check(record, "answered", caller_job=caller_job))
+        if record.question is None:
+            return
+        self.store.append_event(job_id, Answered(record.run, tuple(answer), self.clock()))
 
     def finish(self, job_id: str, report: Report) -> Path:
         """Write ``report`` as the ``result.md`` of a launched job, then append its job record to ``ledger.jsonl``,

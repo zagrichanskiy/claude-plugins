@@ -163,8 +163,8 @@ def test_is_open(state, is_open):
 
 def test_state_values_are_the_documented_words():
     assert {s.value for s in State} == {
-        "queued", "held", "awaiting-approval", "approved", "launched", "running", "stalled", "blocked", "lost",
-        "needs-input", "done", "failed", "abandoned"}
+        "queued", "held", "awaiting-approval", "approved", "launched", "running", "stalled", "awaiting-answer",
+        "blocked", "lost", "needs-input", "done", "failed", "abandoned"}
 
 
 # --- lock rule ----------------------------------------------------------------------------------------
