@@ -23,7 +23,7 @@ Create nothing and delete nothing before step 6.
 
 - List `~/.claude/retros/????-??-??-*.md`.
 - Report the other files in one line and leave them.
-- Run `cure-job list --json`. Its rows have `id` (`<yymmdd>-<hhmm>-<repo>-<slug>`), `state` and `dir`. A job matches a retrospective when its id ends in `-<repo>-<slug>`. The job is open in any state except `done`, `failed` or `abandoned`. Skip a retrospective whose job is open.
+- Run `cure-job list --json`. Its rows have `id` (`<ticket>-<repo>-<slug>`, or `<yymmdd>-<hhmm>-<repo>-<slug>` without a ticket), `state` and `dir`. A job matches a retrospective when its id ends in `-<repo>-<slug>`. For an id that `cure-job new` cut to 60 characters, the id holds, after the ticket or time part, a prefix of `<repo>`, a `-`, then a prefix of `<slug>`. Example: repo `video-core-firmware-images-and-more` and slug `report-pass-from-signal-and-more` give `abc-1-video-core-firmware-images-report-pass-from-signal-an`. The job is open in any state except `done`, `failed` or `abandoned`. Skip a retrospective whose job is open.
 
 ## 2. Read the proposals
 

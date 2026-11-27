@@ -31,7 +31,7 @@ from ..errors import (ClaudeError, CureJobError, GitError, HandoffError, JobStat
 from ..events import Approved, Claim, Closed, Origin, Release, Reported
 from ..goal import PLUGIN_ROOT, tier
 from ..handoff import parse_submitted, stamp
-from ..job_id import make_id, slugify
+from ..job_id import make_id, slug_of
 from ..result import Report, render_result
 from ..job import JobRecord
 from ..events import WORK
@@ -83,7 +83,7 @@ class JobsProvider:
                                  f"{self.store.job_dir(handoff.after)} holds no handoff.md")
         created = self.clock()
         try:
-            base = make_id(created, os.path.basename(handoff.launch_dir), slug)
+            base = make_id(created, os.path.basename(handoff.launch_dir), slug, handoff.ticket)
         except ValueError as e:
             raise HandoffError(f"cannot build a job id: {e}") from e
         return self.store.create(base, lambda job_id: stamp(text, job_id, created, origin, ticket_summary))
@@ -303,7 +303,6 @@ class JobsProvider:
         except CureJobError:
             goal_text = None
         repo = os.path.basename(record.handoff.launch_dir)
-        prefix = f"{record.id[:11]}-{slugify(repo)}-"
         orchestrator, subagents = [], []
         for uuid in self._session_uuids(record):
             main, found = ledger.locate(self.projects_root, uuid)
@@ -311,7 +310,7 @@ class JobsProvider:
             subagents.extend(found)
         return ledger.job_record(
             job_id=record.id, date=format_local(self.clock()), repo=repo,
-            slug=record.id.removeprefix(prefix) if record.id.startswith(prefix) else None,
+            slug=slug_of(record.id, repo),
             tier=tier(goal_text) if goal_text is not None else None, outcome=report.status.value,
             est_lines=ledger.est_lines(handoff_text) if handoff_text is not None else None,
             lines=self._changed_lines(record), orchestrator=ledger.read_usage(orchestrator),

@@ -102,8 +102,8 @@ class JobStore:
         return self.job_dir(job_id) / f"{stem}-{n}.md"
 
     def create(self, base_id: str, render: Callable[[str], str]) -> str:
-        """Reserve the first free id from ``base_id`` on that ends in no run marker, write ``render(id)``
-        as its handoff."""
+        """Reserve the first free id from ``base_id`` on that ends in no run marker and has no kept ledger,
+        write ``render(id)`` as its handoff."""
         self._make_jobs()
         job_id = self._reserve(base_id)
         reserved = self.job_dir(job_id)
@@ -295,17 +295,17 @@ class JobStore:
 
     def remove(self, job_id: str) -> None:
         """Remove the job directory after appending its ``ledger.jsonl``, when it has one, to the kept ledger,
-        unless the kept ledger already ends with it."""
+        unless the kept ledger already ends with it. The kept ledger is created even empty: it keeps the id taken."""
         directory = self.job_dir(job_id)
         text, _ = _read_text(self.ledger_path(job_id))
         target = self.kept_ledger_path(job_id)
         # A retry after a failed rmtree finds the ledger already kept.
         kept = _read_text(target)[0] or ""
-        if text and not kept.endswith(text):
-            with _store_errors(target):
-                os.makedirs(target.parent, _DIR_MODE, exist_ok=True)
-                descriptor = os.open(target, os.O_WRONLY | os.O_APPEND | os.O_CREAT, _FILE_MODE)
-                with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+        with _store_errors(target):
+            os.makedirs(target.parent, _DIR_MODE, exist_ok=True)
+            descriptor = os.open(target, os.O_WRONLY | os.O_APPEND | os.O_CREAT, _FILE_MODE)
+            with os.fdopen(descriptor, "w", encoding=_ENCODING) as sink:
+                if text and not kept.endswith(text):
                     sink.write(("\n" if kept and not kept.endswith("\n") else "") + text)
         with _store_errors(directory):
             shutil.rmtree(directory)
@@ -362,7 +362,8 @@ class JobStore:
     def _reserve(self, base_id: str) -> str:
         candidates = [base_id] + [ids.with_suffix(base_id, n) for n in range(2, ids.MAX_SUFFIX + 1)]
         for candidate in candidates:
-            if ids.ends_in_run_marker(candidate):
+            # A kept ledger belongs to a removed job; reusing its id would merge the two jobs' ledgers.
+            if ids.ends_in_run_marker(candidate) or self.kept_ledger_path(candidate).exists():
                 continue
             path = self.job_dir(candidate)
             try:

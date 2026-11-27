@@ -5,8 +5,9 @@ bench is a short hold the job claims per step. ``origin``, optional,
 names the session the job reports back to; ``cure-job new`` writes it, and a
 submitted handoff that names it is refused. ``after``, optional, names the
 job this one is stacked on. ``ticket``, ``ticket-summary`` and ``branch``,
-optional, are read for ``cure-job list``. Every other field and section
-belongs to the dispatcher and is not checked here.
+optional, are read for ``cure-job list``. ``created``, which ``cure-job new``
+writes, orders the jobs; a value that does not read leaves it ``None``. Every
+other field and section belongs to the dispatcher and is not checked here.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from . import job_id as ids
-from .clock import format_local
+from .clock import format_local, parse_local
 from .errors import HandoffError
 from .frontmatter import FrontmatterError, Value, as_list, is_writable, parse, render_value, set_scalars
 
@@ -38,6 +39,7 @@ class Handoff:
     ticket: str | None = None
     ticket_summary: str | None = None
     branch: str | None = None
+    created: datetime | None = None
 
     @property
     def launch_dir(self) -> str:
@@ -85,7 +87,8 @@ def _handoff(entries: dict[str, Value]) -> Handoff:
     device = entries.get("device")
     try:
         return Handoff(repos=tuple(repos), device=Device(device), origin=origin or None, after=after,
-                       ticket=ticket, ticket_summary=ticket_summary, branch=branch)
+                       ticket=ticket, ticket_summary=ticket_summary, branch=branch,
+                       created=_created(entries.get("created")))
     except ValueError:
         choices = " or ".join(member.value for member in Device)
         if device is None:
@@ -98,6 +101,13 @@ def _scalar(entries: dict[str, Value], key: str) -> str | None:
     if isinstance(value, list):
         raise HandoffError(f"{key} is a list; expected one line of text")
     return value
+
+
+def _created(value: Value | None) -> datetime | None:
+    try:
+        return parse_local(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
 
 
 def stamp(text: str, job_id: str, created: datetime, origin: str | None = None,

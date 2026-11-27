@@ -162,6 +162,30 @@ def test_finish_appends_one_job_record_with_tokens_lines_tier_and_estimate(world
     assert "rounds" not in record
 
 
+def test_finish_records_the_slug_of_a_ticket_job_id(world):
+    jobs, store, clock, projects, repo = world
+    job_id = jobs.new(handoff_text((repo,)).replace("device: none", "device: none\nticket: ABC-1"), "fix-it")
+    assert job_id == "abc-1-video-core-fix-it"
+    store.goal_path(job_id).write_text("## Rules\n\n- Tier: Light\n", encoding="utf-8")
+    jobs.approve(job_id)
+    jobs.launch(job_id)
+    jobs.finish(job_id, Report(ResultStatus.DONE))
+    assert records(store, job_id)[0]["slug"] == "fix-it"
+
+
+def test_finish_records_the_slug_of_a_job_id_whose_repository_was_cut(world, tmp_path):
+    jobs, store, *_ = world
+    repo = str(make_repo(tmp_path / "src", "video-core-firmware-images-and-more"))
+    text = handoff_text((repo,)).replace("device: none", "device: none\nticket: ABC-1")
+    job_id = jobs.new(text, "report-pass-from-signal-and-more")
+    assert job_id == "abc-1-video-core-firmware-images-report-pass-from-signal-an"
+    store.goal_path(job_id).write_text("## Rules\n\n- Tier: Light\n", encoding="utf-8")
+    jobs.approve(job_id)
+    jobs.launch(job_id)
+    jobs.finish(job_id, Report(ResultStatus.DONE))
+    assert records(store, job_id)[0]["slug"] == "report-pass-from-signal-an"
+
+
 def test_finish_without_transcript_or_estimate_records_null_never_zero(world):
     jobs, store, *_ = world
     job_id = launched(world, estimate=False)

@@ -2,14 +2,14 @@
 
 This module holds the States table, the lock rule and the retention rule. No
 lock file exists. Lock order puts a job with a launched event first, then
-ascending id. In lock order, a launched open job holds each resource it names
+creation order: the handoff's ``created``, ties by id. In lock order, a launched open job holds each resource it names
 that no job before it holds. Every other job holds nothing.
 """
 from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import AbstractSet, Iterable, Mapping, Sequence
 
 from .claude import Session
@@ -162,10 +162,23 @@ def needs_sessions(records: Iterable[JobRecord]) -> bool:
     return any(record.open_sessions() and not phase_of(record).is_terminal for record in records)
 
 
-def lock_rank(record: JobRecord) -> tuple[bool, str]:
+#: The creation time of a job whose handoff has no readable ``created``: before every other job.
+_UNKNOWN_CREATED = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def creation_order(record: JobRecord) -> tuple[datetime, str]:
+    return (record.handoff.created or _UNKNOWN_CREATED, record.id)
+
+
+def lock_rank(record: JobRecord) -> tuple[bool, datetime, str]:
     """The lock order. A launched job is already using its resources; after a
-    backward clock step it can sort above a newer job (local-time ids)."""
-    return (record.run == 0, record.id)
+    backward clock step it can sort above a newer job."""
+    return (record.run == 0, *creation_order(record))
+
+
+def invalid_lock_rank(job_id: str) -> tuple[bool, datetime, str]:
+    """The lock rank of an invalid job: launched, created at an unknown time."""
+    return (False, _UNKNOWN_CREATED, job_id)
 
 
 def holders(records: Iterable[JobRecord]) -> dict[str, str]:
@@ -178,9 +191,9 @@ def holders(records: Iterable[JobRecord]) -> dict[str, str]:
 
 def derive(records: Sequence[JobRecord], sessions: Mapping[str, Session], now: datetime,
            invalid_ids: AbstractSet[str], launch_grace: timedelta = LAUNCH_GRACE) -> list[JobView]:
-    """One view per record, ascending id. ``sessions`` maps a session name to its listing.
+    """One view per record, in creation order. ``sessions`` maps a session name to its listing.
     ``invalid_ids`` names the jobs whose files do not read."""
-    ordered = sorted(records, key=lambda record: record.id)
+    ordered = sorted(records, key=creation_order)
     terminal = {record.id: _terminal_state(record) for record in ordered}
     by_id = {record.id: record for record in ordered}
     parts: dict[str, tuple[Phase, dict[str, SessionView], bool]] = {}

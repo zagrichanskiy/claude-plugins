@@ -57,6 +57,11 @@ Run the project's formatter and linter on the files you touched, a type check wh
 project has one, and the tests that already cover the changed code. Full-suite runs
 belong to `qa` and end-to-end behaviour to `verifier`.
 
+Run `pre-commit run --files <new and changed files>`, never the `-a`/`--all-files` form: it skips
+untracked files. Never pipe a build or test command; report its own exit code. Wait in the
+foreground or on a PID, never with `pgrep -f`, which matches its own command line. Paste the last
+lines of the lint and test output into the report.
+
 If a pre-existing test fails because your change exposed a real defect elsewhere,
 report the defect.
 

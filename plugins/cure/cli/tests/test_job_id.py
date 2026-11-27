@@ -102,3 +102,66 @@ def test_session_name_of_first_run_is_the_id():
 
 def test_session_name_of_later_run_has_run_suffix():
     assert job_id.session_name("261013-1742-repo-x", 3) == "261013-1742-repo-x-r3"
+
+
+@pytest.mark.parametrize("ticket, expected", [
+    ("zagrichanskiy/claude-plugins#126", "issue-126-claude-plugins-report-pass"),
+    ("#126", "issue-126-claude-plugins-report-pass"),
+    ("ABC-123", "abc-123-claude-plugins-report-pass"),
+    ("https://github.com/zagrichanskiy/claude-plugins/issues/126", "issue-126-claude-plugins-report-pass"),
+])
+def test_make_id_with_a_ticket_drops_the_time_prefix(ticket, expected):
+    result = job_id.make_id(CREATED, "claude-plugins", "Report pass", ticket)
+    assert result == expected
+    assert job_id.is_valid(result)
+
+
+@pytest.mark.parametrize("ticket", [None, "", "a login bug", "https://example.com/browse",
+                                    "https://app.clickup.com/t/86abc123"])
+def test_make_id_without_a_readable_ticket_keeps_the_time_prefix(ticket):
+    assert job_id.make_id(CREATED, "repo", "x", ticket) == "261013-1742-repo-x"
+
+
+def test_make_id_keeps_the_time_prefix_when_the_ticket_leaves_no_room():
+    assert job_id.make_id(CREATED, "repo", "x", "ABC-" + "1" * 60) == "261013-1742-repo-x"
+
+
+@pytest.mark.parametrize("text", ["issue-126-claude-plugins-report-pass", "abc-123-meta-x", "abc-123-meta-x-2"])
+def test_is_valid_accepts_ticket_ids(text):
+    assert job_id.is_valid(text)
+
+
+@pytest.mark.parametrize("text", ["abc-123-meta", "abc-meta-x", "7abc-123-meta-x", "Abc-123-meta-x", "abc-123--x-y"])
+def test_is_valid_rejects_malformed_ticket_ids(text):
+    assert not job_id.is_valid(text)
+
+
+def test_a_job_id_with_a_kept_ledger_is_taken(tmp_path):
+    from cure_job.store import JobStore
+    store = JobStore(tmp_path / "cure")
+    base = job_id.make_id(CREATED, "repo", "x", "ABC-1")
+    store.kept_ledger_path(base).parent.mkdir(parents=True)
+    store.kept_ledger_path(base).write_text("{}\n", encoding="utf-8")
+    assert store.create(base, lambda _: "---\nrepos: [/r]\ndevice: none\n---\n") == base + "-2"
+
+
+@pytest.mark.parametrize("ticket, prefix", [(None, "261013-1742-"), ("ABC-1", "abc-1-")])
+def test_make_id_cut_inside_a_long_repo_keeps_the_slug(ticket, prefix):
+    result = job_id.make_id(CREATED, "meta-" * 12, "fix", ticket)
+    assert result.startswith(prefix + "meta-meta") and result.endswith("-fix")
+    assert len(result) <= 60 and job_id.is_valid(result)
+
+
+def test_make_id_cut_of_a_long_repo_and_slug_keeps_half_the_room_for_the_slug():
+    result = job_id.make_id(CREATED, "r" * 60, "s" * 60)
+    assert result == "261013-1742-" + "r" * 24 + "-" + "s" * 23
+
+
+def test_a_removed_job_id_stays_taken(tmp_path):
+    from cure_job.store import JobStore
+    store = JobStore(tmp_path / "cure")
+    base = job_id.make_id(CREATED, "repo", "x", "ABC-1")
+    store.create(base, lambda _: "---\nrepos: [/r]\ndevice: none\n---\n")
+    store.remove(base)
+    assert store.kept_ledger_path(base).read_text(encoding="utf-8") == ""
+    assert store.create(base, lambda _: "---\nrepos: [/r]\ndevice: none\n---\n") == base + "-2"

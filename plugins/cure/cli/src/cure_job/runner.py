@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, NamedTuple, Sequence
 
-from . import resource, slot, worktree
+from . import resource, slot, trust, worktree
 from .claude import Claude, Session
 from .clock import Clock
 from .config import DEFAULTS
@@ -73,6 +73,7 @@ class SessionRunner:
         arguments = [*(["--agent", agent] if agent is not None else []), *settings_arguments(kind, ctx),
                      *kind.default_args, *claude_args]
         cwd = str(self._directory(record))
+        trust.mark_trusted(cwd)
         in_worktree = record.worktree_root is None and slot.find_workspace(record.handoff.repos[0]) is None
         if continuation is not None:
             # Resuming a live session starts a copy, so it is stopped first.
