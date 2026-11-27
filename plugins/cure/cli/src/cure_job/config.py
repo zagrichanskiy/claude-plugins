@@ -58,6 +58,8 @@ DEFAULTS: dict[str, object] = {
     "dashboard.job-scope": "workspace",
     "launch-grace-seconds": 60,
     "worktree.root": "~/work/yocto/worktrees",
+    "slots.count": 5,
+    "slots.root": "~/work/yocto/slots",
 }
 
 
@@ -349,6 +351,8 @@ _CHECKS: dict[str, Callable[[object], str | None]] = {
     "dashboard.job-scope": _job_scope,
     "launch-grace-seconds": _int_range(10, 600),
     "worktree.root": _directory,
+    "slots.count": _int_range(1, 20),
+    "slots.root": _directory,
 }
 
 #: The ``defaults.md`` keys whose rows hold one scalar, and their ``config.json`` keys.

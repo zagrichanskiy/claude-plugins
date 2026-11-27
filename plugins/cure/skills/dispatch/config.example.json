@@ -57,5 +57,9 @@
   "launch-grace-seconds": 60,
   "worktree": {
     "root": "~/work/yocto/worktrees"
+  },
+  "slots": {
+    "count": 5,
+    "root": "~/work/yocto/slots"
   }
 }

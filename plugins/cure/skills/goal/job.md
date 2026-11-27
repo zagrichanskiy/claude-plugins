@@ -49,6 +49,11 @@ When the job's row in `cure-job list --json` has `after`, read
   `<repo name>` is the basename of `git -C <repo> rev-parse --show-toplevel`. Write each path of the
   goal and each done-when command with the worktree path, expanded to an absolute path without `~`,
   or `git -C <worktree>`, never the repository path the handoff lists. The worker starts in the worktree of the first repository.
+- When the handoff's first repository is inside a `repo` tool workspace (the nearest ancestor that
+  holds `.repo/`), the job works in a workspace slot instead, which `cure-job launch` picks. Write
+  each path under that workspace as `<slot>/<path relative to the workspace root>`, with the literal
+  `<slot>`, in each path, done-when command, `git -C` and build claim (`build:<slot>/<build dir>`).
+  The worker starts in the slot copy of the first repository.
 - A work item that launches interactive or `--bg` `claude` (not `claude -p`) in a directory names
   the directory as a literal absolute path under a trusted ancestor.
 
@@ -67,8 +72,8 @@ When the job's row in `cure-job list --json` has `after`, read
 | File | Path |
 |---|---|
 | Goal | `<job>/goal.md`. The `.notes/` exclusion is skipped for it. |
-| Ledger | `.notes/ledger-<slug>.md` in the worktree of the handoff's first repository |
-| Backlog | `.notes/<slug>-backlog.md` in the same worktree |
+| Ledger | `.notes/ledger-<slug>.md` in the worktree or slot copy of the handoff's first repository |
+| Backlog | `.notes/<slug>-backlog.md` in the same directory |
 
 A Solo goal has no ledger and no backlog. Apply the `.notes/` exclusion for the ledger and the
 backlog, as the `note` skill describes. The goal never deletes the job directory.

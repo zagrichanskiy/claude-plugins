@@ -33,6 +33,14 @@ class ResourceHeld(CureJobError):
         self.holder = holder
 
 
+class MainHeld(ResourceHeld):
+    """Another session holds the claim ``main``."""
+
+    def __init__(self, holder: str, release: str):
+        super().__init__("main", holder)
+        self.args = (f"{self.args[0]}; when that session no longer runs, release its claim: {release}",)
+
+
 class SessionGone(CureJobError):
     """The session of a job's latest run is no longer listed, so ``resume`` cannot continue it."""
 
@@ -51,6 +59,10 @@ class PluginError(CureJobError):
 
 class GitError(CureJobError):
     """A ``git`` command on a repository of a job or its worktree failed."""
+
+
+class SlotError(CureJobError):
+    """A workspace slot cannot be taken, created or prepared for a job."""
 
 
 class ClaudeError(CureJobError):

@@ -1,4 +1,5 @@
-"""Resource names: ``device:bench`` or ``build:<absolute path>``, each a short hold."""
+"""Resource names: ``device:bench`` or ``build:<absolute path>``, each a short hold, and ``slot:<absolute path>``,
+the workspace slot a job holds until it ends."""
 from __future__ import annotations
 
 import enum
@@ -8,6 +9,7 @@ DEVICE_BENCH = "device:bench"
 
 _DEVICE_PREFIX = "device:"
 _BUILD_PREFIX = "build:"
+_SLOT_PREFIX = "slot:"
 
 
 class Kind(enum.Enum):
@@ -22,8 +24,18 @@ def build(path: str) -> str:
     return _BUILD_PREFIX + os.path.realpath(path)
 
 
+def slot(path: str) -> str:
+    """The resource name of a workspace slot, with symlinks resolved as in :func:`build`."""
+    return _SLOT_PREFIX + os.path.realpath(path)
+
+
+def slot_path(name: str) -> str | None:
+    """The directory of a slot resource name; ``None`` for a name of another kind."""
+    return name[len(_SLOT_PREFIX):] if name.startswith(_SLOT_PREFIX) else None
+
+
 def kind(name: str) -> Kind | None:
-    """``None`` for a name of no current kind, such as a repository claimed by an earlier version."""
+    """``None`` for a name that is no short hold: a slot, or a repository claimed by an earlier version."""
     if name.startswith(_DEVICE_PREFIX):
         return Kind.DEVICE
     if name.startswith(_BUILD_PREFIX):

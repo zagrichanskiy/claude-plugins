@@ -8,11 +8,11 @@
 4. Print a 3-line summary: the outcome; the tier and repository; the done-when count and the delivery (`commit` or `pr`), plus each classifier-gated action the goal needs (for example `git commit --amend`, force-push, device power).
 5. Approve. When the tier is in `cure-job config get dispatcher.auto-approve-tiers` (default `["Solo", "Light"]`), `open` is 0 and every check passed on this wake (a failure settled as `(policy)` counts as passed), run `cure-job approve <id> --by auto` after the checks and after any `goal.md` edit they cause. On exit 1, or for any other tier, wait for the user's answer, then run `cure-job approve <id> --by user`.
 6. Write every answer into `goal.md` through `cure:goal` before `approve`: a later edit revokes the approval.
-7. Launch an `approved` job with `cure-job launch <id>`, or `-- --permission-mode <mode>` when the goal's Rules state one. Show the output. On a missing-plugin-path exit 1, follow "Answer and resume" step 4.
+7. Launch an `approved` job with `cure-job launch <id>`, or `-- --permission-mode <mode>` when the goal's Rules state one. Show the output. On a missing-plugin-path exit 1, follow "Answer and resume" step 4. On exit 1 with `error: no free slot: ...`, the job waits: it stays `approved`, ask nothing, and launch it again when a job in a slot becomes `done`, `failed` or `abandoned`. Any other slot error needs the user: show it and ask.
 
-Before `launch`, when the target checkout has uncommitted changes and the user gave no instruction, ask in the question round: the job's worktree starts from the committed HEAD and does not see them. The job stays `approved` until the user answers. An answer that edits `goal.md` revokes the approval: write it, then approve again.
+Before `launch`, when the target checkout has uncommitted changes and the user gave no instruction, ask in the question round: the job's worktree or slot starts from committed history and does not see them. The job stays `approved` until the user answers. An answer that edits `goal.md` revokes the approval: write it, then approve again.
 
-States: `held` waits for an unmet `after` and holds nothing. `awaiting-approval` has a goal and no valid approval. A job claims no repository: jobs on one repository run in parallel, each in its own worktree. Only a change of the `goal.md` digest revokes an approval; to withdraw one, close the job or re-draft the goal. A `needs-input` job and later runs need no approval.
+States: `held` waits for an unmet `after` and holds nothing. `awaiting-approval` has a goal and no valid approval. A job claims no repository: jobs on one repository run in parallel, each in its own worktree or slot. Only a change of the `goal.md` digest revokes an approval; to withdraw one, close the job or re-draft the goal. A `needs-input` job and later runs need no approval.
 
 ## Asking
 
