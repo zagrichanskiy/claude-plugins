@@ -384,3 +384,128 @@ def test_pruning_an_expired_slot_job_removes_only_its_record(h, workspace, slots
     assert h.run("prune") == 0
     assert not (h.root / "jobs" / job_id).exists()
     assert project.is_dir()
+
+
+def test_preparing_a_slot_waits_until_the_previous_jobs_session_is_down(h, workspace, slots, monkeypatch):
+    first = start(h, workspace, "a")
+    name = h.claude.started[-1][0]
+    finish(h, first)
+    assert h.claude.statuses[name] is not SessionStatus.STOPPED
+    seen = []
+    prepare = slot.prepare
+
+    def watching(path):
+        seen.append(h.claude.statuses.get(name))
+        prepare(path)
+
+    monkeypatch.setattr(slot, "prepare", watching)
+    start(h, workspace, "b")
+    assert seen and seen[0] in (None, SessionStatus.STOPPED)
+
+
+def test_an_after_job_starts_from_the_base_when_the_predecessor_branch_is_gone_from_origin_and_the_slot(
+        h, workspace, slots, origin):
+    first = start(h, workspace, "a", branch="feat-a")
+    predecessor = session_cwd(h)
+    git(predecessor, "commit", "-q", "--allow-empty", "-m", "predecessor work")
+    git(predecessor, "push", "-q", "origin", "feat-a")
+    finish(h, first)
+    git(predecessor, "switch", "-q", "--detach", "origin/main")
+    git(predecessor, "branch", "-q", "-D", "feat-a")
+    git(origin, "branch", "-q", "-D", "feat-a")
+    start(h, workspace, "b", branch="feat-b", after=first)
+    project = session_cwd(h)
+    assert git(project, "rev-parse", "feat-b") == git(project, "rev-parse", "origin/main")
+
+
+def test_an_after_job_takes_the_predecessor_branch_over_a_diverged_local_only_one_and_keeps_the_old_one(
+        h, workspace, slots):
+    filler = start(h, workspace, "f")
+    old = push_new_branch(session_cwd(h), "feat-a", push=False)
+    first = start(h, workspace, "a", branch="feat-a")
+    predecessor = session_cwd(h)
+    assert predecessor != slots / "1" / PROJECT
+    git(predecessor, "commit", "-q", "--allow-empty", "-m", "predecessor work")
+    tip = git(predecessor, "rev-parse", "HEAD")
+    finish(h, filler)
+    finish(h, first)
+    start(h, workspace, "b", branch="feat-b", after=first)
+    project = session_cwd(h)
+    assert project == slots / "1" / PROJECT
+    assert git(project, "rev-parse", "feat-a") == tip
+    assert git(project, "rev-parse", "feat-b") == tip
+    backups = [name for name in local_branches(project) if "backup" in name]
+    assert [git(project, "rev-parse", name) for name in backups] == [old]
+
+
+def test_a_slot_reused_from_another_workspace_copies_conf_from_the_new_workspace(workspace, repo_log, tmp_path):
+    target = tmp_path / "slots" / "1"
+    slot.create(workspace, target)
+    other = tmp_path / "ws2"
+    shutil.copytree(workspace, other, symlinks=True)
+    (other / "build" / "conf" / "local.conf").write_text('DL_DIR = "/srv/other/downloads"\n', encoding="utf-8")
+    (other / "build" / "conf" / "bblayers.conf").write_text(f'BBLAYERS = "{other}/layers/meta"\n', encoding="utf-8")
+    slot.ready(other, target)
+    assert (target / "build" / "conf" / "local.conf").read_text(encoding="utf-8") == 'DL_DIR = "/srv/other/downloads"\n'
+    assert (target / "build" / "conf" / "bblayers.conf").read_text(encoding="utf-8") == \
+        f'BBLAYERS = "{target}/layers/meta"\n'
+
+
+def test_a_slot_reused_from_another_workspace_drops_the_conf_files_only_the_old_workspace_had(
+        workspace, repo_log, tmp_path):
+    (workspace / "build" / "conf" / "site.conf").write_text('SSTATE_DIR = "/srv/old"\n', encoding="utf-8")
+    target = tmp_path / "slots" / "1"
+    slot.create(workspace, target)
+    other = tmp_path / "ws2"
+    shutil.copytree(workspace, other, symlinks=True)
+    (other / "build" / "conf" / "site.conf").unlink()
+    slot.ready(other, target)
+    assert not (target / "build" / "conf" / "site.conf").exists()
+    assert (target / "build" / "conf" / "local.conf").is_file()
+
+
+def test_a_slot_reused_from_another_workspace_points_its_links_at_the_new_workspace(workspace, repo_log, tmp_path):
+    target = tmp_path / "slots" / "1"
+    slot.create(workspace, target)
+    other = tmp_path / "ws2"
+    shutil.copytree(workspace, other, symlinks=True)
+    slot.ready(other, target)
+    for name in ("CLAUDE.md", ".claude", "sources/CLAUDE.md", "sources/CLAUDE.local.md"):
+        assert os.readlink(target / name) == str(other / name)
+
+
+def test_an_after_start_fails_when_the_predecessor_slot_cannot_be_read_though_its_branch_is_recorded(
+        workspace, repo_log, tmp_path):
+    target = tmp_path / "slots" / "1"
+    slot.create(workspace, target)
+    unreadable = tmp_path / "slots" / "2"
+    (unreadable / PROJECT).mkdir(parents=True)
+    with pytest.raises(slot.SlotError):
+        slot.start_branches(workspace, target, [str(workspace / PROJECT)], "feat-b", (unreadable, "feat-a"))
+
+
+def test_an_after_launch_exits_1_when_the_predecessor_slot_cannot_be_read(h, workspace, slots, capsys):
+    filler = start(h, workspace, "filler")
+    first = start(h, workspace, "a", branch="feat-a")
+    finish(h, filler)
+    finish(h, first)
+    shutil.rmtree(slots / "2" / PROJECT / ".git")
+    second = h.new(workspace.parent, repos=(str(workspace / PROJECT),), slug="b", branch="feat-b", after=first)
+    h.approve(second)
+    capsys.readouterr()
+    assert h.run("launch", second) == 1
+    assert str(slots / "2" / PROJECT) in capsys.readouterr().err
+
+
+def test_a_slot_whose_reconfiguration_failed_is_reconfigured_by_the_next_ready(workspace, repo_log, tmp_path,
+                                                                             monkeypatch):
+    target = tmp_path / "slots" / "1"
+    slot.create(workspace, target)
+    other = tmp_path / "ws2"
+    shutil.copytree(workspace, other, symlinks=True)
+    with monkeypatch.context() as broken:
+        broken.setattr(slot, "_copy_conf", lambda *args: (_ for _ in ()).throw(OSError("disk full")))
+        with pytest.raises(slot.SlotError):
+            slot.ready(other, target)
+    slot.ready(workspace, target)
+    assert (target / "build" / "conf" / "local.conf").is_file()

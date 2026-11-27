@@ -281,9 +281,11 @@ class JobsProvider:
         return [entry.path for entry in self.store.half_created()
                 if now - entry.mtime > HALF_CREATED_AGE and self.store.remove_half_created(entry)]
 
-    def prune(self, failed: Callable[[str, GitError], None] | None = None) -> list[str]:
+    def prune(self, failed: Callable[[str, GitError], None] | None = None,
+              left: Callable[[str, Path, GitError], None] | None = None) -> list[str]:
         """Remove every :func:`expired` job that no open job names as ``after``, with its worktrees but not
-        its branches or its slot. Return the removed ids. A job whose worktree removal fails stays and goes to ``failed``."""
+        its branches or its slot. Return the removed ids. A job whose worktrees cannot be found stays and goes to
+        ``failed``. A worktree git refuses to remove stays on disk, goes to ``left``, and its job is removed."""
         now = self.clock()
         kept_for = retention(self.config)
         views = self.views()
@@ -293,14 +295,17 @@ class JobsProvider:
             if expired(view, now, kept_for) and view.record.id not in predecessors:
                 record = view.record
                 try:
-                    if record.slot is None:
-                        worktree.remove_all(record.worktree_root or self.config["worktree.root"],
-                                            record.handoff.repos, record.id)
+                    kept = [] if record.slot is not None else worktree.remove_all(
+                        record.worktree_root or self.config["worktree.root"], record.handoff.repos, record.id)
                 except GitError as e:
                     if failed is None:
                         raise
                     failed(record.id, e)
                     continue
+                for path, error in kept:
+                    if left is None:
+                        raise error
+                    left(record.id, path, error)
                 self.store.remove(view.record.id)
                 removed.append(view.record.id)
         return removed

@@ -1,16 +1,16 @@
 """The claim ``main``: the one interactive session that may write in the main workspace.
 
 The main workspace is a ``repo`` tool workspace that is not a slot, that is, whose parent is not ``slots.root``.
-The claim is the file ``main-claim`` in the state root, holding the session id. A write is an Edit or a Write of
-a file, or a Bash command that runs ``bitbake``, a ``git`` command :func:`_git_reads` does not accept, or a ``repo``
-subcommand outside :data:`REPO_READS`. A target under ``slots.root`` or ``worktree.root`` is never in the main
+The claim is the file ``main-claim`` in the state root, holding the session id. An Edit or a Write of a file in the
+main workspace needs the claim. A Bash command that runs there, or names a path there in any word, needs the claim
+unless it is one simple command of :data:`_READS`, or ``cure-job main-claim`` or ``main-release``, without a
+character of :data:`_METACHARACTERS`. A target under ``slots.root`` or ``worktree.root`` is never in the main
 workspace, even where that root lies inside it.
 """
 from __future__ import annotations
 
 import os
 import re
-import shlex
 from pathlib import Path
 from typing import Mapping
 
@@ -21,15 +21,20 @@ from .store import JobStore
 MAIN = "main"
 _FILE = "main-claim"
 
-GIT_READS = frozenset({"status", "log", "diff", "show", "blame", "grep", "rev-parse", "rev-list", "ls-files",
-                       "ls-tree", "ls-remote", "cat-file", "describe", "shortlog", "merge-base", "for-each-ref",
-                       "show-ref", "name-rev", "help", "version", "reflog", "symbolic-ref"})
+_METACHARACTERS = ";&|<>`$\n"
 
-REPO_READS = frozenset({"status", "info", "list", "manifest", "diff", "branches"})
+_READS = frozenset({"ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "stat", "file"})
 
-_SEPARATORS = re.compile(r"&&|\|\||[;|&\n()]")
+_GIT_READS = frozenset({"status", "log", "diff", "show", "branch", "rev-parse", "ls-files", "grep", "blame"})
 
-_TAG_LIST_FLAGS = re.compile(r"-l|--list|-n\d*|-i|--ignore-case|--(sort|format|color|column)(=.*)?|--no-column")
+_BRANCH_LISTS = frozenset({"-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "-l", "--list",
+                           "--show-current"})
+
+_FIND_ACTIONS = frozenset({"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf", "-fls"})
+
+# Each piece that may name a path: the shell may cut words at these characters, and an option may carry its value
+# after ``=``.
+_PIECES = re.compile(r"[^\s;&|<>()`'\"=]+")
 
 
 def holder(store: JobStore) -> str | None:
@@ -72,7 +77,7 @@ def denial(store: JobStore, payload: Mapping[str, object], slots_root: str, work
     """The reason to deny the tool call of the PreToolUse ``payload``, or ``None`` to allow it."""
     session = str(payload.get("session_id") or "")
     job_roots = [os.path.realpath(os.path.expanduser(root)) for root in (slots_root, worktree_root)]
-    for target in _targets(payload):
+    for target in _targets(payload, cure_job):
         workspace = find_workspace(target)
         if workspace is None or any(_under(target, root) for root in job_roots):
             continue
@@ -89,8 +94,8 @@ def denial(store: JobStore, payload: Mapping[str, object], slots_root: str, work
     return None
 
 
-def _targets(payload: Mapping[str, object]) -> list[str]:
-    """The directories or files the tool call writes in."""
+def _targets(payload: Mapping[str, object], cure_job: Path) -> list[str]:
+    """The directories or files the tool call touches without the claim."""
     cwd = str(payload.get("cwd") or os.getcwd())
     tool_input = payload.get("tool_input")
     tool_input = tool_input if isinstance(tool_input, dict) else {}
@@ -98,65 +103,58 @@ def _targets(payload: Mapping[str, object]) -> list[str]:
         path = tool_input.get("file_path")
         return [os.path.join(cwd, os.path.expanduser(path))] if isinstance(path, str) and path else []
     command = tool_input.get("command")
-    if payload.get("tool_name") != "Bash" or not isinstance(command, str):
+    if payload.get("tool_name") != "Bash" or not isinstance(command, str) or _allowed(command, cure_job):
         return []
-    found = []
-    directory = cwd
-    for segment in _SEPARATORS.split(command):
-        try:
-            words = shlex.split(segment)
-        except ValueError:
-            words = segment.split()
-        while words and re.fullmatch(r"\w+=.*", words[0]):
-            words.pop(0)
-        if not words:
-            continue
-        name = os.path.basename(words[0])
-        if name == "cd" and len(words) > 1:
-            directory = os.path.join(directory, os.path.expanduser(words[1]))
-        elif name == "bitbake":
-            found.append(directory)
-        elif name == "git":
-            where, rest = _git(words[1:], directory)
-            if rest and not _git_reads(rest[0], rest[1:]):
-                found.append(where)
-        elif name == "repo":
-            subcommand = next((word for word in words[1:] if not word.startswith("-")), None)
-            if subcommand is not None and subcommand not in REPO_READS:
-                found.append(directory)
-    return found
+    pieces = _PIECES.findall(command)
+    # A short option may carry its value without a space, as in ``-C/path``.
+    pieces += [piece[2:] for piece in pieces if piece[:1] == "-" and piece[1:2] not in ("-", "")]
+    return [cwd, *(os.path.join(cwd, os.path.expandvars(os.path.expanduser(piece))) for piece in pieces)]
 
 
-def _under(path: str, root: str) -> bool:
-    return os.path.commonpath([os.path.realpath(path), root]) == root
+def _allowed(command: str, cure_job: Path) -> bool:
+    if any(char in command for char in _METACHARACTERS):
+        return False
+    # Quotes and backslashes join a word without changing it, so ``'--output=f'`` is still that option.
+    words = re.sub(r"[\\'\"]", "", command).split()
+    if not words:
+        return True
+    if words[0] == str(cure_job):
+        return words[1:2] in ([f"{MAIN}-claim"], [f"{MAIN}-release"])
+    if words[0] == "git":
+        return words[1:] == ["remote", "-v"] or len(words) > 1 and _git_reads(words[1], words[2:])
+    if words[0] == "find":
+        return not any(word in _FIND_ACTIONS for word in words)
+    if words[0] == "rg":
+        return not any(word.split("=")[0] in ("--pre", "--pre-glob", "--hostname-bin") for word in words)
+    if words[0] == "file":
+        return not any(_short(word, "C") or _long(word, "--compile") for word in words[1:])
+    return words[0] in _READS
 
 
 def _git_reads(subcommand: str, args: list[str]) -> bool:
-    if subcommand == "reflog":
-        return not args or args[0] not in ("expire", "delete")
-    if subcommand == "symbolic-ref":
-        return not {"-d", "--delete"} & set(args) and len([arg for arg in args if not arg.startswith("-")]) <= 1
-    if subcommand == "remote":
-        return not args or args[0] in ("-v", "--verbose", "get-url", "show")
-    if subcommand == "fetch":
-        # The first word that is not an option names the repository, which may be a URL holding a colon.
-        positional = [arg for arg in args if not arg.startswith("-")]
-        return "--stdin" not in args and not any(":" in arg for arg in positional[1:])
-    if subcommand == "tag":
-        return args[:1] in (["-l"], ["--list"]) or all(_TAG_LIST_FLAGS.fullmatch(arg) for arg in args)
-    if subcommand == "worktree":
-        return args[:1] == ["list"]
-    return subcommand in GIT_READS
+    if any(_long(arg, "--output") or _long(arg, "--open-files-in-pager") for arg in args):
+        return False
+    if subcommand == "branch":
+        return all(arg in _BRANCH_LISTS for arg in args)
+    if subcommand == "grep" and any(_short(arg, "O") for arg in args):
+        return False
+    return subcommand in _GIT_READS
 
 
-def _git(words: list[str], directory: str) -> tuple[str, list[str]]:
-    """The directory of the ``git`` arguments ``words`` and the words from its subcommand on."""
-    index = 0
-    while index < len(words) and words[index].startswith("-"):
-        if words[index] == "-C" and index + 1 < len(words):
-            directory = os.path.join(directory, os.path.expanduser(words[index + 1]))
-            index += 1
-        elif words[index] == "-c":
-            index += 1
-        index += 1
-    return directory, words[index:]
+def _short(word: str, letter: str) -> bool:
+    """Whether ``word`` holds the short option ``-<letter>``, alone or bundled with others."""
+    return word[:1] == "-" and word[1:2] != "-" and letter in word
+
+
+def _long(word: str, option: str) -> bool:
+    """Whether ``word`` may be the long ``option``. Git and ``file`` accept an unambiguous prefix of a long option,
+    such as ``--outp`` for ``--output``."""
+    name = word.split("=")[0]
+    return name.startswith("--") and (len(name) > 2 and option.startswith(name) or name.startswith(option))
+
+
+def _under(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([os.path.realpath(path), root]) == root
+    except (OSError, ValueError):
+        return False

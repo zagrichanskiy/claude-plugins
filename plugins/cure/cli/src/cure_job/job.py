@@ -7,7 +7,8 @@ from functools import cached_property
 from pathlib import Path
 
 from . import resource
-from .events import WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved, SessionStarted
+from .events import (WORK, Approved, Claim, Closed, Event, Origin, Release, Reported, SessionsRemoved, SessionStarted,
+                     WorktreeOpened)
 from .handoff import Handoff
 from .result import Result
 from .sessions import JobSession, fold
@@ -98,8 +99,11 @@ class JobRecord:
 
     @property
     def worktree_root(self) -> str | None:
-        return next((event.worktree_root for event in self.events
-                     if isinstance(event, SessionStarted) and event.worktree_root is not None), None)
+        """The first recorded root: of the ``worktree-opened`` event written before the first start, or of a
+        ``launched`` event, which an older version reads it from."""
+        roots = (event.worktree_root if isinstance(event, SessionStarted) else event.root
+                 for event in self.events if isinstance(event, (SessionStarted, WorktreeOpened)))
+        return next((root for root in roots if root is not None), None)
 
     @property
     def slot(self) -> str | None:
