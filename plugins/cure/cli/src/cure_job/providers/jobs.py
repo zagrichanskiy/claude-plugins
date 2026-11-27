@@ -91,6 +91,14 @@ class JobsProvider:
     def views(self) -> list[JobView]:
         return self.listing().views
 
+    def job_records(self) -> list[dict]:
+        """The last ledger record of each job, current or removed; it holds the totals of every run."""
+        last = {}
+        for text in self.store.ledgers():
+            for row in ledger.records(text):
+                last[row.get("job")] = row
+        return list(last.values())
+
     def listing(self) -> Listing:
         """The views of the readable jobs and the invalid jobs, from one snapshot."""
         snapshot = self.store.snapshot()

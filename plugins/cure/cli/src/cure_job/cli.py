@@ -40,6 +40,7 @@ from .commands.remove_sessions import RemoveSessionsCommand
 from .commands.reported import ReportedCommand
 from .commands.resume import ResumeCommand
 from .commands.start import StartCommand
+from .commands.stats import StatsCommand
 from .commands.stop import StopCommand
 from .errors import CureJobError
 from .goal import PLUGIN_ROOT
@@ -76,7 +77,8 @@ class Cli:
                           LaunchCommand(self), ResumeCommand(self), StartCommand(self), ClaimCommand(self),
                           ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
                           FinishCommand(self), EndCommand(self),
-                          ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), ConfigCommand(self),
+                          ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), StatsCommand(self),
+                          ConfigCommand(self),
                           MainClaimCommand(self), MainReleaseCommand(self), MainCheckCommand(self)]
         self._parser = self._build_parser()
 

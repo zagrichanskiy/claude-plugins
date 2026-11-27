@@ -14,6 +14,8 @@ from typing import Iterable, Mapping, NamedTuple
 
 _USAGE_KEYS = (("input", "input_tokens"), ("output", "output_tokens"),
                ("cache_creation", "cache_creation_input_tokens"), ("cache_read", "cache_read_input_tokens"))
+#: The token types of ``orchestrator_tokens`` and ``subagent_tokens``.
+TOKEN_TYPES = tuple(field for field, _ in _USAGE_KEYS)
 _SETTLED_HEADING = re.compile(r"^## Settled[ \t]*$", re.MULTILINE)
 _NEXT_HEADING = re.compile(r"^#{1,2} ", re.MULTILINE)
 _ESTIMATE_LINE = re.compile(r"^[-*] Estimate: ~?(\d+) changed lines\b", re.MULTILINE)
@@ -86,6 +88,20 @@ def job_record(*, job_id: str, date: str, repo: str, slug: str, tier: str | None
             "subagent_tokens": _tokens(subagents)}
 
 
+def records(text: str) -> list[dict]:
+    """The job records of a ledger's text. A line that is not a JSON object, such as one a crash cut short, is
+    skipped."""
+    rows = []
+    for line in text.splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
 def append(path: Path, record: Mapping) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as sink:
@@ -93,5 +109,5 @@ def append(path: Path, record: Mapping) -> None:
 
 
 def _tokens(usage: Usage) -> dict[str, int | None]:
-    return {field: getattr(usage, field) for field, _ in _USAGE_KEYS}
+    return {field: getattr(usage, field) for field in TOKEN_TYPES}
 
