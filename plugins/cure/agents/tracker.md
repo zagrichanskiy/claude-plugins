@@ -16,7 +16,7 @@ The brief names one operation and the tracker: the MCP server, or `gh` with `--r
 |---|---|
 | `read` | Read the named fields of an issue. |
 | `comment` | Add a comment with the given text. |
-| `transition` | Move an issue to the named status, with the fields the transition requires. |
+| `transition` | Move an issue to the named status, with the fields the transition requires. The brief may also ask to assign the issue to the tracker's signed-in user. An issue already in the named status is not transitioned; an issue already assigned to the signed-in user is not reassigned. A `transition` whose status has no name in the instance facts reports `skipped: no status named`, not a question. The brief carries the generic status name (In progress, In review); `tracker` maps it to the instance's status name from the instance facts. |
 | `field` | Write the given value to a named field, such as "Pull Requests". For a list field the value written is the URLs already in the field merged with the given URLs, deduplicated and sorted, in the field format from the instance facts. |
 | `create` | Create an issue with the given fields. |
 

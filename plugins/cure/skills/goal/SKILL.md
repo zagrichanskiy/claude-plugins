@@ -87,6 +87,7 @@ context compaction and before an exit.
    Print `date --iso-8601=seconds` as `<start>`.
 2. <One step, its agent, its files. A step that writes to git or GitHub (branch, commit, amend, push, PR) names `delivery` (Light and Full) as its agent.>
    <A tracker step (read, comment, transition, field write, create) names `tracker` as its agent. No other agent of a job has a tracker tool.>
+   <Light and Full: the ticket status steps of `rules.md` are `tracker` `transition` steps. Put each into the work item that runs it. A status step adds no done-when item, and no done-when check reads its result. Its result goes to the ledger and the final message.>
 K-1. (Light and Full, when Settled has an estimate) <the size-check item text of `sizing.md`>
 K.   <The push and the pull request, when the job pushes, dispatched to `delivery` (Light and Full). K is the item before the retrospective.>
 N-1. (Light and Full) Write the retrospective to `~/.claude/retros/<date>-<repo>-<slug>.md`; print

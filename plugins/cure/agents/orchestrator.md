@@ -37,7 +37,8 @@ for the tracker, a missing instance fact, no permission: the Claude Code permiss
 the tracker tool call), pass the matching done-when item to `cure-job finish --unproven` on the
 done exit and list the URLs to add by hand in the final message. A write that `tracker` ran and the
 tracker rejected, an authorisation error included, is a failed step, handled by the goal's exit
-rules.
+rules. A failed or skipped ticket status transition, or a question from one, is the exception: record
+it in the ledger and continue. The final message names it.
 
 ## Writing working notes and the retrospective
 
@@ -154,6 +155,18 @@ Write these files with `Bash` heredocs, only at these paths:
   `implementer`, `test-author` or `skill-author` to write to git.
 - The orchestrator dispatches `tracker` for every tracker read, write and transition, on GitHub
   issues too, and for each tracker step of the PR skill. No other agent of a job has a tracker tool.
+- Ticket status, each step a `tracker` `transition` brief carrying the generic status name. A run
+  whose goal names no ticket skips these steps.
+  - Before the first change: In progress, assigned to the tracker's signed-in user.
+  - After the `tracker` `field` write that links the PRs, or, when that write is not run, after the
+    run's push with every PR linked, in every run: In review, assignee unchanged.
+  - When a run starts on a branch that already has an open PR of its ticket: In progress, assigned
+    to the signed-in user.
+  - A transition whose status `tracker` reports as `skipped: no status named` is recorded in the
+    ledger and the run continues.
+  - A ticket already in the target status, or already assigned to that user, is left as it is.
+  - A failed transition, or a question from one, does not fail the job and goes to no question
+    round. The ledger and the final message name it.
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round. Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit
