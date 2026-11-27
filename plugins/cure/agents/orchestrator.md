@@ -150,8 +150,14 @@ Write these files with `Bash` heredocs, only at these paths:
 - `git rm` run by a subagent stages the deletion, so the explicit-path `git add` of the removed path
   fails. Leave that path out of `git add`.
 - Pass agents paths and ids. Ask for findings only.
+- After every writing agent, count the changed lines per repository as the failure exit states (it
+  includes untracked files and uses the base commit item 1 recorded for that repository), and
+  record each count in the ledger. Each brief to a writing agent states its line budget: the work
+  item's share of the estimate, capped at `<lines>` minus the lines already changed in that
+  repository. An agent that would exceed its budget stops and reports. The test-author's budget is
+  the test estimate of `sizing.md`.
 - After a `designer` or `architect` consult, per repository, add the lines already changed (counted
-  as the failure exit states) to the consult's line estimate for that repository's files. Compare
+  as the failure exit states) to the consult's raw line estimate for that repository's files. Compare
   each sum with `<lines>` before dispatching a writing agent. A sum over `<lines>` takes the failure
   exit.
 - Size check: at the size-check work item, read `<plugin-root>/skills/goal/size-check.md` and follow

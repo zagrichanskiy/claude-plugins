@@ -44,7 +44,7 @@ DEFAULTS: dict[str, object] = {
     "short-hold.wait-total-minutes": 120,
     "prune.failed-days": 30,
     "launch-grace-seconds": 60,
-    "worktree.root": "~/work/yocto/worktrees",
+    "worktree.root": "~/dev/worktrees",
     "slots.count": 5,
     "slots.root": "~/work/yocto/slots",
 }

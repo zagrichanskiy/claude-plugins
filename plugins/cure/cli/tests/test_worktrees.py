@@ -61,15 +61,15 @@ def session_cwd(h) -> Path:
     return Path(h.claude.started[-1][1])
 
 
-def test_worktree_root_defaults_to_the_yocto_worktrees_directory(h):
-    assert DEFAULTS["worktree.root"] == "~/work/yocto/worktrees"
+def test_worktree_root_defaults_to_the_dev_worktrees_directory(h):
+    assert DEFAULTS["worktree.root"] == "~/dev/worktrees"
     assert h.run("config", "get", "worktree.root") == 0
-    assert h.lines == ['"~/work/yocto/worktrees"']
+    assert h.lines == ['"~/dev/worktrees"']
 
 
 def test_the_default_root_expands_the_home_directory(h, tmp_path, repo):
     job_id = launch(h, tmp_path, [repo], branch="feat")
-    assert session_cwd(h) == tmp_path / "home" / "work" / "yocto" / "worktrees" / "video-core" / job_id
+    assert session_cwd(h) == tmp_path / "home" / "dev" / "worktrees" / "video-core" / job_id
 
 
 def test_launch_runs_the_session_in_a_worktree_detached_at_the_repository_head(h, tmp_path, repo, worktrees):

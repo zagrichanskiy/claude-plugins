@@ -14,8 +14,11 @@ import subprocess
 
 import pytest
 
+from cure_job.events import WorktreeOpened
 from cure_job.goal import PLUGIN_ROOT
 from cure_job.kinds import CURE_JOB
+from cure_job.store import JobStore
+from tests.builders import handoff_text
 from tests.test_cli import Harness
 from tests.test_config import configure
 
@@ -123,6 +126,19 @@ def test_a_write_under_the_worktree_root_is_never_denied_inside_the_main_workspa
     inside = main_ws / "worktrees"
     configure(h, {"slots": {"root": str(main_ws.parent / "slots")}, "worktree": {"root": str(inside)}})
     target = inside / "job" / "sources" / "app"
+    target.mkdir(parents=True)
+    assert hook("s1", "Edit", target, file_path=str(target / "f.c")) == "allow"
+    assert hook("s1", "Bash", target, command="git commit -m x") == "allow"
+    assert hook("s1", "Edit", main_ws, file_path=str(main_ws / "f")) == "deny"
+
+
+def test_a_write_under_the_worktree_root_a_job_recorded_is_never_denied_after_the_root_changes(h, main_ws, root):
+    recorded = main_ws / "old-worktrees"
+    configure(h, {"slots": {"root": str(main_ws.parent / "slots")}, "worktree": {"root": str(main_ws / "new")}})
+    store = JobStore(root)
+    job_id = store.create("260101-0000-job", lambda _: handoff_text())
+    store.append_event(job_id, WorktreeOpened(str(recorded)))
+    target = recorded / "app" / job_id
     target.mkdir(parents=True)
     assert hook("s1", "Edit", target, file_path=str(target / "f.c")) == "allow"
     assert hook("s1", "Bash", target, command="git commit -m x") == "allow"

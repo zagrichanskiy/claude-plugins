@@ -102,7 +102,7 @@ def test_cli_check_scenario(tmp_path, workdir, root, fake_state):
     start = [call for call in calls if call["argv"][0] == "--bg"][0]
     assert start["argv"][:3] == ["--bg", "--name", first]
     assert start["argv"][-1] == f"/goal @{root / 'jobs' / first / 'goal.md'}"
-    assert start["cwd"] == str((tmp_path / "home" / "work" / "yocto" / "worktrees" / "repo" / first).resolve())
+    assert start["cwd"] == str((tmp_path / "home" / "dev" / "worktrees" / "repo" / first).resolve())
 
     # Step 4: the job session writes result.md.
     (root / "jobs" / first / "result.md").write_text("---\nstatus: done\n---\n", encoding="utf-8")
