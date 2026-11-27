@@ -30,7 +30,6 @@ from .commands.end import EndCommand
 from .commands.finish import FinishCommand
 from .commands.launch import LaunchCommand
 from .commands.list import ListCommand
-from .commands.main import MainCheckCommand, MainClaimCommand, MainReleaseCommand
 from .commands.new import NewCommand
 from .commands.next import NextCommand
 from .commands.origin import OriginCommand
@@ -78,8 +77,7 @@ class Cli:
                           ReleaseCommand(self), StopCommand(self), CloseCommand(self), OriginCommand(self),
                           FinishCommand(self), EndCommand(self),
                           ReportedCommand(self), RemoveSessionsCommand(self), PruneCommand(self), StatsCommand(self),
-                          ConfigCommand(self),
-                          MainClaimCommand(self), MainReleaseCommand(self), MainCheckCommand(self)]
+                          ConfigCommand(self)]
         self._parser = self._build_parser()
 
     def origin(self) -> str | None:

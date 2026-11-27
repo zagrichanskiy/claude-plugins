@@ -117,7 +117,7 @@ def clone_in(slot_dir: Path) -> Path:
 
 def test_slot_defaults():
     assert DEFAULTS["slots.count"] == 5
-    assert DEFAULTS["slots.root"] == "~/work/yocto/slots"
+    assert DEFAULTS["slots.root"] == "~/work/slots"
 
 
 def test_the_workspace_is_the_nearest_ancestor_holding_repo(tmp_path):

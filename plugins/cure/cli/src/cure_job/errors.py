@@ -33,14 +33,6 @@ class ResourceHeld(CureJobError):
         self.holder = holder
 
 
-class MainHeld(ResourceHeld):
-    """Another session holds the claim ``main``."""
-
-    def __init__(self, holder: str, release: str):
-        super().__init__("main", holder)
-        self.args = (f"{self.args[0]}; when that session no longer runs, release its claim: {release}",)
-
-
 class SessionGone(CureJobError):
     """The session of a job's latest run is no longer listed, so ``resume`` cannot continue it."""
 

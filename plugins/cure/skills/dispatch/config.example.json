@@ -35,6 +35,6 @@
   },
   "slots": {
     "count": 5,
-    "root": "~/work/yocto/slots"
+    "root": "~/work/slots"
   }
 }

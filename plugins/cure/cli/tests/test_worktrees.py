@@ -72,13 +72,62 @@ def test_the_default_root_expands_the_home_directory(h, tmp_path, repo):
     assert session_cwd(h) == tmp_path / "home" / "dev" / "worktrees" / "video-core" / job_id
 
 
-def test_launch_runs_the_session_in_a_worktree_detached_at_the_repository_head(h, tmp_path, repo, worktrees):
+def test_launch_in_a_repository_without_origin_runs_the_session_in_a_worktree_detached_at_its_head(
+        h, tmp_path, repo, worktrees, capsys):
     job_id = launch(h, tmp_path, [repo], branch="feat-a")
     cwd = session_cwd(h)
     assert cwd == worktrees / "video-core" / job_id
     assert git(cwd, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD"
-    assert git(cwd, "rev-parse", "HEAD") == git(repo, "rev-parse", "HEAD")
+    head = git(repo, "rev-parse", "HEAD")
+    assert git(cwd, "rev-parse", "HEAD") == head
     assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    err = capsys.readouterr().err
+    assert err.startswith(f"{repo}: worktree {cwd} starts at HEAD {head}: git fetch origin main failed: ")
+    assert err.count("\n") == 1
+
+
+def clone(tmp_path) -> tuple[Path, Path]:
+    upstream = make_repo(tmp_path / "upstream", "video-core")
+    repo = tmp_path / "src" / "video-core"
+    git(tmp_path, "clone", "-q", str(upstream), str(repo))
+    return upstream, repo
+
+
+def test_a_worktree_starts_at_the_origin_branch_when_the_local_base_branch_is_behind(h, tmp_path, worktrees):
+    upstream, repo = clone(tmp_path)
+    git(upstream, "commit", "-q", "--allow-empty", "-m", "merged upstream")
+    launch(h, tmp_path, [repo], branch="feat-a")
+    assert git(session_cwd(h), "rev-parse", "HEAD") == git(upstream, "rev-parse", "main")
+    assert git(session_cwd(h), "rev-parse", "HEAD") != git(repo, "rev-parse", "main")
+
+
+def test_a_worktree_of_a_detached_checkout_starts_at_its_head_and_says_why(h, tmp_path, worktrees, capsys):
+    upstream, repo = clone(tmp_path)
+    git(repo, "switch", "-q", "--detach")
+    git(upstream, "commit", "-q", "--allow-empty", "-m", "merged upstream")
+    launch(h, tmp_path, [repo], branch="feat-a")
+    head = git(repo, "rev-parse", "HEAD")
+    assert git(session_cwd(h), "rev-parse", "HEAD") == head
+    assert f"starts at HEAD {head}: HEAD is detached" in capsys.readouterr().err
+
+
+def test_a_worktree_starts_at_the_head_when_origin_lacks_the_checked_out_branch(h, tmp_path, worktrees, capsys):
+    _, repo = clone(tmp_path)
+    git(repo, "switch", "-q", "-c", "topic")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "local work")
+    launch(h, tmp_path, [repo], branch="feat-a")
+    head = git(repo, "rev-parse", "HEAD")
+    assert git(session_cwd(h), "rev-parse", "HEAD") == head
+    assert f"starts at HEAD {head}: git fetch origin topic failed: " in capsys.readouterr().err
+
+
+def test_a_worktree_keeps_the_local_head_when_the_local_branch_is_ahead_of_origin(h, tmp_path, worktrees, capsys):
+    _, repo = clone(tmp_path)
+    git(repo, "commit", "-q", "--allow-empty", "-m", "local work")
+    launch(h, tmp_path, [repo], branch="feat-a")
+    head = git(repo, "rev-parse", "HEAD")
+    assert git(session_cwd(h), "rev-parse", "HEAD") == head
+    assert f"starts at HEAD {head}: main has commits not on origin/main" in capsys.readouterr().err
 
 
 def test_the_worktree_is_named_after_the_toplevel_and_the_session_starts_in_the_subdirectory(h, tmp_path, repo, worktrees):
