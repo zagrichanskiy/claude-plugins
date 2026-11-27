@@ -45,6 +45,8 @@ caller invoke the `designer` agent.
 If `${CLAUDE_PLUGIN_ROOT}` does not resolve, run `echo $CLAUDE_PLUGIN_ROOT` and use the absolute
 path. If a file is missing, say so in your reply and proceed on your own judgement.
 
+Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.
+
 ## Document mode additions
 
 The document rules are in `core.md`, *DOCUMENT*. Before writing, grep the whole target directory

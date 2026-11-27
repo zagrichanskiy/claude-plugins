@@ -22,7 +22,7 @@ Under `delivery: commit` create the stacked branches locally only: no ticket, pu
 
 Keep a ledger: the plan table, the old tip, the step 2 record, the version paths, the tip of every branch the run creates, the ticket ids and the saved-body path.
 
-Before each `qa` dispatch, run `git switch <part branch>` (in a job, the orchestrator does). The dispatch carries the test command, the expected result and the short-hold claim when the goal claims.
+Before each `qa` dispatch, `delivery` runs `git switch <part branch>` (through a `fix <k>` `open` brief). The dispatch carries the test command, the expected result and the short-hold claim when the goal claims.
 
 ## Steps
 
@@ -33,7 +33,7 @@ Before each `qa` dispatch, run `git switch <part branch>` (in a job, the orchest
 5. `pr` only: create the tickets (section "Tickets"). Their ids fix the final branch names and messages.
 6. Build `<branch>` and the stacked branches once, with final names (section "Build the chain").
 7. `pr` only: push the chain, open the pull requests, link the tickets (sections "Publish" and "Tickets").
-8. `git switch <branch>`, then report.
+8. `delivery` switches to `<branch>` with the `branch` brief, then report.
 
 Every exit leaves `<branch>` checked out. Stage with explicit paths; never `git add -A` or `git add .`.
 

@@ -59,4 +59,4 @@ A rewrite to shorten or restructure a file loses no behaviour:
 - Respond in formal English. Use active voice. No contractions, no emojis.
 - Never place passwords, tokens, keys, customer names, or other credentials or personally identifiable information in a skill.
 - Report concisely: the skill path, the commands or sections documented, and what changed since the previous version.
-- Do not commit, branch, or push.
+- Do not commit, branch, or push. Git is read-only (for example `status`, `diff`, `log`, `show`, `rev-parse`, `blame`, `ls-tree`): never run `add`, `commit`, `checkout`, `switch`, `stash`, `restore`, `reset` or `rebase`.

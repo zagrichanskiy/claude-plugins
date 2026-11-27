@@ -27,7 +27,8 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   with the local branch, not `origin/<base>`, because the predecessor commits locally and pushes
   nothing. In a workspace slot, `cure-job launch` copies the predecessor's local branches into the
   job's slot, so `<base>` is a local branch there. A part 1 branch that exists only on origin has no
-  local branch: first run `git branch --track <base> origin/<base>`. When `origin/<base>` exists,
+  local branch: first have `delivery` (Solo: the session) run the `track` brief,
+  `git branch --track <base> origin/<base>`. When `origin/<base>` exists,
   run `git merge-base --is-ancestor origin/<base> <base>`; a failure is a failure cause. Never base
   the work on `origin/<base>` here: that drops the predecessor's commits. Any other base keeps the
   check above.
@@ -57,13 +58,15 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   `git -C` and done-when command uses the worktree or slot path. The repository path the handoff
   lists is the user's checkout: the job never edits it or switches its branch.
 - Branch: the goal names the job's branch as a literal name. A branch exists when it is local or on
-  origin. A branch missing on run 1 is not an item 1 mismatch. The step after the fact check (the
-  orchestrator's in Light and Full, the session's in Solo) creates it in each repository with
-  `git switch -c <branch> <base>`; with `git switch <branch>` when it exists locally (a run after
-  `needs-input`); with `git switch -c <branch> --track origin/<branch>` when it exists only on origin.
-  Never `git switch -C`: it resets the branch and drops commits. When `git switch` refuses a branch
-  checked out in a finished job's worktree under `worktree.root`, run `git -C <that worktree> switch
-  --detach` and switch again; in any other worktree (the user's checkout) it is a question at item 1.
+  origin. A branch missing on run 1 is not an item 1 mismatch. The step after the fact check
+  (`delivery` with the `branch` brief in Light and Full, the session in Solo) creates it in each
+  repository with `git switch -c <branch> <base>`; with `git switch <branch>` when it exists
+  locally (a run after `needs-input`); with `git switch -c <branch> --track origin/<branch>` when
+  it exists only on origin. Never `git switch -C`: it resets the branch and drops commits. When
+  `git switch` refuses a branch checked out in a finished job's worktree under `worktree.root`,
+  `delivery` (Solo: the session) runs `git -C <that worktree> switch --detach` and switches
+  again. The brief passes `worktree.root` and the finished jobs' worktree paths. In any other
+  worktree (the user's checkout) it is a question at item 1.
 - A choice that changes behaviour the user would see is a question, also when the goal file or its
   design source is silent or contradictory on it. Never decide it silently. A fork whose options
   differ in nothing the user would see takes the recommended option, recorded as an assumption. A
@@ -72,7 +75,8 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   and wait. Each question states the situation, the options, the consequence of each and a
   recommendation, for a reader who has not followed the run.
 - Read with `gh issue view --json <fields>` or `gh pr view --json <fields>`. Edit with `gh api`, for
-  example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -f body=...`. `gh issue view` and
+  example `gh api -X PATCH repos/{owner}/{repo}/pulls/<n> -F body=@<file>`; in Light and Full
+  `delivery` runs it with the `pr-edit` brief. `gh issue view` and
   `gh pr edit` without these fail on the Projects (classic) deprecation.
 - Stage git changes with explicit paths; never `git add -A` or `git add .`.
 - A command for the user to run with `!` is a script file, run as `! python3 <absolute path>`. Job
@@ -86,8 +90,10 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 
 - The main session orchestrates: it dispatches agents, keeps the ledger, checks completeness. It reads
   no source and edits no code.
-- The orchestrator creates the branch and makes every commit, with explicit paths. It never asks
-  `implementer`, `test-author` or `skill-author` to do either.
+- The orchestrator dispatches `delivery` for every git and GitHub write: branch creation, commit,
+  amend, push and PR, with explicit paths. It keeps read-only git (for example `status`, `diff`,
+  `log`, `show`, `rev-parse`, `merge-base`, `ls-tree`, `fetch`) and `gh` reads. It never asks
+  `implementer`, `test-author` or `skill-author` to write to git.
 - An agent returns its questions in its report. The orchestrator puts a work item's questions in one
   round. Record a mechanical choice in the ledger as an assumption.
 - An agent report that names a file it left untouched for a finding is a gap. Dispatch that edit
@@ -96,8 +102,8 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   item's checks, and record the verification in the ledger.
 - Mark a review finding fixed in the ledger only after `qa` confirms the fix.
 - Record the turn count in the ledger after each work item.
-- `git rm` run by a subagent stages the deletion, so the explicit-path `git add` of the removed path
-  fails. Leave that path out of `git add`.
+- Pass `delivery` every deleted path with the commit brief. Leave a path out only when `git status`
+  shows its deletion already staged.
 - Pass agents paths and ids. Ask for findings only.
 - After every writing agent, count the changed lines per repository as the failure exit states (it
   includes untracked files and uses the base commit item 1 recorded for that repository), and
@@ -112,9 +118,9 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 - Size check: at the size-check work item, read `<plugin-root>/skills/goal/size-check.md` and follow
   it. Read it again after a compaction before the item ends.
 - Review fixes: once the PR exists, squash each fix into the job's latest commit
-  (`git commit --amend --no-edit` with explicit paths). No separate fix commit. After amending a
-  pushed commit, the next push is `git push --force-with-lease`. Every `MUST-FIX` and
-  `SHOULD-CONSIDER` is still fixed.
+  (the orchestrator has `delivery` run the `amend` brief with explicit paths). No separate fix
+  commit. After amending a pushed commit, the next push uses the `push` brief with
+  `--force-with-lease`. Every `MUST-FIX` and `SHOULD-CONSIDER` is still fixed.
 - Full: run `test-author` only for a behaviour change that has no test.
 - Review round: one reviewer pass, the same unit for every tier. The goal states N, the round limit
   (N = `reviews.<tier>`). Round 1 reviews the diff. Rounds 2..N, the fresh reader included, re-check
@@ -124,7 +130,7 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
   rounds 2..N; there is no backlog. Every reviewer brief of rounds 2..N, the Light reviewer's
   included, carries the line
   `Round: re-check; raise a new finding only when it is a behaviour defect`.
-  The orchestrator commits each round's fixes, and `qa` re-runs, before the next round. A `MUST-FIX`
+  `delivery` commits each round's fixes, and `qa` re-runs, before the next round. A `MUST-FIX`
   or `SHOULD-CONSIDER` open after round N takes the failure exit; no round N+1 starts. A work item
   with a fresh-reader check adds its passes to each round (`fresh-reader.md`).
   Every `NITPICK` and `enhancement` is fixed with the round's fixes. Those of the last round are
@@ -140,8 +146,8 @@ tiers", then "Light and Full" or "Solo". The exit clauses are in the goal file.
 - Prose review: each round also dispatches the prose reviewer that the goal's Tools section names,
   on the prose of the diff: added or changed code comments, documents, the commit message and the PR
   text. Before round 1 the orchestrator drafts the commit message and the PR text under `.notes/` and
-  passes their paths with the diff. Fixes to them follow the same round rules. The orchestrator makes
-  or amends the commit with the reviewed message (`git commit -F <draft>`) and passes the reviewed PR
+  passes their paths with the diff. Fixes to them follow the same round rules. `delivery` makes
+  or amends the commit with the reviewed message (`commit -F <draft>`) and passes the reviewed PR
   text to the PR step (the PR skill or `gh pr create`). The prose reviewer's findings join the round
   like a reviewer's. In Full, the orchestrator passes the prose reviewer from the goal's Tools section
   when it runs `review-change`, which dispatches it. A goal whose Tools section names no prose

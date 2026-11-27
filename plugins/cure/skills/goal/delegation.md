@@ -42,11 +42,11 @@ A Solo goal differs from the template:
 ## Delegate, then reflect (Light and Full)
 
 - Orchestrator: the main session dispatches, tracks and checks. It reads no source and edits no code.
-- Branch and commits: each is an orchestrator work item, committed with explicit paths. No work item
+- Branch and commits: each is a `delivery` work item, committed with explicit paths. No work item
   or agent brief assigns them to `implementer`, `test-author` or `skill-author`; these refuse. The
-  orchestrator's commit messages omit attribution trailers (`Co-Authored-By`, `Claude-Session:`,
-  "Generated with") when the user's `CLAUDE.md` forbids them. Trailers the repository requires, such
-  as `Signed-off-by:`, stay.
+  commit messages the orchestrator passes to `delivery` omit attribution trailers
+  (`Co-Authored-By`, `Claude-Session:`, "Generated with") when the user's `CLAUDE.md` forbids
+  them. Trailers the repository requires, such as `Signed-off-by:`, stay.
 - Agent per step: each work item names its agent. Items with disjoint files run in parallel. Two
   writing agents that share a CLI or a file format get its command names, run semantics and format in
   both briefs; otherwise the docs agent runs after the CLI.
@@ -55,7 +55,7 @@ A Solo goal differs from the template:
   that ended on a failed test or check counts apart from a round spent on review findings. A
   `MUST-FIX` or `SHOULD-CONSIDER` open after a PR's round N takes the failure exit; no round N+1
   starts. Rounds 2..N re-check only the previous round's fixes and findings and raise no new topic
-  except a behaviour defect, which the job fixes. The orchestrator commits each round's fixes with
+  except a behaviour defect, which the job fixes. `delivery` commits each round's fixes with
   explicit paths, new files included, before the re-check. Once the PR exists, a fix is squashed into
   the job's latest commit.
 - Consultation: `designer` answers class-level questions, `architect` component-level ones. Record
